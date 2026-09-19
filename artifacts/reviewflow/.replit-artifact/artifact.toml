@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "ReviewFlow"
+description = "An AI-assisted evidence-grounded data-labeling and human-review platform with validated imports, replaceable Jev evaluation, deterministic demo simulation, review and escalation workflows, audits, and immutable dataset releases."
+version = "1.0.0"
+id = "artifacts/reviewflow"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19873
+
+[services.development]
+run = "pnpm --filter @workspace/reviewflow run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/reviewflow", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/reviewflow/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19873"
+BASE_PATH = "/"

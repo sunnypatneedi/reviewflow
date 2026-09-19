@@ -1,36 +1,348 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 1.0.0
+  description: ReviewFlow evidence-grounded labeling API
 servers:
   - url: /api
-    description: Base API path
 tags:
-  - name: health
-    description: Health operations
+  - { name: health }
+  - { name: reviewflow }
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
-      summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
           content:
             application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+  /reviewflow/bootstrap:
+    get:
+      operationId: getBootstrap
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Current project state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bootstrap" }
+  /reviewflow/tasks/import:
+    post:
+      operationId: importTasks
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaskImportInput" }
+      responses:
+        "200":
+          description: Validated import result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportResult" }
+        "409": { description: Conflicting external ID }
+  /reviewflow/tasks:
+    get:
+      operationId: listTasks
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
               schema:
-                $ref: "#/components/schemas/HealthStatus"
+                type: array
+                items: { $ref: "#/components/schemas/Task" }
+  /reviewflow/evaluate:
+    post:
+      operationId: evaluateTasks
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EvaluateInput" }
+      responses:
+        "200":
+          description: Evaluation result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EvaluateResult" }
+        "401": { description: Live credentials missing }
+        "502": { description: "Provider failure; never simulated" }
+  /reviewflow/review/next:
+    get:
+      operationId: getNextReview
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Next review item
+          content:
+            application/json:
+              schema:
+                type: [object, "null"]
+                allOf:
+                  - { $ref: "#/components/schemas/ReviewItem" }
+  /reviewflow/reviews:
+    post:
+      operationId: submitReview
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviewInput" }
+      responses:
+        "200":
+          description: Saved review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Task" }
+        "409": { description: Stale review version }
+  /reviewflow/metrics:
+    get:
+      operationId: getMetrics
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Record-derived metrics
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Metrics" }
+  /reviewflow/releases:
+    get:
+      operationId: listReleases
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Releases
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Release" }
+    post:
+      operationId: createRelease
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReleaseInput" }
+      responses:
+        "201":
+          description: Immutable release
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Release" }
+        "409": { description: Unresolved work blocks release }
+  /reviewflow/releases/{id}/download:
+    get:
+      operationId: downloadRelease
+      tags: [reviewflow]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: JSONL export
+          content:
+            application/x-ndjson:
+              schema: { type: string }
+  /reviewflow/audits:
+    get:
+      operationId: listAudits
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Audit records
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Audit" }
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
+      properties: { status: { type: string } }
+    Label:
+      type: string
+      enum: [supported, contradicted, insufficient_evidence]
+    Risk:
+      type: string
+      enum: [low, medium, high]
+    TaskStatus:
+      type: string
+      enum: [pending, proposed, in_review, escalated, finalized]
+    TaskInput:
+      type: object
+      required: [externalId, question, evidence, candidateAnswer, risk]
       properties:
-        status:
-          type: string
-      required:
-        - status
-
+        externalId: { type: string, minLength: 1, maxLength: 120 }
+        question: { type: string, minLength: 1, maxLength: 5000 }
+        evidence: { type: string, minLength: 1, maxLength: 30000 }
+        candidateAnswer: { type: string, minLength: 1, maxLength: 10000 }
+        scenarioFamilyId: { type: ["string", "null"], maxLength: 120 }
+        risk: { $ref: "#/components/schemas/Risk" }
+    TaskImportInput:
+      type: object
+      required: [tasks]
+      properties:
+        tasks:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: "#/components/schemas/TaskInput" }
+    ImportResult:
+      type: object
+      required: [imported, unchanged, total]
+      properties:
+        imported: { type: integer }
+        unchanged: { type: integer }
+        total: { type: integer }
+    Proposal:
+      type: object
+      required: [id, taskId, mode, model, label, labelProbability, probabilities, injectionProbability, complexity, confidence, latencyMs, createdAt]
+      properties:
+        id: { type: string }
+        taskId: { type: string }
+        mode: { type: string, enum: [demo, live] }
+        model: { type: string }
+        label: { $ref: "#/components/schemas/Label" }
+        labelProbability: { type: number, minimum: 0, maximum: 1 }
+        probabilities:
+          type: object
+          additionalProperties: { type: number }
+        injectionProbability: { type: number, minimum: 0, maximum: 1 }
+        complexity: { type: number }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        latencyMs: { type: integer }
+        inputTokens: { type: ["integer", "null"] }
+        outputTokens: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    Task:
+      type: object
+      required: [id, externalId, question, evidence, candidateAnswer, risk, status, version, mode, createdAt]
+      properties:
+        id: { type: string }
+        externalId: { type: string }
+        question: { type: string }
+        evidence: { type: string }
+        candidateAnswer: { type: string }
+        scenarioFamilyId: { type: ["string", "null"] }
+        risk: { $ref: "#/components/schemas/Risk" }
+        status: { $ref: "#/components/schemas/TaskStatus" }
+        version: { type: integer }
+        mode: { type: string, enum: [demo, live] }
+        finalLabel:
+          type: ["string", "null"]
+          enum: [supported, contradicted, insufficient_evidence, null]
+        proposal:
+          type: [object, "null"]
+          allOf:
+            - { $ref: "#/components/schemas/Proposal" }
+        createdAt: { type: string, format: date-time }
+    EvaluateInput:
+      type: object
+      required: [taskIds, mode, ownerConsent]
+      properties:
+        taskIds:
+          type: array
+          minItems: 1
+          maxItems: 25
+          items: { type: string }
+        mode: { type: string, enum: [demo, live] }
+        ownerConsent: { type: boolean }
+    EvaluateResult:
+      type: object
+      required: [processed, failed, mode]
+      properties:
+        processed: { type: integer }
+        failed: { type: integer }
+        mode: { type: string, enum: [demo, live] }
+    ReviewItem:
+      type: object
+      required: [task, routingReasons]
+      properties:
+        task: { $ref: "#/components/schemas/Task" }
+        routingReasons:
+          type: array
+          items: { type: string }
+    ReviewInput:
+      type: object
+      required: [taskId, version, action, activeMs]
+      properties:
+        taskId: { type: string }
+        version: { type: integer }
+        action: { type: string, enum: [accept, correct, escalate] }
+        correctedLabel: { type: ["string", "null"], enum: [supported, contradicted, insufficient_evidence, null] }
+        reason: { type: ["string", "null"], maxLength: 2000 }
+        evidenceExcerpt: { type: ["string", "null"], maxLength: 2000 }
+        activeMs: { type: integer, minimum: 0, maximum: 7200000 }
+    Metrics:
+      type: object
+      required: [total, pending, proposed, escalated, finalized, failures, corrections, correctionDenominator, shadowCoverage, averageReviewMs, averageLatencyMs, independentAccuracy]
+      properties:
+        total: { type: integer }
+        pending: { type: integer }
+        proposed: { type: integer }
+        escalated: { type: integer }
+        finalized: { type: integer }
+        failures: { type: integer }
+        corrections: { type: integer }
+        correctionDenominator: { type: integer }
+        shadowCoverage: { type: number }
+        averageReviewMs: { type: ["number", "null"] }
+        averageLatencyMs: { type: ["number", "null"] }
+        independentAccuracy: { type: ["number", "null"] }
+    ReleaseInput:
+      type: object
+      required: [name, includeSourceText]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        includeSourceText: { type: boolean }
+    Release:
+      type: object
+      required: [id, name, itemCount, mode, digest, createdAt, includeSourceText]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        itemCount: { type: integer }
+        mode: { type: string, enum: [demo, live] }
+        digest: { type: string }
+        includeSourceText: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    Audit:
+      type: object
+      required: [id, status, sampleSize, seed, independent, createdAt]
+      properties:
+        id: { type: string }
+        status: { type: string }
+        sampleSize: { type: integer }
+        seed: { type: string }
+        independent: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    Bootstrap:
+      type: object
+      required: [projectName, mode, liveCredentialConfigured, providerModel, shadowPolicyVersion, metrics, tasks, releases]
+      properties:
+        projectName: { type: string }
+        mode: { type: string, enum: [demo, live] }
+        liveCredentialConfigured: { type: boolean }
+        providerModel: { type: string }
+        shadowPolicyVersion: { type: string }
+        metrics: { $ref: "#/components/schemas/Metrics" }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/Task" }
+        releases:
+          type: array
+          items: { $ref: "#/components/schemas/Release" }
