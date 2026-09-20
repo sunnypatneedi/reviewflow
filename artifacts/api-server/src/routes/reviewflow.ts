@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter, type Request, type Response as ExpressResponse } from "express";
 import { getAuth } from "@clerk/express";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import {
@@ -18,6 +18,7 @@ import {
   db,
   eventsTable,
   jobsTable,
+  membershipsTable,
   projectsTable,
   proposalsTable,
   releasesTable,
@@ -26,6 +27,14 @@ import {
 } from "@workspace/db";
 import { enqueueEvaluationJobs } from "../evaluation-worker";
 import { MODEL } from "../evaluation";
+import {
+  RELEASE_ROLES,
+  REVIEW_ROLES,
+  isEscalationResolution,
+  isProjectRole,
+  roleAllows,
+  type ProjectRole,
+} from "./authorization";
 
 const router: IRouter = Router();
 const LABELS = ["supported", "contradicted", "insufficient_evidence"] as const;
@@ -33,7 +42,12 @@ type Label = (typeof LABELS)[number];
 
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
 const identity = (req: Request) => getAuth(req).userId ?? `demo:${req.signedCookies?.reviewflow_demo ?? "unknown"}`;
-const isAuthenticated = (req: Request) => Boolean(getAuth(req).userId);
+type ProjectContext = {
+  project: typeof projectsTable.$inferSelect;
+  demoId: string;
+  userId: string | null;
+  role: ProjectRole | null;
+};
 
 const samples = [
   ["rf-001","What is the return window?","Unopened items may be returned within 30 days of delivery.","The return window is 30 days.","low","supported"],
@@ -72,6 +86,14 @@ async function ensureProject(req: Request) {
       demoSessionId: userId ? null : demoId,
       mode: "demo",
     }).returning();
+    if (userId) {
+      await db.insert(membershipsTable).values({
+        id: randomUUID(),
+        projectId: key,
+        userId,
+        role: "owner",
+      });
+    }
     await db.insert(tasksTable).values(samples.map(([externalId, question, evidence, candidateAnswer, risk, referenceLabel]) => {
       const content = JSON.stringify({ externalId, question, evidence, candidateAnswer, risk });
       return {
@@ -80,7 +102,54 @@ async function ensureProject(req: Request) {
       };
     }));
   }
-  return { project, demoId };
+  let role: ProjectRole | null = null;
+  if (userId) {
+    let [membership] = await db.select().from(membershipsTable).where(and(
+      eq(membershipsTable.projectId, project.id),
+      eq(membershipsTable.userId, userId),
+    ));
+    // Projects created before membership enforcement have a trusted ownerId.
+    // Materialize that owner membership once; every authorization decision
+    // below still reads the persisted membership row.
+    if (!membership && project.ownerId === userId) {
+      [membership] = await db.insert(membershipsTable).values({
+        id: randomUUID(),
+        projectId: project.id,
+        userId,
+        role: "owner",
+      }).onConflictDoNothing().returning();
+    }
+    if (membership && isProjectRole(membership.role)) {
+      role = membership.role as ProjectRole;
+    }
+  }
+  return { project, demoId, userId: userId ?? null, role } satisfies ProjectContext;
+}
+
+async function requireProjectAccess(
+  req: Request,
+  res: ExpressResponse,
+  context: ProjectContext,
+  roles?: readonly ProjectRole[],
+  options: { allowDemo?: boolean } = {},
+): Promise<boolean> {
+  const allowDemo = options.allowDemo ?? true;
+  if (!context.userId) {
+    if (allowDemo && context.project.mode === "demo" && context.project.demoSessionId === context.demoId) {
+      return true;
+    }
+    res.status(401).json({ error: "Authentication required" });
+    return false;
+  }
+  if (!context.role) {
+    res.status(403).json({ error: "You are not a member of this project" });
+    return false;
+  }
+  if (!roleAllows(context.role, roles)) {
+    res.status(403).json({ error: "Your project role is not allowed for this action" });
+    return false;
+  }
+  return true;
 }
 
 function proposalView(row: typeof proposalsTable.$inferSelect) {
@@ -246,7 +315,9 @@ router.use(async (req, res, next): Promise<void> => {
 });
 
 router.get("/reviewflow/bootstrap", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req);
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context)) return;
+  const { project } = context;
   const [tasks, releases, data] = await Promise.all([
     taskViews(project.id),
     db.select().from(releasesTable).where(eq(releasesTable.projectId, project.id)).orderBy(asc(releasesTable.createdAt)),
@@ -258,7 +329,9 @@ router.get("/reviewflow/bootstrap", async (req, res): Promise<void> => {
 });
 
 router.get("/reviewflow/tasks", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req); res.json(await taskViews(project.id));
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context)) return;
+  res.json(await taskViews(context.project.id));
 });
 
 router.get("/reviewflow/evaluation-jobs", async (req, res): Promise<void> => {
@@ -325,7 +398,9 @@ router.post("/reviewflow/evaluation-jobs/retry", async (req, res): Promise<void>
 });
 
 router.post("/reviewflow/tasks/import", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req);
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context, ["owner"])) return;
+  const { project } = context;
   const inputs = Array.isArray(req.body?.tasks) ? req.body.tasks : [];
   if (!inputs.length || inputs.length > 200) { res.status(400).json({ error: "Import must contain 1–200 tasks" }); return; }
   const seen = new Set<string>();
@@ -355,18 +430,21 @@ router.post("/reviewflow/tasks/import", async (req, res): Promise<void> => {
 });
 
 router.post("/reviewflow/evaluate", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req);
+  const context = await ensureProject(req);
+  const { project } = context;
   const { taskIds, mode, ownerConsent } = req.body ?? {};
   if (!Array.isArray(taskIds) || !taskIds.length || taskIds.length > 25 || !["demo","live"].includes(mode)) { res.status(400).json({ error: "Invalid evaluation request" }); return; }
-  if (mode === "live" && (!isAuthenticated(req) || ownerConsent !== true)) { res.status(403).json({ error: "Live Jev requires authentication and explicit owner consent" }); return; }
   if (mode === "live" && !process.env.TYPESAFE_API_KEY) {
     res.status(401).json({ error: "Live Jev credentials are not configured" });
     return;
   }
-  const tasks = await db.select({ id: tasksTable.id }).from(tasksTable).where(and(
-    eq(tasksTable.projectId, project.id),
-    inArray(tasksTable.id, taskIds),
-  ));
+  if (mode === "live" && ownerConsent !== true) { res.status(403).json({ error: "Live Jev requires explicit owner consent" }); return; }
+  if (!await requireProjectAccess(req, res, context, context.userId || mode === "live" ? ["owner"] : undefined)) return;
+  if (mode === "live" && project.mode !== "live") {
+    await db.update(projectsTable).set({ mode: "live" }).where(eq(projectsTable.id, project.id));
+    project.mode = "live";
+  }
+  const tasks = await db.select().from(tasksTable).where(and(eq(tasksTable.projectId, project.id), inArray(tasksTable.id, taskIds)));
   const queued = await enqueueEvaluationJobs({
     projectId: project.id,
     taskIds: tasks.map((task) => task.id),
@@ -376,7 +454,9 @@ router.post("/reviewflow/evaluate", async (req, res): Promise<void> => {
 });
 
 router.get("/reviewflow/review/next", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req);
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context)) return;
+  const { project } = context;
   const tasks = await taskViews(project.id);
   const task = tasks.find((t) => ["proposed","in_review"].includes(t.status));
   if (!task) { res.json(null); return; }
@@ -390,7 +470,8 @@ router.get("/reviewflow/review/next", async (req, res): Promise<void> => {
 });
 
 router.post("/reviewflow/reviews", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req);
+  const context = await ensureProject(req);
+  const { project } = context;
   const { taskId, version, action, correctedLabel, reason, evidenceExcerpt, activeMs } = req.body ?? {};
   const [task] = await db.select().from(tasksTable).where(and(eq(tasksTable.id, taskId),eq(tasksTable.projectId,project.id)));
   const [proposal] = await db.select().from(proposalsTable).where(eq(proposalsTable.taskId, taskId));
@@ -399,6 +480,15 @@ router.post("/reviewflow/reviews", async (req, res): Promise<void> => {
   if (!["accept","correct","escalate"].includes(action)) { res.status(400).json({ error:"Invalid action" }); return; }
   if (action === "correct" && (!LABELS.includes(correctedLabel) || !reason?.trim())) { res.status(400).json({ error:"Corrections require a label and reason" }); return; }
   if (action === "escalate" && !reason?.trim()) { res.status(400).json({ error:"Escalations require a reason" }); return; }
+  if (task.status === "escalated" && action === "escalate") { res.status(409).json({ error:"This task is already escalated" }); return; }
+  const isLive = task.mode === "live" || project.mode === "live";
+  const escalationResolution = isEscalationResolution(task.status, action);
+  const allowedRoles = escalationResolution
+    ? RELEASE_ROLES
+    : isLive
+      ? REVIEW_ROLES
+      : undefined;
+  if (!await requireProjectAccess(req, res, context, allowedRoles, { allowDemo: !escalationResolution })) return;
   if (evidenceExcerpt && !task.evidence.includes(evidenceExcerpt)) { res.status(400).json({ error:"Evidence excerpt must appear verbatim in supplied evidence" }); return; }
   const finalLabel = action === "accept" ? proposal.label : action === "correct" ? correctedLabel : null;
   await db.transaction(async (tx) => {
@@ -411,13 +501,21 @@ router.post("/reviewflow/reviews", async (req, res): Promise<void> => {
   const updated = (await taskViews(project.id)).find((t) => t.id === taskId); res.json(updated);
 });
 
-router.get("/reviewflow/metrics", async (req, res): Promise<void> => { const {project}=await ensureProject(req); res.json(await metrics(project.id)); });
+router.get("/reviewflow/metrics", async (req, res): Promise<void> => {
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context)) return;
+  res.json(await metrics(context.project.id));
+});
 router.get("/reviewflow/releases", async (req,res):Promise<void> => {
-  const {project}=await ensureProject(req); const rows=await db.select().from(releasesTable).where(eq(releasesTable.projectId,project.id));
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context)) return;
+  const {project}=context; const rows=await db.select().from(releasesTable).where(eq(releasesTable.projectId,project.id));
   res.json(rows.map((r)=>({id:r.id,name:r.name,itemCount:r.itemCount,mode:r.mode,digest:r.digest,includeSourceText:r.includeSourceText,createdAt:r.createdAt.toISOString()})));
 });
 router.post("/reviewflow/releases", async (req,res):Promise<void> => {
-  const {project}=await ensureProject(req); const {name,includeSourceText}=req.body??{};
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context, RELEASE_ROLES)) return;
+  const {project}=context; const {name,includeSourceText}=req.body??{};
   const tasks=await db.select().from(tasksTable).where(eq(tasksTable.projectId,project.id));
   if (!name?.trim() || tasks.some((t)=>t.status!=="finalized")) { res.status(409).json({error:"Release blocked: all tasks must have a resolved human decision"}); return; }
   const requiredAudits = await db.select().from(auditsTable).where(and(eq(auditsTable.projectId, project.id), eq(auditsTable.required, true)));
@@ -447,10 +545,17 @@ router.post("/reviewflow/releases", async (req,res):Promise<void> => {
   res.status(201).json({id:release.id,name:release.name,itemCount:release.itemCount,mode:release.mode,digest:release.digest,includeSourceText:release.includeSourceText,createdAt:release.createdAt.toISOString()});
 });
 router.get("/reviewflow/releases/:id/download", async (req,res):Promise<void> => {
-  const {project}=await ensureProject(req); const id=String(req.params.id);
+  const context = await ensureProject(req); const {project}=context; const id=String(req.params.id);
   const [release]=await db.select().from(releasesTable).where(and(eq(releasesTable.id,id),eq(releasesTable.projectId,project.id)));
   if(!release){res.status(404).json({error:"Release not found"});return;}
+  if (!await requireProjectAccess(req, res, context, release.mode === "live" ? RELEASE_ROLES : undefined)) return;
   res.setHeader("content-type","application/x-ndjson");res.setHeader("content-disposition",`attachment; filename=\"${release.name.replace(/[^a-z0-9_-]/gi,"_")}.jsonl\"`);res.send(release.jsonl);
+});
+router.get("/reviewflow/audits",async(req,res):Promise<void>=>{
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context)) return;
+  const rows=await db.select().from(auditsTable).where(eq(auditsTable.projectId,context.project.id));
+  res.json(rows.map((a)=>({...a,createdAt:a.createdAt.toISOString(),updatedAt:undefined,projectId:undefined,auditorId:undefined,samplingFrameHash:undefined})));
 });
 
 router.post("/reviewflow/audits", async (req, res): Promise<void> => {

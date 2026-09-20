@@ -31,7 +31,9 @@ export const membershipsTable = pgTable("rf_memberships", {
   userId: text("user_id").notNull(),
   role: text("role").notNull(),
   ...timestamps,
-});
+}, (table) => [
+  uniqueIndex("rf_memberships_project_user_unique").on(table.projectId, table.userId),
+]);
 
 export const rubricVersionsTable = pgTable("rf_rubric_versions", {
   id: text("id").primaryKey(),
