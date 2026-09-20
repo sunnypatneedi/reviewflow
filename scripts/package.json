@@ -1,0 +1,13 @@
+{
+  "name": "@workspace/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "node --check reviewflow-e2e.mjs && node --check same-origin-proxy.mjs && node --check package-source.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:"
+  }
+}

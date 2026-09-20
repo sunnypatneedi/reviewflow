@@ -1,0 +1,40 @@
+name: verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  isolated-verification:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: reviewflow_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d reviewflow_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/reviewflow_ci
+      REVIEWFLOW_MIGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/reviewflow_ci
+      REVIEWFLOW_MIGRATION_CONFIRM: reviewflow_ci
+      REVIEWFLOW_DISPOSABLE_DB: "1"
+      REVIEWFLOW_ISOLATED_READY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: sh scripts/verify-isolated.sh

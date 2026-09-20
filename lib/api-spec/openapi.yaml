@@ -1,0 +1,635 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 1.0.0
+  description: ReviewFlow evidence-grounded labeling API
+servers:
+  - url: /api
+tags:
+  - { name: health }
+  - { name: reviewflow }
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HealthStatus" }
+  /reviewflow/bootstrap:
+    get:
+      operationId: getBootstrap
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Current project state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bootstrap" }
+  /reviewflow/tasks/import:
+    post:
+      operationId: importTasks
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaskImportInput" }
+      responses:
+        "200":
+          description: Validated import result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportResult" }
+        "409": { description: Conflicting external ID }
+  /reviewflow/tasks:
+    get:
+      operationId: listTasks
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Task" }
+  /reviewflow/evaluation-jobs:
+    get:
+      operationId: listEvaluationJobs
+      tags: [reviewflow]
+      parameters:
+        - in: query
+          name: taskIds
+          required: true
+          description: Task IDs in the selected evaluation batch.
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 200
+            items: { type: string }
+          style: form
+          explode: false
+        - in: query
+          name: mode
+          required: false
+          schema: { type: string, enum: [demo, live] }
+      responses:
+        "200":
+          description: Evaluation jobs scoped to the current project and requested tasks.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EvaluationJob" }
+        "400": { description: Invalid task batch filter }
+  /reviewflow/evaluation-jobs/retry:
+    post:
+      operationId: retryEvaluationJob
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EvaluationRetryInput" }
+      responses:
+        "202":
+          description: The selected failed job was re-enqueued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EvaluateResult" }
+        "401": { description: Live credentials missing }
+        "403": { description: Live consent or authentication required }
+        "404": { description: Evaluation job not found in the current project }
+        "409": { description: Only terminally failed jobs can be retried }
+  /reviewflow/evaluate:
+    post:
+      operationId: evaluateTasks
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EvaluateInput" }
+      responses:
+        "200":
+          description: Evaluation result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EvaluateResult" }
+        "202":
+          description: Evaluation jobs queued for the supervised worker
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EvaluateResult" }
+        "401": { description: Live credentials missing }
+        "502": { description: "Provider failure; never simulated" }
+  /reviewflow/review/next:
+    get:
+      operationId: getNextReview
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Next review item
+          content:
+            application/json:
+              schema:
+                type: [object, "null"]
+                allOf:
+                  - { $ref: "#/components/schemas/ReviewItem" }
+  /reviewflow/reviews:
+    post:
+      operationId: submitReview
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviewInput" }
+      responses:
+        "200":
+          description: Saved review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Task" }
+        "409": { description: Stale review version }
+  /reviewflow/metrics:
+    get:
+      operationId: getMetrics
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Record-derived metrics
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Metrics" }
+  /reviewflow/releases:
+    get:
+      operationId: listReleases
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Releases
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Release" }
+    post:
+      operationId: createRelease
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReleaseInput" }
+      responses:
+        "201":
+          description: Immutable release
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Release" }
+        "409": { description: Unresolved work blocks release }
+  /reviewflow/releases/{id}/download:
+    get:
+      operationId: downloadRelease
+      tags: [reviewflow]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: JSONL export
+          content:
+            application/x-ndjson:
+              schema: { type: string }
+  /reviewflow/audits:
+    get:
+      operationId: listAudits
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Audit records
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Audit" }
+    post:
+      operationId: createAudit
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuditInput" }
+      responses:
+        "201":
+          description: Immutable audit assignment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Audit" }
+        "409": { description: Not enough eligible tasks for the requested sample }
+  /reviewflow/audits/{id}:
+    get:
+      operationId: getAudit
+      tags: [reviewflow]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Blind audit work surface
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditDetail" }
+        "403": { description: Audit is assigned to another auditor }
+  /reviewflow/audits/{id}/decisions:
+    post:
+      operationId: submitAuditDecision
+      tags: [reviewflow]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuditDecisionInput" }
+      responses:
+        "201":
+          description: Blind audit decision
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditDecisionResult" }
+        "403": { description: Auditor is not independent }
+        "409": { description: Decision already exists }
+  /reviewflow/audits/{id}/adjudication:
+    get:
+      operationId: getAuditAdjudication
+      tags: [reviewflow]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Adjudicator-only disagreement queue
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditAdjudicationDetail" }
+        "403": { description: Auditor or original reviewer cannot see this queue }
+  /reviewflow/audits/{id}/disputes/{disputeId}/adjudicate:
+    post:
+      operationId: adjudicateAuditDispute
+      tags: [reviewflow]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: disputeId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdjudicationInput" }
+      responses:
+        "200":
+          description: Resolved disagreement
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditDispute" }
+        "403": { description: Auditor or original reviewer cannot adjudicate }
+        "409": { description: Disagreement already resolved }
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties: { status: { type: string } }
+    Label:
+      type: string
+      enum: [supported, contradicted, insufficient_evidence]
+    Risk:
+      type: string
+      enum: [low, medium, high]
+    TaskStatus:
+      type: string
+      enum: [pending, proposed, in_review, escalated, finalized]
+    TaskInput:
+      type: object
+      required: [externalId, question, evidence, candidateAnswer, risk]
+      properties:
+        externalId: { type: string, minLength: 1, maxLength: 120 }
+        question: { type: string, minLength: 1, maxLength: 5000 }
+        evidence: { type: string, minLength: 1, maxLength: 30000 }
+        candidateAnswer: { type: string, minLength: 1, maxLength: 10000 }
+        scenarioFamilyId: { type: ["string", "null"], maxLength: 120 }
+        risk: { $ref: "#/components/schemas/Risk" }
+    TaskImportInput:
+      type: object
+      required: [tasks]
+      properties:
+        tasks:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: "#/components/schemas/TaskInput" }
+    ImportResult:
+      type: object
+      required: [imported, unchanged, total]
+      properties:
+        imported: { type: integer }
+        unchanged: { type: integer }
+        total: { type: integer }
+    Proposal:
+      type: object
+      required: [id, taskId, mode, model, label, labelProbability, probabilities, injectionProbability, complexity, confidence, latencyMs, createdAt]
+      properties:
+        id: { type: string }
+        taskId: { type: string }
+        mode: { type: string, enum: [demo, live] }
+        model: { type: string }
+        label: { $ref: "#/components/schemas/Label" }
+        labelProbability: { type: number, minimum: 0, maximum: 1 }
+        probabilities:
+          type: object
+          additionalProperties: { type: number }
+        injectionProbability: { type: number, minimum: 0, maximum: 1 }
+        complexity: { type: number }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        latencyMs: { type: integer }
+        inputTokens: { type: ["integer", "null"] }
+        outputTokens: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    Task:
+      type: object
+      required: [id, externalId, question, evidence, candidateAnswer, risk, status, version, mode, createdAt]
+      properties:
+        id: { type: string }
+        externalId: { type: string }
+        question: { type: string }
+        evidence: { type: string }
+        candidateAnswer: { type: string }
+        scenarioFamilyId: { type: ["string", "null"] }
+        risk: { $ref: "#/components/schemas/Risk" }
+        status: { $ref: "#/components/schemas/TaskStatus" }
+        version: { type: integer }
+        mode: { type: string, enum: [demo, live] }
+        finalLabel:
+          type: ["string", "null"]
+          enum: [supported, contradicted, insufficient_evidence, null]
+        proposal:
+          type: [object, "null"]
+          allOf:
+            - { $ref: "#/components/schemas/Proposal" }
+        createdAt: { type: string, format: date-time }
+    EvaluateInput:
+      type: object
+      required: [taskIds, mode, ownerConsent]
+      properties:
+        taskIds:
+          type: array
+          minItems: 1
+          maxItems: 25
+          items: { type: string }
+        mode: { type: string, enum: [demo, live] }
+        ownerConsent: { type: boolean }
+    EvaluateResult:
+      type: object
+      required: [processed, failed, queued, mode]
+      properties:
+        processed: { type: integer }
+        failed: { type: integer }
+        queued: { type: integer }
+        mode: { type: string, enum: [demo, live] }
+    EvaluationRetryInput:
+      type: object
+      required: [taskId, mode, ownerConsent]
+      properties:
+        taskId: { type: string }
+        mode: { type: string, enum: [demo, live] }
+        ownerConsent: { type: boolean }
+    EvaluationJob:
+      type: object
+      required: [id, taskId, mode, status, attempts, lastError, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        taskId: { type: string }
+        mode: { type: string, enum: [demo, live] }
+        status: { type: string, enum: [queued, running, succeeded, failed] }
+        attempts: { type: integer }
+        lastError: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ReviewItem:
+      type: object
+      required: [task, routingReasons]
+      properties:
+        task: { $ref: "#/components/schemas/Task" }
+        routingReasons:
+          type: array
+          items: { type: string }
+    ReviewInput:
+      type: object
+      required: [taskId, version, action, activeMs]
+      properties:
+        taskId: { type: string }
+        version: { type: integer }
+        action: { type: string, enum: [accept, correct, escalate] }
+        correctedLabel: { type: ["string", "null"], enum: [supported, contradicted, insufficient_evidence, null] }
+        reason: { type: ["string", "null"], maxLength: 2000 }
+        evidenceExcerpt: { type: ["string", "null"], maxLength: 2000 }
+        activeMs: { type: integer, minimum: 0, maximum: 7200000 }
+    Metrics:
+      type: object
+      required: [total, pending, proposed, escalated, finalized, failures, corrections, correctionDenominator, shadowCoverage, averageReviewMs, averageLatencyMs, independentAccuracy]
+      properties:
+        total: { type: integer }
+        pending: { type: integer }
+        proposed: { type: integer }
+        escalated: { type: integer }
+        finalized: { type: integer }
+        failures: { type: integer }
+        corrections: { type: integer }
+        correctionDenominator: { type: integer }
+        shadowCoverage: { type: number }
+        averageReviewMs: { type: ["number", "null"] }
+        averageLatencyMs: { type: ["number", "null"] }
+        independentAccuracy: { type: ["number", "null"] }
+    ReleaseInput:
+      type: object
+      required: [name, includeSourceText]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        includeSourceText: { type: boolean }
+    Release:
+      type: object
+      required: [id, name, itemCount, mode, digest, createdAt, includeSourceText]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        itemCount: { type: integer }
+        mode: { type: string, enum: [demo, live] }
+        digest: { type: string }
+        includeSourceText: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    Audit:
+      type: object
+      required: [id, status, sampleSize, seed, samplingFrameHash, independent, required, completedItems, effectiveSampleSize, openDisputes, createdAt]
+      properties:
+        id: { type: string }
+        status: { type: string }
+        sampleSize: { type: integer }
+        seed: { type: string }
+        samplingFrameHash: { type: string }
+        independent: { type: boolean }
+        required: { type: boolean }
+        completedItems: { type: integer }
+        effectiveSampleSize: { type: integer }
+        openDisputes: { type: integer }
+        createdAt: { type: string, format: date-time }
+    AuditInput:
+      type: object
+      required: [sampleSize, independent, required]
+      properties:
+        sampleSize: { type: integer, minimum: 1, maximum: 200 }
+        seed: { type: ["string", "null"], maxLength: 120 }
+        independent: { type: boolean }
+        required: { type: boolean }
+    AuditDecisionInput:
+      type: object
+      required: [auditItemId, label]
+      properties:
+        auditItemId: { type: string }
+        label: { $ref: "#/components/schemas/Label" }
+        reason: { type: ["string", "null"], maxLength: 2000 }
+    AuditDecisionResult:
+      type: object
+      required: [id, auditId, auditItemId, taskId, label, selfCheck, included, status]
+      properties:
+        id: { type: string }
+        auditId: { type: string }
+        auditItemId: { type: string }
+        taskId: { type: string }
+        label: { $ref: "#/components/schemas/Label" }
+        selfCheck: { type: boolean }
+        included: { type: boolean }
+        disputeId: { type: ["string", "null"] }
+        status: { type: string }
+    AuditTaskDecision:
+      type: object
+      required: [label, selfCheck, included]
+      properties:
+        label: { $ref: "#/components/schemas/Label" }
+        reason: { type: ["string", "null"] }
+        selfCheck: { type: boolean }
+        included: { type: boolean }
+    AuditItem:
+      type: object
+      required: [id, ordinal, taskId, externalId, question, evidence, candidateAnswer, risk, decision]
+      properties:
+        id: { type: string }
+        ordinal: { type: integer }
+        taskId: { type: string }
+        externalId: { type: string }
+        question: { type: string }
+        evidence: { type: string }
+        candidateAnswer: { type: string }
+        risk: { $ref: "#/components/schemas/Risk" }
+        decision:
+          type: ["object", "null"]
+          allOf:
+            - { $ref: "#/components/schemas/AuditTaskDecision" }
+    AuditDisputeSummary:
+      type: object
+      required: [id, auditItemId, taskId, status]
+      properties:
+        id: { type: string }
+        auditItemId: { type: string }
+        taskId: { type: string }
+        status: { type: string }
+    AuditDetail:
+      allOf:
+        - { $ref: "#/components/schemas/Audit" }
+        - type: object
+          required: [items, disputes]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/AuditItem" }
+            disputes:
+              type: array
+              items: { $ref: "#/components/schemas/AuditDisputeSummary" }
+    AuditAdjudicationDispute:
+      type: object
+      required: [id, auditItemId, taskId, status, originalLabel, auditLabel, question, evidence, candidateAnswer, resolvedLabel]
+      properties:
+        id: { type: string }
+        auditItemId: { type: string }
+        taskId: { type: string }
+        status: { type: string }
+        originalLabel: { $ref: "#/components/schemas/Label" }
+        auditLabel: { $ref: "#/components/schemas/Label" }
+        question: { type: string }
+        evidence: { type: string }
+        candidateAnswer: { type: string }
+        resolvedLabel: { $ref: "#/components/schemas/Label" }
+    AuditAdjudicationDetail:
+      allOf:
+        - { $ref: "#/components/schemas/Audit" }
+        - type: object
+          required: [disputes]
+          properties:
+            disputes:
+              type: array
+              items: { $ref: "#/components/schemas/AuditAdjudicationDispute" }
+    AdjudicationInput:
+      type: object
+      required: [resolvedLabel]
+      properties:
+        resolvedLabel: { $ref: "#/components/schemas/Label" }
+        reason: { type: ["string", "null"], maxLength: 2000 }
+    AuditDispute:
+      type: object
+      required: [id, auditId, auditItemId, taskId, originalLabel, auditLabel, status, resolvedLabel, adjudicatorId]
+      properties:
+        id: { type: string }
+        auditId: { type: string }
+        auditItemId: { type: string }
+        taskId: { type: string }
+        originalLabel: { $ref: "#/components/schemas/Label" }
+        auditLabel: { $ref: "#/components/schemas/Label" }
+        status: { type: string }
+        resolvedLabel: { $ref: "#/components/schemas/Label" }
+        adjudicatorId: { type: string }
+    Bootstrap:
+      type: object
+      required: [projectName, mode, liveCredentialConfigured, providerModel, shadowPolicyVersion, metrics, tasks, releases]
+      properties:
+        projectName: { type: string }
+        mode: { type: string, enum: [demo, live] }
+        liveCredentialConfigured: { type: boolean }
+        providerModel: { type: string }
+        shadowPolicyVersion: { type: string }
+        metrics: { $ref: "#/components/schemas/Metrics" }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/Task" }
+        releases:
+          type: array
+          items: { $ref: "#/components/schemas/Release" }

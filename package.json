@@ -1,0 +1,26 @@
+{
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "db:migrate": "pnpm --filter @workspace/db run migrate",
+    "demo:isolated": "sh scripts/demo-isolated.sh",
+    "dev:proxy": "node scripts/same-origin-proxy.mjs",
+    "test": "pnpm --filter @workspace/api-server run test",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "verify:isolated": "sh scripts/verify-isolated.sh",
+    "package:source": "node scripts/package-source.mjs"
+  },
+  "private": true,
+  "packageManager": "pnpm@10.26.1",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6",
+    "typescript": "~5.9.3"
+  }
+}
