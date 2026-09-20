@@ -1,0 +1,44 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "MeaWu_a7vUzC2Kr4X3Arb"
+uri = "file://releases/reviewflow-source.tar.gz"
+type = "unspecified"
+title = "ReviewFlow sanitized alpha source"
+description = "Verified source archive; 206 files, no private history or runtime data. GitHub publication is blocked by expired authorization."
+logical_id = "e75df95e-836e-4228-a910-634c13f6e6f7"
+content_hash = "sha256:3b29d1e33119ae3eccb15b0418396d810d53ef18139116f3c32b55f1b2d29247"
+size = 271186
+mtime_ms = 1789880771724
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:1368abc0-d08e-493f-b904-96c0cc476faf/e75df95e-836e-4228-a910-634c13f6e6f7/8ca7d5c9-2a7a-4108-8001-3bb1806cbf85"
+storage_version_token = "1789880860196911"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "vWOcJWGbsy_QnMROKqdK1"
+uri = "file://releases/RELEASE-VERIFICATION.md"
+type = "text"
+title = "Exact-revision verification report"
+description = "Commits, checksums, executed checks, browser evidence, scan limits, and GitHub publication blocker."
+logical_id = "46695997-5545-46cc-a2d7-b6661240311f"
+content_hash = "sha256:f28bb77b83bf32d752a6df6adbf445f99f43eb32983127b3eaae0d5452723ed1"
+size = 5230
+mtime_ms = 1789880853893
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:1368abc0-d08e-493f-b904-96c0cc476faf/46695997-5545-46cc-a2d7-b6661240311f/9dcfcd81-799a-4ebd-99f3-f575b8043017"
+storage_version_token = "1789880860680912"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "BFdWnI7BHBr41igayyMnR"
+uri = "file://screenshots/reviewflow-review.png"
+type = "image"
+title = "ReviewFlow synthetic review screenshot"
+description = "Actual running review screen captured in a disposable demo; no private data."
+logical_id = "e77b2b95-0f5f-4a61-9262-1e2cdc8b51df"
+content_hash = "sha256:2eea9c371b223986e9005c635189480cd810ceb627c6e2281d50737d463b84ed"
+size = 82882
+mtime_ms = 1789880630020
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:1368abc0-d08e-493f-b904-96c0cc476faf/e77b2b95-0f5f-4a61-9262-1e2cdc8b51df/bc759d25-1400-44d5-9306-8bcef6110564"
+storage_version_token = "1789880861143071"
+content_type = "image/png"
