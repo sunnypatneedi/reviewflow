@@ -20,7 +20,14 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AdjudicationInput,
   Audit,
+  AuditAdjudicationDetail,
+  AuditDecisionInput,
+  AuditDecisionResult,
+  AuditDetail,
+  AuditDispute,
+  AuditInput,
   Bootstrap,
   EvaluateInput,
   EvaluateResult,
@@ -971,4 +978,396 @@ export function useListAudits<TData = Awaited<ReturnType<typeof listAudits>>, TE
 
 
 
+
+export const getCreateAuditUrl = () => {
+
+
+
+
+  return `/api/reviewflow/audits`
+}
+
+export const createAudit = async (auditInput: AuditInput, options?: Parameters<typeof customFetch>[1]): Promise<Audit> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Audit>(getCreateAuditUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(auditInput)
+  }
+);}
+
+
+
+
+
+export const getCreateAuditMutationKey = () => ['createAudit'] as const;
+
+export const getCreateAuditMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAudit>>, TError,CreateAuditMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAudit>>, TError,CreateAuditMutationVariables, TContext> => {
+
+const mutationKey = getCreateAuditMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAudit>>, CreateAuditMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createAudit(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAuditMutationResult = NonNullable<Awaited<ReturnType<typeof createAudit>>>
+    export type CreateAuditMutationBody = BodyType<AuditInput>
+    export type CreateAuditMutationError = ErrorType<void>
+    export type CreateAuditMutationVariables = {data: BodyType<AuditInput>}
+
+    export const useCreateAudit = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAudit>>, TError,CreateAuditMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAudit>>,
+        TError,
+        CreateAuditMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateAuditMutationOptions(options));
+    }
+
+export const getGetAuditUrl = (id: string,) => {
+
+
+
+
+  return `/api/reviewflow/audits/${id}`
+}
+
+export const getAudit = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<AuditDetail> => {
+
+  return customFetch<AuditDetail>(getGetAuditUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuditQueryKey = (id: string,) => {
+    return [
+    `/api/reviewflow/audits/${id}`
+    ] as const;
+    }
+
+
+export const getGetAuditQueryOptions = <TData = Awaited<ReturnType<typeof getAudit>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuditQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAudit>>> = ({ signal }) => getAudit(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAudit>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuditQueryResult = NonNullable<Awaited<ReturnType<typeof getAudit>>>
+export type GetAuditQueryError = ErrorType<void>
+
+
+
+export function useGetAudit<TData = Awaited<ReturnType<typeof getAudit>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuditQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSubmitAuditDecisionUrl = (id: string,) => {
+
+
+
+
+  return `/api/reviewflow/audits/${id}/decisions`
+}
+
+export const submitAuditDecision = async (id: string,
+    auditDecisionInput: AuditDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<AuditDecisionResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AuditDecisionResult>(getSubmitAuditDecisionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(auditDecisionInput)
+  }
+);}
+
+
+
+
+
+export const getSubmitAuditDecisionMutationKey = () => ['submitAuditDecision'] as const;
+
+export const getSubmitAuditDecisionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAuditDecision>>, TError,SubmitAuditDecisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitAuditDecision>>, TError,SubmitAuditDecisionMutationVariables, TContext> => {
+
+const mutationKey = getSubmitAuditDecisionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitAuditDecision>>, SubmitAuditDecisionMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  submitAuditDecision(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitAuditDecisionMutationResult = NonNullable<Awaited<ReturnType<typeof submitAuditDecision>>>
+    export type SubmitAuditDecisionMutationBody = BodyType<AuditDecisionInput>
+    export type SubmitAuditDecisionMutationError = ErrorType<void>
+    export type SubmitAuditDecisionMutationVariables = {id: string;data: BodyType<AuditDecisionInput>}
+
+    export const useSubmitAuditDecision = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAuditDecision>>, TError,SubmitAuditDecisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitAuditDecision>>,
+        TError,
+        SubmitAuditDecisionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSubmitAuditDecisionMutationOptions(options));
+    }
+
+export const getGetAuditAdjudicationUrl = (id: string,) => {
+
+
+
+
+  return `/api/reviewflow/audits/${id}/adjudication`
+}
+
+export const getAuditAdjudication = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<AuditAdjudicationDetail> => {
+
+  return customFetch<AuditAdjudicationDetail>(getGetAuditAdjudicationUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuditAdjudicationQueryKey = (id: string,) => {
+    return [
+    `/api/reviewflow/audits/${id}/adjudication`
+    ] as const;
+    }
+
+
+export const getGetAuditAdjudicationQueryOptions = <TData = Awaited<ReturnType<typeof getAuditAdjudication>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditAdjudication>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuditAdjudicationQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuditAdjudication>>> = ({ signal }) => getAuditAdjudication(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuditAdjudication>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuditAdjudicationQueryResult = NonNullable<Awaited<ReturnType<typeof getAuditAdjudication>>>
+export type GetAuditAdjudicationQueryError = ErrorType<void>
+
+
+
+export function useGetAuditAdjudication<TData = Awaited<ReturnType<typeof getAuditAdjudication>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditAdjudication>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuditAdjudicationQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAdjudicateAuditDisputeUrl = (id: string,
+    disputeId: string,) => {
+
+
+
+
+  return `/api/reviewflow/audits/${id}/disputes/${disputeId}/adjudicate`
+}
+
+export const adjudicateAuditDispute = async (id: string,
+    disputeId: string,
+    adjudicationInput: AdjudicationInput, options?: Parameters<typeof customFetch>[1]): Promise<AuditDispute> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AuditDispute>(getAdjudicateAuditDisputeUrl(id,disputeId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adjudicationInput)
+  }
+);}
+
+
+
+
+
+export const getAdjudicateAuditDisputeMutationKey = () => ['adjudicateAuditDispute'] as const;
+
+export const getAdjudicateAuditDisputeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adjudicateAuditDispute>>, TError,AdjudicateAuditDisputeMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof adjudicateAuditDispute>>, TError,AdjudicateAuditDisputeMutationVariables, TContext> => {
+
+const mutationKey = getAdjudicateAuditDisputeMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adjudicateAuditDispute>>, AdjudicateAuditDisputeMutationVariables> = (props) => {
+          const {id,disputeId,data} = props ?? {};
+
+          return  adjudicateAuditDispute(id,disputeId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdjudicateAuditDisputeMutationResult = NonNullable<Awaited<ReturnType<typeof adjudicateAuditDispute>>>
+    export type AdjudicateAuditDisputeMutationBody = BodyType<AdjudicationInput>
+    export type AdjudicateAuditDisputeMutationError = ErrorType<void>
+    export type AdjudicateAuditDisputeMutationVariables = {id: string;disputeId: string;data: BodyType<AdjudicationInput>}
+
+    export const useAdjudicateAuditDispute = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adjudicateAuditDispute>>, TError,AdjudicateAuditDisputeMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof adjudicateAuditDispute>>,
+        TError,
+        AdjudicateAuditDisputeMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAdjudicateAuditDisputeMutationOptions(options));
+    }
 

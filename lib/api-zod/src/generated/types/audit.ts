@@ -11,6 +11,11 @@ export interface Audit {
   status: string;
   sampleSize: number;
   seed: string;
+  samplingFrameHash: string;
   independent: boolean;
+  required: boolean;
+  completedItems: number;
+  effectiveSampleSize: number;
+  openDisputes: number;
   createdAt: Date;
 }

@@ -23,7 +23,6 @@ export const getBootstrapResponseTasksItemProposalOneConfidenceMin = 0;
 export const getBootstrapResponseTasksItemProposalOneConfidenceMax = 1;
 
 
-
 export const GetBootstrapResponse = zod.object({
   "projectName": zod.string(),
   "mode": zod.enum(['demo', 'live']),
@@ -99,7 +98,6 @@ export const importTasksBodyTasksItemScenarioFamilyIdMax = 120;
 export const importTasksBodyTasksMax = 200;
 
 
-
 export const ImportTasksBody = zod.object({
   "tasks": zod.array(zod.object({
   "externalId": zod.string().min(1).max(importTasksBodyTasksItemExternalIdMax),
@@ -126,7 +124,6 @@ export const listTasksResponseProposalOneInjectionProbabilityMax = 1;
 
 export const listTasksResponseProposalOneConfidenceMin = 0;
 export const listTasksResponseProposalOneConfidenceMax = 1;
-
 
 
 export const ListTasksResponseItem = zod.object({
@@ -165,7 +162,6 @@ export const ListTasksResponse = zod.array(ListTasksResponseItem)
 export const evaluateTasksBodyTaskIdsMax = 25;
 
 
-
 export const EvaluateTasksBody = zod.object({
   "taskIds": zod.array(zod.string()).min(1).max(evaluateTasksBodyTaskIdsMax),
   "mode": zod.enum(['demo', 'live']),
@@ -188,7 +184,6 @@ export const getNextReviewResponseOneTaskProposalOneInjectionProbabilityMax = 1;
 
 export const getNextReviewResponseOneTaskProposalOneConfidenceMin = 0;
 export const getNextReviewResponseOneTaskProposalOneConfidenceMax = 1;
-
 
 
 export const GetNextReviewResponse = zod.object({
@@ -234,7 +229,6 @@ export const submitReviewBodyActiveMsMin = 0;
 export const submitReviewBodyActiveMsMax = 7200000;
 
 
-
 export const SubmitReviewBody = zod.object({
   "taskId": zod.string(),
   "version": zod.number().int(),
@@ -253,7 +247,6 @@ export const submitReviewResponseProposalOneInjectionProbabilityMax = 1;
 
 export const submitReviewResponseProposalOneConfidenceMin = 0;
 export const submitReviewResponseProposalOneConfidenceMax = 1;
-
 
 
 export const SubmitReviewResponse = zod.object({
@@ -319,7 +312,6 @@ export const ListReleasesResponse = zod.array(ListReleasesResponseItem)
 export const createReleaseBodyNameMax = 120;
 
 
-
 export const CreateReleaseBody = zod.object({
   "name": zod.string().min(1).max(createReleaseBodyNameMax),
   "includeSourceText": zod.boolean()
@@ -348,9 +340,158 @@ export const ListAuditsResponseItem = zod.object({
   "status": zod.string(),
   "sampleSize": zod.number().int(),
   "seed": zod.string(),
+  "samplingFrameHash": zod.string(),
   "independent": zod.boolean(),
+  "required": zod.boolean(),
+  "completedItems": zod.number().int(),
+  "effectiveSampleSize": zod.number().int(),
+  "openDisputes": zod.number().int(),
   "createdAt": zod.coerce.date()
 })
 export const ListAuditsResponse = zod.array(ListAuditsResponseItem)
 
+export const createAuditBodySampleSizeMax = 200;
 
+
+export const adjudicateAuditDisputeBodyReasonMax = 2000;
+
+export const CreateAuditResponse = zod.object({
+  "id": zod.string(),
+  "status": zod.string(),
+  "sampleSize": zod.number().int(),
+  "seed": zod.string(),
+  "samplingFrameHash": zod.string(),
+  "independent": zod.boolean(),
+  "required": zod.boolean(),
+  "completedItems": zod.number().int(),
+  "effectiveSampleSize": zod.number().int(),
+  "openDisputes": zod.number().int(),
+  "createdAt": zod.coerce.date()
+})
+
+export const GetAuditParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const submitAuditDecisionBodyReasonMax = 2000;
+
+export const SubmitAuditDecisionResponse = zod.object({
+  "id": zod.string(),
+  "auditId": zod.string(),
+  "auditItemId": zod.string(),
+  "taskId": zod.string(),
+  "label": zod.enum(['supported', 'contradicted', 'insufficient_evidence']),
+  "selfCheck": zod.boolean(),
+  "included": zod.boolean(),
+  "disputeId": zod.string().nullish(),
+  "status": zod.string()
+})
+
+export const SubmitAuditDecisionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetAuditAdjudicationResponse = zod.object({
+  "id": zod.string(),
+  "status": zod.string(),
+  "sampleSize": zod.number().int(),
+  "seed": zod.string(),
+  "samplingFrameHash": zod.string(),
+  "independent": zod.boolean(),
+  "required": zod.boolean(),
+  "completedItems": zod.number().int(),
+  "effectiveSampleSize": zod.number().int(),
+  "openDisputes": zod.number().int(),
+  "createdAt": zod.coerce.date()
+}).and(zod.object({
+  "disputes": zod.array(zod.object({
+  "id": zod.string(),
+  "auditItemId": zod.string(),
+  "taskId": zod.string(),
+  "status": zod.string(),
+  "originalLabel": zod.enum(['supported', 'contradicted', 'insufficient_evidence']),
+  "auditLabel": zod.enum(['supported', 'contradicted', 'insufficient_evidence']),
+  "question": zod.string(),
+  "evidence": zod.string(),
+  "candidateAnswer": zod.string(),
+  "resolvedLabel": zod.enum(['supported', 'contradicted', 'insufficient_evidence'])
+}))
+}))
+
+export const SubmitAuditDecisionBody = zod.object({
+  "auditItemId": zod.string(),
+  "label": zod.enum(['supported', 'contradicted', 'insufficient_evidence']),
+  "reason": zod.string().max(submitAuditDecisionBodyReasonMax).nullish()
+})
+
+export const GetAuditAdjudicationParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdjudicateAuditDisputeParams = zod.object({
+  "id": zod.coerce.string(),
+  "disputeId": zod.coerce.string()
+})
+
+export const AdjudicateAuditDisputeBody = zod.object({
+  "resolvedLabel": zod.enum(['supported', 'contradicted', 'insufficient_evidence']),
+  "reason": zod.string().max(adjudicateAuditDisputeBodyReasonMax).nullish()
+})
+
+export const GetAuditResponse = zod.object({
+  "id": zod.string(),
+  "status": zod.string(),
+  "sampleSize": zod.number().int(),
+  "seed": zod.string(),
+  "samplingFrameHash": zod.string(),
+  "independent": zod.boolean(),
+  "required": zod.boolean(),
+  "completedItems": zod.number().int(),
+  "effectiveSampleSize": zod.number().int(),
+  "openDisputes": zod.number().int(),
+  "createdAt": zod.coerce.date()
+}).and(zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "ordinal": zod.number().int(),
+  "taskId": zod.string(),
+  "externalId": zod.string(),
+  "question": zod.string(),
+  "evidence": zod.string(),
+  "candidateAnswer": zod.string(),
+  "risk": zod.enum(['low', 'medium', 'high']),
+  "decision": zod.object({
+  "label": zod.enum(['supported', 'contradicted', 'insufficient_evidence']),
+  "reason": zod.string().nullish(),
+  "selfCheck": zod.boolean(),
+  "included": zod.boolean()
+}).nullable()
+})),
+  "disputes": zod.array(zod.object({
+  "id": zod.string(),
+  "auditItemId": zod.string(),
+  "taskId": zod.string(),
+  "status": zod.string()
+}))
+}))
+
+export const createAuditBodySeedMax = 120;
+
+export const AdjudicateAuditDisputeResponse = zod.object({
+  "id": zod.string(),
+  "auditId": zod.string(),
+  "auditItemId": zod.string(),
+  "taskId": zod.string(),
+  "originalLabel": zod.enum(['supported', 'contradicted', 'insufficient_evidence']),
+  "auditLabel": zod.enum(['supported', 'contradicted', 'insufficient_evidence']),
+  "status": zod.string(),
+  "resolvedLabel": zod.enum(['supported', 'contradicted', 'insufficient_evidence']),
+  "adjudicatorId": zod.string()
+})
+
+export const CreateAuditBody = zod.object({
+  "sampleSize": zod.number().int().min(1).max(createAuditBodySampleSizeMax),
+  "seed": zod.string().max(createAuditBodySeedMax).nullish(),
+  "independent": zod.boolean(),
+  "required": zod.boolean()
+})

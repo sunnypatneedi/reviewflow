@@ -172,6 +172,101 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/Audit" }
+    post:
+      operationId: createAudit
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuditInput" }
+      responses:
+        "201":
+          description: Immutable audit assignment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Audit" }
+        "409": { description: Not enough eligible tasks for the requested sample }
+  /reviewflow/audits/{id}:
+    get:
+      operationId: getAudit
+      tags: [reviewflow]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Blind audit work surface
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditDetail" }
+        "403": { description: Audit is assigned to another auditor }
+  /reviewflow/audits/{id}/decisions:
+    post:
+      operationId: submitAuditDecision
+      tags: [reviewflow]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuditDecisionInput" }
+      responses:
+        "201":
+          description: Blind audit decision
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditDecisionResult" }
+        "403": { description: Auditor is not independent }
+        "409": { description: Decision already exists }
+  /reviewflow/audits/{id}/adjudication:
+    get:
+      operationId: getAuditAdjudication
+      tags: [reviewflow]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Adjudicator-only disagreement queue
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditAdjudicationDetail" }
+        "403": { description: Auditor or original reviewer cannot see this queue }
+  /reviewflow/audits/{id}/disputes/{disputeId}/adjudicate:
+    post:
+      operationId: adjudicateAuditDispute
+      tags: [reviewflow]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: disputeId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdjudicationInput" }
+      responses:
+        "200":
+          description: Resolved disagreement
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditDispute" }
+        "403": { description: Auditor or original reviewer cannot adjudicate }
+        "409": { description: Disagreement already resolved }
 components:
   schemas:
     HealthStatus:
@@ -328,14 +423,133 @@ components:
         createdAt: { type: string, format: date-time }
     Audit:
       type: object
-      required: [id, status, sampleSize, seed, independent, createdAt]
+      required: [id, status, sampleSize, seed, samplingFrameHash, independent, required, completedItems, effectiveSampleSize, openDisputes, createdAt]
       properties:
         id: { type: string }
         status: { type: string }
         sampleSize: { type: integer }
         seed: { type: string }
+        samplingFrameHash: { type: string }
         independent: { type: boolean }
+        required: { type: boolean }
+        completedItems: { type: integer }
+        effectiveSampleSize: { type: integer }
+        openDisputes: { type: integer }
         createdAt: { type: string, format: date-time }
+    AuditInput:
+      type: object
+      required: [sampleSize, independent, required]
+      properties:
+        sampleSize: { type: integer, minimum: 1, maximum: 200 }
+        seed: { type: ["string", "null"], maxLength: 120 }
+        independent: { type: boolean }
+        required: { type: boolean }
+    AuditDecisionInput:
+      type: object
+      required: [auditItemId, label]
+      properties:
+        auditItemId: { type: string }
+        label: { $ref: "#/components/schemas/Label" }
+        reason: { type: ["string", "null"], maxLength: 2000 }
+    AuditDecisionResult:
+      type: object
+      required: [id, auditId, auditItemId, taskId, label, selfCheck, included, status]
+      properties:
+        id: { type: string }
+        auditId: { type: string }
+        auditItemId: { type: string }
+        taskId: { type: string }
+        label: { $ref: "#/components/schemas/Label" }
+        selfCheck: { type: boolean }
+        included: { type: boolean }
+        disputeId: { type: ["string", "null"] }
+        status: { type: string }
+    AuditTaskDecision:
+      type: object
+      required: [label, selfCheck, included]
+      properties:
+        label: { $ref: "#/components/schemas/Label" }
+        reason: { type: ["string", "null"] }
+        selfCheck: { type: boolean }
+        included: { type: boolean }
+    AuditItem:
+      type: object
+      required: [id, ordinal, taskId, externalId, question, evidence, candidateAnswer, risk, decision]
+      properties:
+        id: { type: string }
+        ordinal: { type: integer }
+        taskId: { type: string }
+        externalId: { type: string }
+        question: { type: string }
+        evidence: { type: string }
+        candidateAnswer: { type: string }
+        risk: { $ref: "#/components/schemas/Risk" }
+        decision:
+          type: ["object", "null"]
+          allOf:
+            - { $ref: "#/components/schemas/AuditTaskDecision" }
+    AuditDisputeSummary:
+      type: object
+      required: [id, auditItemId, taskId, status]
+      properties:
+        id: { type: string }
+        auditItemId: { type: string }
+        taskId: { type: string }
+        status: { type: string }
+    AuditDetail:
+      allOf:
+        - { $ref: "#/components/schemas/Audit" }
+        - type: object
+          required: [items, disputes]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/AuditItem" }
+            disputes:
+              type: array
+              items: { $ref: "#/components/schemas/AuditDisputeSummary" }
+    AuditAdjudicationDispute:
+      type: object
+      required: [id, auditItemId, taskId, status, originalLabel, auditLabel, question, evidence, candidateAnswer, resolvedLabel]
+      properties:
+        id: { type: string }
+        auditItemId: { type: string }
+        taskId: { type: string }
+        status: { type: string }
+        originalLabel: { $ref: "#/components/schemas/Label" }
+        auditLabel: { $ref: "#/components/schemas/Label" }
+        question: { type: string }
+        evidence: { type: string }
+        candidateAnswer: { type: string }
+        resolvedLabel: { $ref: "#/components/schemas/Label" }
+    AuditAdjudicationDetail:
+      allOf:
+        - { $ref: "#/components/schemas/Audit" }
+        - type: object
+          required: [disputes]
+          properties:
+            disputes:
+              type: array
+              items: { $ref: "#/components/schemas/AuditAdjudicationDispute" }
+    AdjudicationInput:
+      type: object
+      required: [resolvedLabel]
+      properties:
+        resolvedLabel: { $ref: "#/components/schemas/Label" }
+        reason: { type: ["string", "null"], maxLength: 2000 }
+    AuditDispute:
+      type: object
+      required: [id, auditId, auditItemId, taskId, originalLabel, auditLabel, status, resolvedLabel, adjudicatorId]
+      properties:
+        id: { type: string }
+        auditId: { type: string }
+        auditItemId: { type: string }
+        taskId: { type: string }
+        originalLabel: { $ref: "#/components/schemas/Label" }
+        auditLabel: { $ref: "#/components/schemas/Label" }
+        status: { type: string }
+        resolvedLabel: { $ref: "#/components/schemas/Label" }
+        adjudicatorId: { type: string }
     Bootstrap:
       type: object
       required: [projectName, mode, liveCredentialConfigured, providerModel, shadowPolicyVersion, metrics, tasks, releases]

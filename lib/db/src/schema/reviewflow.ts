@@ -122,11 +122,26 @@ export const auditsTable = pgTable("rf_audits", {
   sampleSize: integer("sample_size").notNull(),
   seed: text("seed").notNull(),
   samplingFrameHash: text("sampling_frame_hash").notNull(),
+  samplingFrame: jsonb("sampling_frame").notNull(),
   independent: boolean("independent").notNull(),
+  required: boolean("required").notNull().default(true),
   auditorId: text("auditor_id"),
   ...timestamps,
 });
 
+export const auditItemsTable = pgTable("rf_audit_items", {
+  id: text("id").primaryKey(),
+  auditId: text("audit_id").notNull(),
+  taskId: text("task_id").notNull(),
+  ordinal: integer("ordinal").notNull(),
+  originalReviewId: text("original_review_id").notNull(),
+  originalReviewerId: text("original_reviewer_id").notNull(),
+  originalLabel: text("original_label").notNull(),
+  taskContentHash: text("task_content_hash").notNull(),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("rf_audit_items_audit_task_unique").on(table.auditId, table.taskId),
+]);
 export const releasesTable = pgTable("rf_releases", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
@@ -150,3 +165,34 @@ export const eventsTable = pgTable("rf_events", {
   payload: jsonb("payload").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const auditDisputesTable = pgTable("rf_audit_disputes", {
+  id: text("id").primaryKey(),
+  auditId: text("audit_id").notNull(),
+  auditItemId: text("audit_item_id").notNull(),
+  taskId: text("task_id").notNull(),
+  originalLabel: text("original_label").notNull(),
+  auditLabel: text("audit_label").notNull(),
+  status: text("status").notNull().default("pending"),
+  adjudicatorId: text("adjudicator_id"),
+  resolvedLabel: text("resolved_label"),
+  reason: text("reason"),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("rf_audit_disputes_item_unique").on(table.auditItemId),
+]);
+
+export const auditDecisionsTable = pgTable("rf_audit_decisions", {
+  id: text("id").primaryKey(),
+  auditId: text("audit_id").notNull(),
+  auditItemId: text("audit_item_id").notNull(),
+  taskId: text("task_id").notNull(),
+  auditorId: text("auditor_id").notNull(),
+  label: text("label").notNull(),
+  reason: text("reason"),
+  selfCheck: boolean("self_check").notNull().default(false),
+  included: boolean("included").notNull().default(true),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("rf_audit_decisions_item_auditor_unique").on(table.auditItemId, table.auditorId),
+]);

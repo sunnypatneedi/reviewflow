@@ -293,10 +293,29 @@ export interface Audit {
   status: string;
   sampleSize: number;
   seed: string;
+  samplingFrameHash: string;
   independent: boolean;
+  required: boolean;
+  completedItems: number;
+  effectiveSampleSize: number;
+  openDisputes: number;
   createdAt: string;
 }
 
+export interface AuditInput {
+  /**
+     * @minimum 1
+     * @maximum 200
+     */
+  sampleSize: number;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  seed?: string | null;
+  independent: boolean;
+  required: boolean;
+}
 export type BootstrapMode = typeof BootstrapMode[keyof typeof BootstrapMode];
 
 
@@ -316,3 +335,97 @@ export interface Bootstrap {
   releases: Release[];
 }
 
+
+export interface AuditAdjudicationDispute {
+  id: string;
+  auditItemId: string;
+  taskId: string;
+  status: string;
+  originalLabel: Label;
+  auditLabel: Label;
+  question: string;
+  evidence: string;
+  candidateAnswer: string;
+  resolvedLabel: Label;
+}
+
+export interface AuditTaskDecision {
+  label: Label;
+  /** @nullable */
+  reason?: string | null;
+  selfCheck: boolean;
+  included: boolean;
+}
+
+export type AuditAdjudicationDetail = Audit & {
+  disputes: AuditAdjudicationDispute[];
+};
+
+export interface AdjudicationInput {
+  resolvedLabel: Label;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  reason?: string | null;
+}
+
+export interface AuditDispute {
+  id: string;
+  auditId: string;
+  auditItemId: string;
+  taskId: string;
+  originalLabel: Label;
+  auditLabel: Label;
+  status: string;
+  resolvedLabel: Label;
+  adjudicatorId: string;
+}
+
+export interface AuditDecisionResult {
+  id: string;
+  auditId: string;
+  auditItemId: string;
+  taskId: string;
+  label: Label;
+  selfCheck: boolean;
+  included: boolean;
+  /** @nullable */
+  disputeId?: string | null;
+  status: string;
+}
+
+export interface AuditDecisionInput {
+  auditItemId: string;
+  label: Label;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  reason?: string | null;
+}
+
+export interface AuditDisputeSummary {
+  id: string;
+  auditItemId: string;
+  taskId: string;
+  status: string;
+}
+
+export type AuditDetail = Audit & {
+  items: AuditItem[];
+  disputes: AuditDisputeSummary[];
+};
+
+export interface AuditItem {
+  id: string;
+  ordinal: number;
+  taskId: string;
+  externalId: string;
+  question: string;
+  evidence: string;
+  candidateAnswer: string;
+  risk: Risk;
+  /** @nullable */
+  decision: AuditTaskDecision | null;
+}

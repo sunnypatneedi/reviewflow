@@ -1,1 +1,2 @@
 - [Raw SQL claim rows](raw-sql-claim-aliases.md) — Drizzle raw SQL results need explicit quoted camelCase aliases before use as typed rows.
+- [ReviewFlow request identity](reviewflow-request-identity.md) — initialize the demo identity on the request before route handlers reuse it.
