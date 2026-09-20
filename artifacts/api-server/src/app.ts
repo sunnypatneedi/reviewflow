@@ -21,6 +21,7 @@ import {
 
 const app: Express = express();
 const config = loadRuntimeConfig(process.env);
+app.locals.runtimeConfig = config;
 
 app.use(
   pinoHttp({

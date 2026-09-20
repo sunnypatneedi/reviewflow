@@ -8,7 +8,7 @@ private-data service. Run `APP_MODE=demo pnpm run verify:isolated` with Node
 temporary PostgreSQL cluster, applies the committed migration, and removes that
 cluster afterward. It never falls back to the ambient application database.
 
-## Executed results — 2026-09-20
+## Initial executed results — 2026-09-20
 
 The complete workspace verification exited successfully:
 
@@ -48,6 +48,21 @@ Earlier passing tests and the historical audit are not substituted for this
 release's verification. The distributed candidate receives an additional clean
 install/build/test pass; the accompanying release receipt records its exact
 commit and archive checksum.
+
+## Anonymous-demo admission hardening
+
+A subsequent security review found unbounded anonymous project creation despite
+the initial scanners reporting no findings. Creation now uses a PostgreSQL
+transaction and shared advisory lock, with a persistent global project cap and
+short-window creation limit. Existing sessions remain usable at either limit.
+Capacity and throttling errors are explicit and visible in the overview.
+
+Regression coverage includes concurrent admission, atomic seed creation,
+database-backed limits, HTTP 429/503 mapping, Retry-After, and existing-session
+access. The accompanying release receipt records the updated candidate's full
+verification results. The separate black-box pentest is pending input, not passed.
+These safeguards do not make an anonymously hosted demo production-ready;
+operators still need retention and broader request/resource limits.
 
 ## Explicit skips and limitations
 

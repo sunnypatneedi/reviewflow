@@ -7,6 +7,9 @@ export type RuntimeConfig = {
   liveInferenceEnabled: boolean;
   sessionSecret: string;
   trustedOrigins: ReadonlySet<string>;
+  demoProjectCap: number;
+  demoProjectCreationWindowMax: number;
+  demoProjectCreationWindowSeconds: number;
 };
 
 function parseBoolean(name: string, value: string | undefined): boolean {
@@ -14,6 +17,14 @@ function parseBoolean(name: string, value: string | undefined): boolean {
   if (value === "true") return true;
   if (value === "false") return false;
   throw new Error(`${name} must be "true" or "false"`);
+}
+
+function parsePositiveInteger(name: string, value: string | undefined, fallback: number): number {
+  if (value === undefined || value === "") return fallback;
+  if (!/^[1-9]\d*$/.test(value)) throw new Error(`${name} must be a positive integer`);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) throw new Error(`${name} must be a positive integer`);
+  return parsed;
 }
 
 export function resolveAppMode(env: NodeJS.ProcessEnv): AppMode {
@@ -83,5 +94,16 @@ export function loadRuntimeConfig(
     liveInferenceEnabled: parseBoolean("LIVE_INFERENCE_ENABLED", env.LIVE_INFERENCE_ENABLED),
     sessionSecret: configuredSecret ?? ephemeralSecret(),
     trustedOrigins: resolveTrustedOrigins(env),
+    demoProjectCap: parsePositiveInteger("DEMO_PROJECT_CAP", env.DEMO_PROJECT_CAP, 100),
+    demoProjectCreationWindowMax: parsePositiveInteger(
+      "DEMO_PROJECT_CREATION_WINDOW_MAX",
+      env.DEMO_PROJECT_CREATION_WINDOW_MAX,
+      10,
+    ),
+    demoProjectCreationWindowSeconds: parsePositiveInteger(
+      "DEMO_PROJECT_CREATION_WINDOW_SECONDS",
+      env.DEMO_PROJECT_CREATION_WINDOW_SECONDS,
+      60,
+    ),
   };
 }

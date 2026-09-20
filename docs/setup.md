@@ -98,7 +98,13 @@ running for queued evaluations to advance.
 
 Demo sessions are separated with a signed HTTP-only cookie. A stable
 `SESSION_SECRET` preserves that session across API restarts. Production mode
-refuses to start without an explicit secret.
+refuses to start without an explicit secret. New anonymous projects are
+database-limited globally by `DEMO_PROJECT_CAP` (default 100) and by
+`DEMO_PROJECT_CREATION_WINDOW_MAX` per
+`DEMO_PROJECT_CREATION_WINDOW_SECONDS` (defaults 10 per 60 seconds). Admission
+is serialized in PostgreSQL, so limits apply across API processes and restarts.
+Sessions whose projects already exist remain usable when either limit is hit.
+These limits do not apply to authenticated Clerk projects.
 
 ## Optional integrations
 

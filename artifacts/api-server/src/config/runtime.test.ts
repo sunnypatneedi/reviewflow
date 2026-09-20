@@ -33,10 +33,27 @@ test("unsafe managed host values are ignored and malformed explicit origins are 
 });
 
 test("live inference is off by default and production requires a session secret", () => {
-  assert.equal(loadRuntimeConfig({}, () => "ephemeral").liveInferenceEnabled, false);
+  const defaults = loadRuntimeConfig({}, () => "ephemeral");
+  assert.equal(defaults.liveInferenceEnabled, false);
+  assert.equal(defaults.demoProjectCap, 100);
+  assert.equal(defaults.demoProjectCreationWindowMax, 10);
+  assert.equal(defaults.demoProjectCreationWindowSeconds, 60);
   assert.throws(() => loadRuntimeConfig({ NODE_ENV: "production", APP_MODE: "demo" }), /SESSION_SECRET/);
   assert.throws(
     () => loadRuntimeConfig({ SESSION_SECRET: "secret", LIVE_INFERENCE_ENABLED: "yes" }),
     /LIVE_INFERENCE_ENABLED/,
   );
+});
+
+test("demo bootstrap limits accept only positive integer configuration", () => {
+  const config = loadRuntimeConfig({
+    DEMO_PROJECT_CAP: "25",
+    DEMO_PROJECT_CREATION_WINDOW_MAX: "4",
+    DEMO_PROJECT_CREATION_WINDOW_SECONDS: "30",
+  }, () => "ephemeral");
+  assert.equal(config.demoProjectCap, 25);
+  assert.equal(config.demoProjectCreationWindowMax, 4);
+  assert.equal(config.demoProjectCreationWindowSeconds, 30);
+  assert.throws(() => loadRuntimeConfig({ DEMO_PROJECT_CAP: "0" }), /DEMO_PROJECT_CAP/);
+  assert.throws(() => loadRuntimeConfig({ DEMO_PROJECT_CREATION_WINDOW_MAX: "1.5" }), /WINDOW_MAX/);
 });

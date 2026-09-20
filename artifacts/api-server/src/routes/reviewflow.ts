@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response as ExpressResponse } from "express";
 import { getAuth } from "@clerk/express";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import {
   buildSamplingFrame,
   blindAuditTask,
@@ -27,6 +27,7 @@ import {
 } from "@workspace/db";
 import { enqueueEvaluationJobs, MAX_ACTIVE_LIVE_JOBS_PER_PROJECT } from "../evaluation-worker";
 import { MODEL } from "../evaluation";
+import type { RuntimeConfig } from "../config/runtime";
 import {
   RELEASE_ROLES,
   REVIEW_ROLES,
@@ -129,28 +130,104 @@ const samples = [
   ["rf-020","What is in the box?","Box contents: camera body, strap, USB-C cable. Memory card sold separately.","A memory card is included.","medium","contradicted"],
 ] as const;
 
+export class DemoProjectAdmissionError extends Error {
+  constructor(
+    message: string,
+    readonly status: 429 | 503,
+    readonly code: "DEMO_CREATION_THROTTLED" | "DEMO_PROJECT_CAP_REACHED",
+    readonly retryAfterSeconds?: number,
+  ) {
+    super(message);
+    this.name = "DemoProjectAdmissionError";
+  }
+}
+
+type DemoAdmissionConfig = Pick<
+  RuntimeConfig,
+  "demoProjectCap" | "demoProjectCreationWindowMax" | "demoProjectCreationWindowSeconds"
+>;
+
+export async function ensureDemoProject(demoId: string, config: DemoAdmissionConfig) {
+  const key = `demo:${demoId}`;
+  const [existing] = await db.select().from(projectsTable).where(eq(projectsTable.id, key));
+  if (existing) return existing;
+
+  return db.transaction(async (tx) => {
+    // One database-scoped admission lane makes the count/check/insert atomic
+    // across requests, server processes, and process restarts.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended('reviewflow:demo-project-admission', 0))`);
+    const [foundAfterLock] = await tx.select().from(projectsTable).where(eq(projectsTable.id, key));
+    if (foundAfterLock) return foundAfterLock;
+
+    const [total] = await tx.select({ count: sql<number>`count(*)::int` })
+      .from(projectsTable)
+      .where(isNotNull(projectsTable.demoSessionId));
+    if ((total?.count ?? 0) >= config.demoProjectCap) {
+      throw new DemoProjectAdmissionError(
+        "The anonymous demo is at capacity. Existing demo sessions can continue; try again after an administrator frees capacity.",
+        503,
+        "DEMO_PROJECT_CAP_REACHED",
+      );
+    }
+
+    const [recent] = await tx.select({ count: sql<number>`count(*)::int` })
+      .from(projectsTable)
+      .where(and(
+        isNotNull(projectsTable.demoSessionId),
+        sql`${projectsTable.createdAt} >= now() - (${config.demoProjectCreationWindowSeconds} * interval '1 second')`,
+      ));
+    if ((recent?.count ?? 0) >= config.demoProjectCreationWindowMax) {
+      throw new DemoProjectAdmissionError(
+        "Anonymous demo creation is temporarily limited. Existing demo sessions can continue; please retry shortly.",
+        429,
+        "DEMO_CREATION_THROTTLED",
+        config.demoProjectCreationWindowSeconds,
+      );
+    }
+
+    const [project] = await tx.insert(projectsTable).values({
+      id: key,
+      name: "Evidence Grounding Lab",
+      ownerId: null,
+      demoSessionId: demoId,
+      mode: "demo",
+    }).returning();
+    await tx.insert(tasksTable).values(samples.map(([externalId, question, evidence, candidateAnswer, risk, referenceLabel]) => {
+      const content = canonicalTaskContent({ externalId, question, evidence, candidateAnswer, risk });
+      return {
+        id: randomUUID(), projectId: key, externalId, question, evidence, candidateAnswer,
+        risk, referenceLabel, contentHash: sha(content), mode: "demo",
+      };
+    }));
+    return project;
+  });
+}
+
 async function ensureProject(req: Request) {
   let demoId = req.signedCookies?.reviewflow_demo as string | undefined;
   if (!demoId) demoId = randomUUID();
   const userId = getAuth(req).userId;
   const key = userId ? `user:${userId}` : `demo:${demoId}`;
+  if (!userId) {
+    const config = req.app.locals.runtimeConfig as RuntimeConfig;
+    const project = await ensureDemoProject(demoId, config);
+    return { project, demoId, userId: null, role: null } satisfies ProjectContext;
+  }
   let [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, key));
   if (!project) {
     [project] = await db.insert(projectsTable).values({
       id: key,
       name: "Evidence Grounding Lab",
       ownerId: userId ?? null,
-      demoSessionId: userId ? null : demoId,
+      demoSessionId: null,
       mode: "demo",
     }).returning();
-    if (userId) {
-      await db.insert(membershipsTable).values({
-        id: randomUUID(),
-        projectId: key,
-        userId,
-        role: "owner",
-      });
-    }
+    await db.insert(membershipsTable).values({
+      id: randomUUID(),
+      projectId: key,
+      userId,
+      role: "owner",
+    });
     await db.insert(tasksTable).values(samples.map(([externalId, question, evidence, candidateAnswer, risk, referenceLabel]) => {
       const content = canonicalTaskContent({ externalId, question, evidence, candidateAnswer, risk });
       return {
@@ -360,15 +437,24 @@ async function live(task: typeof tasksTable.$inferSelect) {
 }
 
 router.use(async (req, res, next): Promise<void> => {
-  const { demoId } = await ensureProject(req);
-  if (!req.signedCookies?.reviewflow_demo) {
-    // Keep the same project for the route handler in this request. The cookie
-    // is sent in the response, so Express has not populated req.signedCookies
-    // yet when the handler calls ensureProject again.
-    req.signedCookies = { ...req.signedCookies, reviewflow_demo: demoId };
-    res.cookie("reviewflow_demo", demoId, { signed: true, httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 30 * 86400_000 });
+  try {
+    const { demoId } = await ensureProject(req);
+    if (!req.signedCookies?.reviewflow_demo) {
+      // Keep the same project for the route handler in this request. The cookie
+      // is sent in the response, so Express has not populated req.signedCookies
+      // yet when the handler calls ensureProject again.
+      req.signedCookies = { ...req.signedCookies, reviewflow_demo: demoId };
+      res.cookie("reviewflow_demo", demoId, { signed: true, httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 30 * 86400_000 });
+    }
+    next();
+  } catch (error) {
+    if (error instanceof DemoProjectAdmissionError) {
+      if (error.retryAfterSeconds) res.setHeader("Retry-After", String(error.retryAfterSeconds));
+      res.status(error.status).json({ error: error.message, code: error.code });
+      return;
+    }
+    next(error);
   }
-  next();
 });
 
 router.get("/reviewflow/bootstrap", async (req, res): Promise<void> => {

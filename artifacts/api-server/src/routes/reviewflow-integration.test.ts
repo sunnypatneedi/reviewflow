@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
 import type { Server } from "node:http";
-import { and, desc, eq } from "drizzle-orm";
+import type { Express } from "express";
+import { and, eq, isNotNull } from "drizzle-orm";
 import {
   auditDecisionsTable,
   auditDisputesTable,
@@ -20,8 +21,9 @@ import {
 
 let server: Server;
 let baseUrl: string;
+let app: Express;
 
-type Session = { cookie: string };
+type Session = { cookie: string; projectId: string };
 
 async function request(
   path: string,
@@ -44,7 +46,11 @@ async function createSession(): Promise<Session> {
   assert.equal(response.status, 200);
   const setCookie = response.headers.get("set-cookie");
   assert.ok(setCookie);
-  return { cookie: setCookie.split(";", 1)[0] };
+  const cookie = setCookie.split(";", 1)[0];
+  const signedValue = decodeURIComponent(cookie.slice(cookie.indexOf("=") + 1));
+  const demoId = /^s:([^.]+)\./.exec(signedValue)?.[1];
+  assert.ok(demoId);
+  return { cookie, projectId: `demo:${demoId}` };
 }
 
 before(async () => {
@@ -52,7 +58,7 @@ before(async () => {
   process.env.APP_MODE = "demo";
   process.env.SESSION_SECRET = "isolated-reviewflow-test-secret";
   process.env.NODE_ENV = "test";
-  const { default: app } = await import("../app");
+  ({ default: app } = await import("../app"));
   await new Promise<void>((resolve) => {
     server = app.listen(0, "127.0.0.1", () => {
       const address = server.address();
@@ -115,9 +121,110 @@ test("concurrent identical imports are idempotent and conflicting batches roll b
   assert.ok(!tasks.some((task) => task.externalId === losingCompanion));
 });
 
+test("demo admission is atomic, globally capped, and preserves existing projects at capacity", async () => {
+  const { DemoProjectAdmissionError, ensureDemoProject } = await import("./reviewflow");
+  const existingProjects = await db.select({ id: projectsTable.id })
+    .from(projectsTable)
+    .where(isNotNull(projectsTable.demoSessionId));
+  const config = {
+    demoProjectCap: existingProjects.length + 1,
+    demoProjectCreationWindowMax: existingProjects.length + 10,
+    demoProjectCreationWindowSeconds: 60,
+  };
+  const demoIds = [randomUUID(), randomUUID()];
+  const raced = await Promise.allSettled(demoIds.map((id) => ensureDemoProject(id, config)));
+  assert.equal(raced.filter((result) => result.status === "fulfilled").length, 1);
+  const rejected = raced.find((result): result is PromiseRejectedResult => result.status === "rejected");
+  assert.ok(rejected);
+  assert.ok(rejected.reason instanceof DemoProjectAdmissionError);
+  assert.equal(rejected.reason.code, "DEMO_PROJECT_CAP_REACHED");
+
+  const created = raced.find((result): result is PromiseFulfilledResult<typeof projectsTable.$inferSelect> =>
+    result.status === "fulfilled");
+  assert.ok(created);
+  // A newly constructed config has no in-process admission state; the cap is
+  // still enforced because its count is persisted in PostgreSQL.
+  const recreatedConfig = { ...config };
+  await assert.rejects(
+    () => ensureDemoProject(randomUUID(), recreatedConfig),
+    (error: unknown) =>
+      error instanceof DemoProjectAdmissionError
+      && error.code === "DEMO_PROJECT_CAP_REACHED",
+  );
+  const reopened = await ensureDemoProject(created.value.demoSessionId!, recreatedConfig);
+  assert.equal(reopened.id, created.value.id);
+  const seededTasks = await db.select({ id: tasksTable.id })
+    .from(tasksTable)
+    .where(eq(tasksTable.projectId, created.value.id));
+  assert.equal(seededTasks.length, 20);
+});
+
+test("demo throttle persists across recreated config and existing projects bypass it", async () => {
+  const { DemoProjectAdmissionError, ensureDemoProject } = await import("./reviewflow");
+  const existingProjects = await db.select({ id: projectsTable.id })
+    .from(projectsTable)
+    .where(isNotNull(projectsTable.demoSessionId));
+  const firstConfig = {
+    demoProjectCap: existingProjects.length + 10,
+    demoProjectCreationWindowMax: existingProjects.length + 1,
+    demoProjectCreationWindowSeconds: 60,
+  };
+  const demoId = randomUUID();
+  const created = await ensureDemoProject(demoId, firstConfig);
+
+  // A fresh config object simulates a recreated process: admission state comes
+  // from PostgreSQL rather than process memory.
+  const recreatedConfig = { ...firstConfig };
+  await assert.rejects(
+    () => ensureDemoProject(randomUUID(), recreatedConfig),
+    (error: unknown) =>
+      error instanceof DemoProjectAdmissionError
+      && error.code === "DEMO_CREATION_THROTTLED"
+      && error.retryAfterSeconds === 60,
+  );
+  const reopened = await ensureDemoProject(demoId, recreatedConfig);
+  assert.equal(reopened.id, created.id);
+});
+
+test("HTTP admission errors map Retry-After and existing cookies work at throttle and cap", async () => {
+  const session = await createSession();
+  const projects = await db.select({ id: projectsTable.id })
+    .from(projectsTable)
+    .where(isNotNull(projectsTable.demoSessionId));
+  const originalConfig = app.locals.runtimeConfig;
+  try {
+    app.locals.runtimeConfig = {
+      ...originalConfig,
+      demoProjectCap: projects.length,
+      demoProjectCreationWindowMax: projects.length + 100,
+      demoProjectCreationWindowSeconds: 60,
+    };
+    const capped = await request("/reviewflow/bootstrap");
+    assert.equal(capped.status, 503);
+    assert.equal(capped.headers.get("set-cookie"), null);
+    assert.equal((await capped.json() as { code: string }).code, "DEMO_PROJECT_CAP_REACHED");
+    assert.equal((await request("/reviewflow/bootstrap", { session })).status, 200);
+
+    app.locals.runtimeConfig = {
+      ...originalConfig,
+      demoProjectCap: projects.length + 100,
+      demoProjectCreationWindowMax: 1,
+      demoProjectCreationWindowSeconds: 37,
+    };
+    const throttled = await request("/reviewflow/bootstrap");
+    assert.equal(throttled.status, 429);
+    assert.equal(throttled.headers.get("retry-after"), "37");
+    assert.equal(throttled.headers.get("set-cookie"), null);
+    assert.equal((await throttled.json() as { code: string }).code, "DEMO_CREATION_THROTTLED");
+    assert.equal((await request("/reviewflow/bootstrap", { session })).status, 200);
+  } finally {
+    app.locals.runtimeConfig = originalConfig;
+  }
+});
+
 test("concurrent reviews commit exactly one decision and protect final state and project scope", async () => {
   const session = await createSession();
-  const [project] = await db.select().from(projectsTable).orderBy(desc(projectsTable.createdAt));
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, session.projectId));
   assert.ok(project);
   const [task] = await db.select().from(tasksTable).where(eq(tasksTable.projectId, project.id));
   assert.ok(task);
@@ -169,7 +276,7 @@ test("concurrent reviews commit exactly one decision and protect final state and
 
 test("concurrent audit decisions and adjudications each produce one committed event", async () => {
   const session = await createSession();
-  const [project] = await db.select().from(projectsTable).orderBy(desc(projectsTable.createdAt));
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, session.projectId));
   assert.ok(project?.demoSessionId);
   const actorId = `demo:${project.demoSessionId}`;
   const [task] = await db.select().from(tasksTable).where(eq(tasksTable.projectId, project.id));
@@ -263,8 +370,7 @@ test("concurrent audit decisions and adjudications each produce one committed ev
 
 test("concurrent live admission is bounded atomically and rejection does not switch project mode", async () => {
   const session = await createSession();
-  void session;
-  const [project] = await db.select().from(projectsTable).orderBy(desc(projectsTable.createdAt));
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, session.projectId));
   assert.ok(project);
   const taskRows = Array.from({ length: 26 }, (_, index) => ({
     id: randomUUID(),

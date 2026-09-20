@@ -4,11 +4,26 @@ import { formatPercent } from "@/lib/utils";
 import { Activity, AlertTriangle, CheckCircle, Clock, FileText, Target } from "lucide-react";
 
 export default function Home() {
-  const { data: metrics, isLoading: loadingMetrics } = useGetMetrics();
-  const { data: bootstrap, isLoading: loadingBootstrap } = useGetBootstrap();
+  const { data: metrics, isLoading: loadingMetrics, error: metricsError } = useGetMetrics();
+  const { data: bootstrap, isLoading: loadingBootstrap, error: bootstrapError } = useGetBootstrap();
 
   if (loadingMetrics || loadingBootstrap) {
     return <div className="p-8 text-muted-foreground">Loading overview...</div>;
+  }
+  const loadError = bootstrapError ?? metricsError;
+  if (loadError) {
+    return (
+      <div className="p-8 max-w-2xl mx-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle>ReviewFlow unavailable</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-destructive">
+            {loadError.message}
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (

@@ -40,7 +40,11 @@ same-origin proxy, and preview plugin remain platform-portable.
 `APP_MODE=demo` is the default when Clerk keys are absent. It creates an
 isolated synthetic project identified by a signed cookie and blocks live
 inference. This is convenient for local evaluation, but it is not an identity
-system and should not hold sensitive or multi-user data.
+system and should not hold sensitive or multi-user data. Anonymous project
+creation has a database-backed global capacity and short-window throttle;
+existing sessions remain usable at capacity. This bounds seeded storage growth
+but intentionally means a public demo can become unavailable to new visitors
+until capacity is freed.
 
 Optional Clerk mode verifies identities and the database stores owner,
 reviewer, and adjudicator memberships. Current routes apply role checks to

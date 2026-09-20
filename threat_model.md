@@ -86,11 +86,14 @@ project-scoped and role-gated for live releases.
 
 ### Denial of Service
 
-The demo project bootstrap path auto-creates a project and 20 seed tasks for any
-request lacking the signed cookie. Because this runs on safe (GET) methods it bypasses
-the write-protection middleware and has no rate limiting, allowing unauthenticated
-storage/row exhaustion (see findings). Live evaluation concurrency is capped per
-project (`MAX_ACTIVE_LIVE_JOBS_PER_PROJECT`), and provider calls have a 20s timeout.
+The demo project bootstrap path creates a project and 20 seed tasks for a new
+signed-cookie session. A PostgreSQL advisory transaction lock serializes global
+admission across processes and restarts; a database count enforces a configurable
+global project cap and a short-window creation throttle. Existing demo projects
+are resolved before admission checks, and Clerk projects bypass anonymous-demo
+limits. This bounds anonymous seeded storage growth without relying on spoofable
+client IP addresses. Live evaluation concurrency is capped per project
+(`MAX_ACTIVE_LIVE_JOBS_PER_PROJECT`), and provider calls have a 20s timeout.
 Import and evaluate endpoints bound batch sizes and text lengths.
 
 ### Elevation of Privilege
@@ -107,4 +110,4 @@ tenant fields is exposed (import and review payloads whitelist fields).
 - Every data-bearing route MUST scope queries to the caller's own project (currently upheld).
 - Write requests MUST carry a trusted Origin and the CSRF header (currently upheld).
 - Unauthenticated request handling MUST NOT allow unbounded resource creation
-  (currently NOT upheld — see demo bootstrap DoS).
+  (currently upheld for demo bootstrap by database-backed global admission limits).
