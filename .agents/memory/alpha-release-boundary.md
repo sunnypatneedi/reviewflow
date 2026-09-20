@@ -13,3 +13,13 @@ design scaffolding that are not part of the requested open-source alpha.
 that candidate on a separately initialized disposable PostgreSQL cluster, never
 the existing user database. Public-alpha claims cover the local synthetic demo;
 mocked provider tests must not become claims of live model quality.
+
+Do not infer connector write authorization from successful GitHub login or
+repository metadata reporting `permissions.push`.
+
+**Why:** Those reads succeeded while the first contents upload was rejected with
+`403 Resource not accessible by integration`; user rights and integration rights
+are distinct.
+
+**How to apply:** Treat write rejection as an unresolved repository/integration
+permission boundary, preserve the verified candidate, and do not claim publication.

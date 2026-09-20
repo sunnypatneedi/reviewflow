@@ -42,3 +42,31 @@ mtime_ms = 1789880630020
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:1368abc0-d08e-493f-b904-96c0cc476faf/e77b2b95-0f5f-4a61-9262-1e2cdc8b51df/bc759d25-1400-44d5-9306-8bcef6110564"
 storage_version_token = "1789880861143071"
 content_type = "image/png"
+
+[[outputs]]
+id = "YuhQXOe1rvhkJnRg7U9aH"
+uri = "file://releases/reviewflow-source-hardened.tar.gz"
+type = "unspecified"
+title = "Verified ReviewFlow source — demo limits fixed"
+description = "Sanitized source candidate; fresh build, 34 tests and end-to-end verification passed. Not yet published to GitHub."
+logical_id = "c2f9099a-b1f5-4541-94b6-bc74f2308829"
+content_hash = "sha256:21168e879f7f16ec86a038d9e8b3da37df5475c421bb43bf94782e5ad5ddd569"
+size = 274776
+mtime_ms = 1789883452244
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:1368abc0-d08e-493f-b904-96c0cc476faf/c2f9099a-b1f5-4541-94b6-bc74f2308829/86f6379f-0a94-4708-9c2c-e26b04889861"
+storage_version_token = "1789883595682445"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "8ebEGifF-9NIpQ3ub9YqI"
+uri = "file://releases/RELEASE-VERIFICATION-HARDENED.md"
+type = "text"
+title = "Updated release verification report"
+description = "Exact candidate hashes, verification results, limitations and GitHub write-permission blocker."
+logical_id = "fe1bc5b7-bcec-49b9-bd8b-fe8acb5409cc"
+content_hash = "sha256:64ae9377a598b3da480d4c372c0e19e07aa240313a0598c5cdc7d578df55c951"
+size = 5129
+mtime_ms = 1789883583948
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:1368abc0-d08e-493f-b904-96c0cc476faf/fe1bc5b7-bcec-49b9-bd8b-fe8acb5409cc/0fc1e207-6be0-429b-9967-456f3b3c419f"
+storage_version_token = "1789883596144520"
+content_type = "text/markdown"
