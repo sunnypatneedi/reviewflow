@@ -3,8 +3,6 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
-import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
-
 const rawPort = process.env.PORT;
 
 if (!rawPort) {
@@ -27,25 +25,21 @@ if (!basePath) {
   );
 }
 
+const configuredAppMode = process.env.APP_MODE ?? process.env.VITE_APP_MODE;
+if (configuredAppMode && configuredAppMode !== 'demo' && configuredAppMode !== 'clerk') {
+  throw new Error('APP_MODE must be either "demo" or "clerk"');
+}
+const frontendAppMode = configuredAppMode
+  ?? (process.env.VITE_CLERK_PUBLISHABLE_KEY ? 'clerk' : 'demo');
+
 export default defineConfig({
   base: basePath,
+  define: {
+    'import.meta.env.VITE_APP_MODE': JSON.stringify(frontendAppMode),
+  },
   plugins: [
     react(),
     tailwindcss(),
-    runtimeErrorOverlay(),
-    ...(process.env.NODE_ENV !== 'production' &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import('@replit/vite-plugin-cartographer').then((m) =>
-            m.cartographer({
-              root: path.resolve(import.meta.dirname, '..'),
-            }),
-          ),
-          await import('@replit/vite-plugin-dev-banner').then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
   ],
   resolve: {
     alias: {

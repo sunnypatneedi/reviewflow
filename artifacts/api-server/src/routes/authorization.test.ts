@@ -40,3 +40,28 @@ test("only owners and adjudicators can resolve escalations", () => {
   assert.equal(roleAllows("reviewer", RELEASE_ROLES), false);
   assert.equal(isEscalationResolution("proposed", "correct"), false);
 });
+
+test("the complete role matrix grants only intended capabilities", () => {
+  const expected = {
+    owner: { review: true, release: true },
+    reviewer: { review: true, release: false },
+    adjudicator: { review: true, release: true },
+  } as const;
+  for (const [role, access] of Object.entries(expected)) {
+    assert.equal(roleAllows(role as keyof typeof expected, REVIEW_ROLES), access.review);
+    assert.equal(roleAllows(role as keyof typeof expected, RELEASE_ROLES), access.release);
+  }
+});
+
+test("membership validation rejects wrong users and invalid persisted roles", () => {
+  assert.equal(membershipBelongsToProject("user-a", "project-a", {
+    userId: "user-b",
+    projectId: "project-a",
+    role: "reviewer",
+  }), false);
+  assert.equal(membershipBelongsToProject("user-a", "project-a", {
+    userId: "user-a",
+    projectId: "project-a",
+    role: "administrator",
+  }), false);
+});

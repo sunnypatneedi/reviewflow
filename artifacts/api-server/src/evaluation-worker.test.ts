@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, afterEach, test } from "node:test";
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   db,
   eventsTable,
@@ -18,7 +18,7 @@ import {
   ProviderError,
   type EvaluationTask,
 } from "./evaluation";
-import { enqueueEvaluationJobs, EvaluationWorker } from "./evaluation-worker";
+import { enqueueEvaluationJobs, EvaluationWorker, isLiveInferenceEnabled } from "./evaluation-worker";
 
 const createdProjectIds: string[] = [];
 
@@ -83,8 +83,12 @@ test("a claimed job is recovered after the worker lease expires", async () => {
     return job?.status === "running";
   });
   await waitFor(async () => {
-    const [job] = await db.select().from(jobsTable).where(eq(jobsTable.taskId, task.id));
-    return Boolean(job?.leaseExpiresAt && job.leaseExpiresAt <= new Date());
+    const result = await db.execute(sql`
+      SELECT lease_expires_at <= NOW() AS expired
+      FROM rf_jobs
+      WHERE task_id = ${task.id}
+    `);
+    return result.rows[0]?.expired === true;
   });
 
   const restartedWorker = new EvaluationWorker({
@@ -97,10 +101,52 @@ test("a claimed job is recovered after the worker lease expires", async () => {
   await firstWorkerRun;
 
   const proposals = await db.select().from(proposalsTable).where(eq(proposalsTable.taskId, task.id));
+  const proposalEvents = await db.select().from(eventsTable).where(and(
+    eq(eventsTable.projectId, task.projectId),
+    eq(eventsTable.type, "proposal.created"),
+  ));
   const [job] = await db.select().from(jobsTable).where(eq(jobsTable.taskId, task.id));
   assert.equal(proposals.length, 1);
+  assert.equal(proposalEvents.length, 1);
   assert.equal(job?.status, "succeeded");
   assert.equal(job?.attempts, 2);
+});
+
+test("repeated enqueue is a no-op for running and succeeded jobs", async () => {
+  const task = await createTask();
+  assert.equal(await enqueueEvaluationJobs({
+    projectId: task.projectId,
+    taskIds: [task.id],
+    mode: "demo",
+  }), 1);
+
+  let releaseProvider!: () => void;
+  const blocked = new Promise<void>((resolve) => { releaseProvider = resolve; });
+  const run = new EvaluationWorker({
+    workerId: "worker-idempotent-enqueue",
+    leaseMs: 5_000,
+    evaluate: async () => {
+      await blocked;
+      return simulated(task);
+    },
+  }).runOnce();
+  await waitFor(async () => {
+    const [job] = await db.select().from(jobsTable).where(eq(jobsTable.taskId, task.id));
+    return job?.status === "running";
+  });
+
+  assert.equal(await enqueueEvaluationJobs({
+    projectId: task.projectId,
+    taskIds: [task.id],
+    mode: "demo",
+  }), 0);
+  releaseProvider();
+  await run;
+  assert.equal(await enqueueEvaluationJobs({
+    projectId: task.projectId,
+    taskIds: [task.id],
+    mode: "demo",
+  }), 0);
 });
 
 test("provider rate limits are delayed, while authentication failures are terminal", async () => {
@@ -160,8 +206,12 @@ test("an expired lease on the final attempt becomes terminal without another pro
     return job?.status === "running";
   });
   await waitFor(async () => {
-    const [job] = await db.select().from(jobsTable).where(eq(jobsTable.taskId, task.id));
-    return Boolean(job?.leaseExpiresAt && job.leaseExpiresAt <= new Date());
+    const result = await db.execute(sql`
+      SELECT lease_expires_at <= NOW() AS expired
+      FROM rf_jobs
+      WHERE task_id = ${task.id}
+    `);
+    return result.rows[0]?.expired === true;
   });
 
   let providerCalled = false;
@@ -181,6 +231,80 @@ test("an expired lease on the final attempt becomes terminal without another pro
   assert.equal(providerCalled, false);
   assert.equal(job?.status, "failed");
   assert.equal(job?.attempts, 1);
+});
+
+test("a provider result arriving after human finalization cannot create proposal side effects", async () => {
+  const task = await createTask();
+  await enqueueEvaluationJobs({ projectId: task.projectId, taskIds: [task.id], mode: "demo" });
+
+  let releaseProvider!: () => void;
+  const providerBlocked = new Promise<void>((resolve) => { releaseProvider = resolve; });
+  const workerRun = new EvaluationWorker({
+    workerId: "worker-final-state-fence",
+    leaseMs: 5_000,
+    evaluate: async () => {
+      await providerBlocked;
+      return simulated(task);
+    },
+  }).runOnce();
+
+  await waitFor(async () => {
+    const [job] = await db.select().from(jobsTable).where(eq(jobsTable.taskId, task.id));
+    return job?.status === "running";
+  });
+  await db.update(tasksTable).set({
+    status: "finalized",
+    finalLabel: "supported",
+  }).where(eq(tasksTable.id, task.id));
+  releaseProvider();
+  await workerRun;
+
+  const [job] = await db.select().from(jobsTable).where(eq(jobsTable.taskId, task.id));
+  const proposals = await db.select().from(proposalsTable).where(eq(proposalsTable.taskId, task.id));
+  const proposalEvents = await db.select().from(eventsTable).where(and(
+    eq(eventsTable.projectId, task.projectId),
+    eq(eventsTable.type, "proposal.created"),
+  ));
+  assert.equal(job?.status, "succeeded");
+  assert.equal(proposals.length, 0);
+  assert.equal(proposalEvents.length, 0);
+});
+
+test("live jobs stay queued unless both live inference gates are enabled", async () => {
+  const task = await createTask();
+  await enqueueEvaluationJobs({ projectId: task.projectId, taskIds: [task.id], mode: "live" });
+  const originalEnabled = process.env.LIVE_INFERENCE_ENABLED;
+  const originalMode = process.env.APP_MODE;
+  let providerCalls = 0;
+  const worker = new EvaluationWorker({
+    workerId: "worker-live-gate",
+    evaluate: async () => {
+      providerCalls++;
+      return simulated(task);
+    },
+  });
+
+  try {
+    process.env.LIVE_INFERENCE_ENABLED = "true";
+    process.env.APP_MODE = "demo";
+    assert.equal(isLiveInferenceEnabled(), false);
+    assert.equal(await worker.runOnce(), false);
+    process.env.LIVE_INFERENCE_ENABLED = "false";
+    process.env.APP_MODE = "clerk";
+    assert.equal(await worker.runOnce(), false);
+    assert.equal(providerCalls, 0);
+
+    process.env.LIVE_INFERENCE_ENABLED = "true";
+    process.env.APP_MODE = "clerk";
+    assert.equal(isLiveInferenceEnabled(), true);
+    assert.equal(await worker.runOnce(), true);
+    assert.equal(providerCalls, 1);
+  } finally {
+    if (originalEnabled === undefined) delete process.env.LIVE_INFERENCE_ENABLED;
+    else process.env.LIVE_INFERENCE_ENABLED = originalEnabled;
+    if (originalMode === undefined) delete process.env.APP_MODE;
+    else process.env.APP_MODE = originalMode;
+  }
 });
 
 test("live provider transport classifies retryable failures without network access", async () => {
@@ -248,6 +372,22 @@ test("live provider transport classifies retryable failures without network acce
         status: 200,
       },
       {
+        name: "out-of-range confidence",
+        response: new Response(JSON.stringify({
+          answers: {
+            label: {
+              choice: "supported",
+              probabilities: { supported: 0.8, contradicted: 0.1, insufficient_evidence: 0.1 },
+              confidence: 1.1,
+            },
+            attempted_redirection: { noul: 0.1 },
+            review_complexity: { score: 2 },
+          },
+        }), { status: 200 }),
+        retryable: false,
+        status: 200,
+      },
+      {
         name: "transient 503 response",
         response: new Response("", { status: 503 }),
         retryable: true,
@@ -300,7 +440,7 @@ test("live provider transport classifies retryable failures without network acce
     else process.env.TYPESAFE_API_KEY = originalKey;
   }
 
-  assert.equal(requests.length, 8);
+  assert.equal(requests.length, 9);
   assert.ok(requests.every((request) => request.method === "POST"));
   assert.ok(requests.every((request) => request.headers instanceof Headers
     ? request.headers.get("authorization") === "Bearer transport-test-key"

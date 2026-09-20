@@ -84,6 +84,7 @@ export default function Tasks() {
       onSuccess: () => {
         setSelectedTasks(new Set());
         setConsent(false);
+        queryClient.invalidateQueries({ queryKey: getListEvaluationJobsQueryKey({ taskIds }) });
         queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetMetricsQueryKey() });
       }
@@ -159,6 +160,11 @@ export default function Tasks() {
               )}
             </div>
           )}
+          {retryEvaluationJob.isError && (
+            <p className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              Retry failed: {retryEvaluationJob.error.message}
+            </p>
+          )}
           <div className="border border-border rounded-md bg-card">
             <Table>
               <TableHeader>
@@ -233,6 +239,9 @@ export default function Tasks() {
             <Button className="w-full" onClick={handleImport} disabled={!importJson || importTasks.isPending}>
               {importTasks.isPending ? "Importing..." : "Import JSONL"}
             </Button>
+            {importTasks.isError && (
+              <p className="text-sm text-destructive">Import failed: {importTasks.error.message}</p>
+            )}
           </div>
 
           <div className="bg-card border border-border p-4 rounded-md space-y-4 shadow-sm">
@@ -269,6 +278,9 @@ export default function Tasks() {
             >
               {evaluateTasks.isPending ? "Evaluating..." : "Run Evaluation"}
             </Button>
+            {evaluateTasks.isError && (
+              <p className="text-sm text-destructive">Evaluation failed: {evaluateTasks.error.message}</p>
+            )}
           </div>
         </div>
       </div>

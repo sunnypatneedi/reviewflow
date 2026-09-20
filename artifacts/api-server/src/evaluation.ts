@@ -157,6 +157,11 @@ async function live(task: EvaluationTask): Promise<EvaluationResult> {
     || Math.abs(sum - 1) > 0.02) {
     throw new ProviderError("Jev returned an invalid probability distribution", { status: response.status });
   }
+  if (!Number.isFinite(choice.confidence) || choice.confidence < 0 || choice.confidence > 1
+    || noul.noul < 0 || noul.noul > 1
+    || !Number.isInteger(score.score) || score.score < 1 || score.score > 5) {
+    throw new ProviderError("Jev returned invalid probability or score bounds", { status: response.status });
+  }
   return {
     label: choice.choice as Label,
     probabilities: probs,

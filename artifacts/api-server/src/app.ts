@@ -11,8 +11,16 @@ import {
   clerkProxyMiddleware,
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware";
+import { loadRuntimeConfig } from "./config/runtime";
+import {
+  corsOrigin,
+  demoSignedOutAuth,
+  enforceLiveInference,
+  protectCredentialedWrites,
+} from "./middlewares/requestSecurity";
 
 const app: Express = express();
+const config = loadRuntimeConfig(process.env);
 
 app.use(
   pinoHttp({
@@ -33,19 +41,27 @@ app.use(
     },
   }),
 );
-app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
-app.use(cors({ credentials: true, origin: true }));
-app.use(cookieParser(process.env.SESSION_SECRET));
+if (config.appMode === "clerk") {
+  app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+}
+app.use(cors({ credentials: true, origin: corsOrigin(config.trustedOrigins) }));
+app.use(cookieParser(config.sessionSecret));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(
-  clerkMiddleware((req) => ({
-    publishableKey: publishableKeyFromHost(
-      getClerkProxyHost(req) ?? "",
-      process.env.CLERK_PUBLISHABLE_KEY,
-    ),
-  })),
-);
+if (config.appMode === "clerk") {
+  app.use(
+    clerkMiddleware((req) => ({
+      publishableKey: publishableKeyFromHost(
+        getClerkProxyHost(req) ?? "",
+        process.env.CLERK_PUBLISHABLE_KEY,
+      ),
+    })),
+  );
+} else {
+  app.use(demoSignedOutAuth());
+}
+app.use(protectCredentialedWrites(config));
+app.use(enforceLiveInference(config));
 
 app.use("/api", router);
 

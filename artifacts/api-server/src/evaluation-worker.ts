@@ -18,6 +18,7 @@ import {
 export const DEFAULT_MAX_ATTEMPTS = 3;
 export const DEFAULT_LEASE_MS = 30_000;
 export const DEFAULT_POLL_MS = 250;
+export const MAX_ACTIVE_LIVE_JOBS_PER_PROJECT = 25;
 
 type Job = typeof jobsTable.$inferSelect;
 type WorkerOptions = {
@@ -32,9 +33,11 @@ export async function enqueueEvaluationJobs(input: {
   projectId: string;
   taskIds: string[];
   mode: EvaluationMode;
+  executor?: Pick<typeof db, "select" | "update" | "insert">;
 }): Promise<number> {
   if (!input.taskIds.length) return 0;
-  const existing = await db.select().from(jobsTable).where(and(
+  const executor = input.executor ?? db;
+  const existing = await executor.select().from(jobsTable).where(and(
     eq(jobsTable.projectId, input.projectId),
     eq(jobsTable.mode, input.mode),
     inArray(jobsTable.taskId, input.taskIds),
@@ -43,7 +46,7 @@ export async function enqueueEvaluationJobs(input: {
   let queued = 0;
   for (const job of existing) {
     if (job.status === "failed") {
-      await db.update(jobsTable).set({
+      const requeued = await executor.update(jobsTable).set({
         status: "queued",
         attempts: 0,
         availableAt: new Date(),
@@ -51,26 +54,40 @@ export async function enqueueEvaluationJobs(input: {
         leaseExpiresAt: null,
         lastError: null,
         updatedAt: new Date(),
-      }).where(and(eq(jobsTable.id, job.id), eq(jobsTable.status, "failed")));
-      queued++;
+      }).where(and(eq(jobsTable.id, job.id), eq(jobsTable.status, "failed")))
+        .returning({ id: jobsTable.id });
+      queued += requeued.length;
     }
   }
-  const rows = await db.insert(jobsTable).values(input.taskIds
+  const pendingInserts = input.taskIds
     .filter((taskId) => !existingByTask.has(taskId))
     .map((taskId) => ({
-    id: randomUUID(),
-    projectId: input.projectId,
-    taskId,
-    mode: input.mode,
-    status: "queued",
-    availableAt: new Date(),
-  }))).onConflictDoNothing({
+      id: randomUUID(),
+      projectId: input.projectId,
+      taskId,
+      mode: input.mode,
+      status: "queued",
+      availableAt: new Date(),
+    }));
+  if (!pendingInserts.length) return queued;
+  const rows = await executor.insert(jobsTable).values(pendingInserts).onConflictDoNothing({
     target: [jobsTable.taskId, jobsTable.mode],
   }).returning({ id: jobsTable.id });
   return queued + rows.length;
 }
 
-async function claimJob(workerId: string, leaseMs: number, maxAttempts: number): Promise<Job | null> {
+export function isLiveInferenceEnabled(
+  environment: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return environment.LIVE_INFERENCE_ENABLED === "true" && environment.APP_MODE === "clerk";
+}
+
+async function claimJob(
+  workerId: string,
+  leaseMs: number,
+  maxAttempts: number,
+  liveEnabled: boolean,
+): Promise<Job | null> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`
       UPDATE rf_jobs
@@ -91,6 +108,7 @@ async function claimJob(workerId: string, leaseMs: number, maxAttempts: number):
           (status = 'queued' AND available_at <= NOW())
           OR (status = 'running' AND lease_expires_at <= NOW() AND attempts < ${maxAttempts})
         )
+          AND (mode <> 'live' OR ${liveEnabled})
         ORDER BY created_at
         FOR UPDATE SKIP LOCKED
         LIMIT 1
@@ -129,8 +147,60 @@ async function loadTask(job: Job) {
   return task;
 }
 
-async function saveSuccess(job: Job, result: EvaluationResult, workerId: string): Promise<void> {
+async function saveSuccess(
+  job: Job,
+  result: EvaluationResult,
+  workerId: string,
+  maxAttempts: number,
+): Promise<void> {
   await db.transaction(async (tx) => {
+    // Fence the lease before touching any domain row. An expired or reclaimed
+    // worker cannot publish a proposal even if its provider call later returns.
+    const fenced = await tx.update(jobsTable).set({
+      status: "succeeded",
+      leaseOwner: null,
+      leaseExpiresAt: null,
+      lastError: null,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(jobsTable.id, job.id),
+      eq(jobsTable.status, "running"),
+      eq(jobsTable.leaseOwner, workerId),
+      eq(jobsTable.attempts, job.attempts),
+      sql`${jobsTable.leaseExpiresAt} > NOW()`,
+    )).returning({ id: jobsTable.id });
+    if (!fenced.length) {
+      // A final-attempt provider response that arrives after lease expiry is
+      // terminal even when no replacement worker has polled yet.
+      await tx.update(jobsTable).set({
+        status: "failed",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        lastError: "Evaluation lease expired after the maximum number of attempts",
+        updatedAt: new Date(),
+      }).where(and(
+        eq(jobsTable.id, job.id),
+        eq(jobsTable.status, "running"),
+        eq(jobsTable.leaseOwner, workerId),
+        eq(jobsTable.attempts, job.attempts),
+        sql`${jobsTable.leaseExpiresAt} <= NOW()`,
+        sql`${jobsTable.attempts} >= ${maxAttempts}`,
+      ));
+      return;
+    }
+
+    // Lock and verify the state before proposal creation. In particular, a
+    // provider response racing a human final decision must not mutate the task.
+    const locked = await tx.execute(sql`
+      SELECT id
+      FROM rf_tasks
+      WHERE id = ${job.taskId}
+        AND project_id = ${job.projectId}
+        AND status IN ('pending', 'proposed', 'in_review')
+      FOR UPDATE
+    `);
+    if (!locked.rows.length) return;
+
     const inserted = await tx.insert(proposalsTable).values({
       id: randomUUID(),
       projectId: job.projectId,
@@ -169,13 +239,6 @@ async function saveSuccess(job: Job, result: EvaluationResult, workerId: string)
         payload: { mode: job.mode, jobId: job.id },
       });
     }
-    await tx.update(jobsTable).set({
-      status: "succeeded",
-      leaseOwner: null,
-      leaseExpiresAt: null,
-      lastError: null,
-      updatedAt: new Date(),
-    }).where(and(eq(jobsTable.id, job.id), eq(jobsTable.leaseOwner, workerId)));
   });
 }
 
@@ -196,7 +259,13 @@ async function saveFailure(
     leaseExpiresAt: null,
     lastError: message,
     updatedAt: new Date(),
-  }).where(and(eq(jobsTable.id, job.id), eq(jobsTable.leaseOwner, workerId)));
+  }).where(and(
+    eq(jobsTable.id, job.id),
+    eq(jobsTable.status, "running"),
+    eq(jobsTable.leaseOwner, workerId),
+    eq(jobsTable.attempts, job.attempts),
+    sql`${jobsTable.leaseExpiresAt} > NOW()`,
+  ));
   return shouldRetry;
 }
 
@@ -217,13 +286,18 @@ export class EvaluationWorker {
   }
 
   async runOnce(): Promise<boolean> {
-    const job = await claimJob(this.workerId, this.leaseMs, this.maxAttempts);
+    const job = await claimJob(
+      this.workerId,
+      this.leaseMs,
+      this.maxAttempts,
+      isLiveInferenceEnabled(),
+    );
     if (!job) return false;
     try {
       const task = await loadTask(job);
       if (!task) throw new ProviderError("Evaluation task no longer exists");
       const result = await this.evaluate(task, job.mode as EvaluationMode);
-      await saveSuccess(job, result, this.workerId);
+      await saveSuccess(job, result, this.workerId, this.maxAttempts);
     } catch (error) {
       await saveFailure(job, this.workerId, error, this.maxAttempts);
     }

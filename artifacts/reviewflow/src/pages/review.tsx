@@ -1,16 +1,33 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGetNextReview, useSubmitReview, getGetNextReviewQueryKey, getGetMetricsQueryKey } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/queryClient";
 import { SimulatedBadge } from "@/components/simulated-badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Check, X, AlertTriangle } from "lucide-react";
+import { ActiveTimeTracker } from "@/lib/active-time";
 
 export default function Review() {
   const { data: item, isLoading } = useGetNextReview();
   const submitReview = useSubmitReview();
   const [reason, setReason] = useState("");
   const [correctedLabel, setCorrectedLabel] = useState<any>("");
+  const activeTime = useRef(new ActiveTimeTracker());
+
+  useEffect(() => {
+    const isActive = () => document.visibilityState === "visible" && document.hasFocus();
+    activeTime.current.reset(isActive());
+    const update = () => activeTime.current.setActive(isActive());
+    document.addEventListener("visibilitychange", update);
+    window.addEventListener("focus", update);
+    window.addEventListener("blur", update);
+    return () => {
+      update();
+      document.removeEventListener("visibilitychange", update);
+      window.removeEventListener("focus", update);
+      window.removeEventListener("blur", update);
+    };
+  }, [item?.task.id]);
 
   if (isLoading) return <div className="p-8 text-muted-foreground">Loading queue...</div>;
   if (!item) return <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-4">
@@ -25,9 +42,9 @@ export default function Review() {
         taskId: item.task.id,
         version: item.task.version,
         action,
-        reason: reason || undefined,
+        reason: action === 'accept' ? undefined : reason || undefined,
         correctedLabel: action === 'correct' ? correctedLabel : undefined,
-        activeMs: 5000, // Simulated active ms
+        activeMs: activeTime.current.milliseconds(),
       }
     }, {
       onSuccess: () => {
@@ -127,6 +144,11 @@ export default function Review() {
         <div className="flex-1 min-h-[40px]" />
 
         <div className="space-y-6 pt-6 mt-6 border-t border-border">
+          {submitReview.isError && (
+            <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              Review failed: {submitReview.error.message}
+            </p>
+          )}
           <div className="space-y-3">
             <h2 className="font-semibold uppercase text-[10px] tracking-widest text-muted-foreground">Accept</h2>
             <Button className="w-full font-medium h-12 text-base" onClick={() => handleAction('accept')} disabled={submitReview.isPending}>

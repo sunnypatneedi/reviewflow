@@ -25,7 +25,7 @@ import {
   reviewsTable,
   tasksTable,
 } from "@workspace/db";
-import { enqueueEvaluationJobs } from "../evaluation-worker";
+import { enqueueEvaluationJobs, MAX_ACTIVE_LIVE_JOBS_PER_PROJECT } from "../evaluation-worker";
 import { MODEL } from "../evaluation";
 import {
   RELEASE_ROLES,
@@ -42,12 +42,69 @@ type Label = (typeof LABELS)[number];
 
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
 const identity = (req: Request) => getAuth(req).userId ?? `demo:${req.signedCookies?.reviewflow_demo ?? "unknown"}`;
+type ImportTask = {
+  externalId: string;
+  question: string;
+  evidence: string;
+  candidateAnswer: string;
+  scenarioFamilyId?: string | null;
+  risk: string;
+};
+
+// Keep this field order stable. Early ReviewFlow rows omitted scenarioFamilyId,
+// so a null scenario deliberately hashes exactly like that legacy shape.
+export function canonicalTaskContent(item: ImportTask): string {
+  return JSON.stringify({
+    externalId: item.externalId,
+    question: item.question,
+    evidence: item.evidence,
+    candidateAnswer: item.candidateAnswer,
+    risk: item.risk,
+    ...(item.scenarioFamilyId == null ? {} : { scenarioFamilyId: item.scenarioFamilyId }),
+  });
+}
+
+export function taskContentHash(item: ImportTask): string {
+  return sha(canonicalTaskContent(item));
+}
+
+function sameTaskContent(row: typeof tasksTable.$inferSelect, item: ImportTask): boolean {
+  return row.externalId === item.externalId
+    && row.question === item.question
+    && row.evidence === item.evidence
+    && row.candidateAnswer === item.candidateAnswer
+    && row.risk === item.risk
+    && (row.scenarioFamilyId ?? null) === (item.scenarioFamilyId ?? null);
+}
 type ProjectContext = {
   project: typeof projectsTable.$inferSelect;
   demoId: string;
   userId: string | null;
   role: ProjectRole | null;
 };
+
+export async function enqueueLiveJobsWithProjectLock(projectId: string, taskIds: string[]) {
+  return db.transaction(async (tx) => {
+    // Serialize admission, retry, and project-mode transition for this project.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${projectId}, 0))`);
+    const active = await tx.select({ taskId: jobsTable.taskId }).from(jobsTable).where(and(
+      eq(jobsTable.projectId, projectId),
+      eq(jobsTable.mode, "live"),
+      inArray(jobsTable.status, ["queued", "running"]),
+    ));
+    const activeTaskIds = new Set(active.map((job) => job.taskId));
+    const additional = taskIds.filter((taskId) => !activeTaskIds.has(taskId)).length;
+    if (active.length + additional > MAX_ACTIVE_LIVE_JOBS_PER_PROJECT) return null;
+    const queued = await enqueueEvaluationJobs({
+      projectId,
+      taskIds,
+      mode: "live",
+      executor: tx,
+    });
+    await tx.update(projectsTable).set({ mode: "live" }).where(eq(projectsTable.id, projectId));
+    return queued;
+  });
+}
 
 const samples = [
   ["rf-001","What is the return window?","Unopened items may be returned within 30 days of delivery.","The return window is 30 days.","low","supported"],
@@ -95,7 +152,7 @@ async function ensureProject(req: Request) {
       });
     }
     await db.insert(tasksTable).values(samples.map(([externalId, question, evidence, candidateAnswer, risk, referenceLabel]) => {
-      const content = JSON.stringify({ externalId, question, evidence, candidateAnswer, risk });
+      const content = canonicalTaskContent({ externalId, question, evidence, candidateAnswer, risk });
       return {
         id: randomUUID(), projectId: key, externalId, question, evidence, candidateAnswer,
         risk, referenceLabel, contentHash: sha(content), mode: "demo",
@@ -335,7 +392,9 @@ router.get("/reviewflow/tasks", async (req, res): Promise<void> => {
 });
 
 router.get("/reviewflow/evaluation-jobs", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req);
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context)) return;
+  const { project } = context;
   const rawTaskIds = Array.isArray(req.query.taskIds)
     ? req.query.taskIds.flatMap((value) => String(value).split(","))
     : String(req.query.taskIds ?? "").split(",");
@@ -364,13 +423,14 @@ router.get("/reviewflow/evaluation-jobs", async (req, res): Promise<void> => {
 });
 
 router.post("/reviewflow/evaluation-jobs/retry", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req);
+  const context = await ensureProject(req);
+  const { project } = context;
   const { taskId, mode, ownerConsent } = req.body ?? {};
   if (typeof taskId !== "string" || !taskId || !["demo", "live"].includes(mode)) {
     res.status(400).json({ error: "A taskId and evaluation mode are required" });
     return;
   }
-  if (mode === "live" && (!isAuthenticated(req) || ownerConsent !== true)) {
+  if (mode === "live" && (!context.userId || ownerConsent !== true)) {
     res.status(403).json({ error: "Live retries require authentication and explicit owner consent" });
     return;
   }
@@ -378,6 +438,7 @@ router.post("/reviewflow/evaluation-jobs/retry", async (req, res): Promise<void>
     res.status(401).json({ error: "Live Jev credentials are not configured" });
     return;
   }
+  if (!await requireProjectAccess(req, res, context, context.userId || mode === "live" ? ["owner"] : undefined)) return;
 
   const [job] = await db.select().from(jobsTable).where(and(
     eq(jobsTable.projectId, project.id),
@@ -393,7 +454,13 @@ router.post("/reviewflow/evaluation-jobs/retry", async (req, res): Promise<void>
     return;
   }
 
-  const queued = await enqueueEvaluationJobs({ projectId: project.id, taskIds: [taskId], mode });
+  const queued = mode === "live"
+    ? await enqueueLiveJobsWithProjectLock(project.id, [taskId])
+    : await enqueueEvaluationJobs({ projectId: project.id, taskIds: [taskId], mode });
+  if (queued === null) {
+    res.status(429).json({ error: `At most ${MAX_ACTIVE_LIVE_JOBS_PER_PROJECT} live evaluations may be active per project` });
+    return;
+  }
   res.status(202).json({ processed: 0, failed: 0, queued, mode });
 });
 
@@ -405,7 +472,12 @@ router.post("/reviewflow/tasks/import", async (req, res): Promise<void> => {
   if (!inputs.length || inputs.length > 200) { res.status(400).json({ error: "Import must contain 1–200 tasks" }); return; }
   const seen = new Set<string>();
   for (const item of inputs) {
-    if (!item.externalId || !item.question || !item.evidence || !item.candidateAnswer || !["low","medium","high"].includes(item.risk)) {
+    if (typeof item.externalId !== "string" || !item.externalId
+      || typeof item.question !== "string" || !item.question
+      || typeof item.evidence !== "string" || !item.evidence
+      || typeof item.candidateAnswer !== "string" || !item.candidateAnswer
+      || (item.scenarioFamilyId != null && typeof item.scenarioFamilyId !== "string")
+      || !["low","medium","high"].includes(item.risk)) {
       res.status(400).json({ error: "Entire import rejected: invalid task shape" }); return;
     }
     if (seen.has(item.externalId) || item.evidence.length > 30_000 || item.question.length > 5_000 || item.candidateAnswer.length > 10_000) {
@@ -413,20 +485,48 @@ router.post("/reviewflow/tasks/import", async (req, res): Promise<void> => {
     }
     seen.add(item.externalId);
   }
-  const existing = await db.select().from(tasksTable).where(and(eq(tasksTable.projectId, project.id), inArray(tasksTable.externalId, [...seen])));
-  const old = new Map(existing.map((t) => [t.externalId, t]));
-  let unchanged = 0;
-  const inserts = [];
-  for (const item of inputs) {
-    const hash = sha(JSON.stringify(item));
-    const prior = old.get(item.externalId);
-    if (prior && prior.contentHash !== hash) { res.status(409).json({ error: `Conflicting content for external ID ${item.externalId}; existing task was not overwritten` }); return; }
-    if (prior) unchanged++;
-    else inserts.push({ id:randomUUID(),projectId:project.id,externalId:item.externalId,question:item.question,evidence:item.evidence,candidateAnswer:item.candidateAnswer,
-      scenarioFamilyId:item.scenarioFamilyId ?? null,risk:item.risk,contentHash:hash,mode:project.mode });
+  try {
+    const imported = await db.transaction(async (tx) => {
+      const inserted = await tx.insert(tasksTable).values(inputs.map((item: ImportTask) => ({
+        id: randomUUID(),
+        projectId: project.id,
+        externalId: item.externalId,
+        question: item.question,
+        evidence: item.evidence,
+        candidateAnswer: item.candidateAnswer,
+        scenarioFamilyId: item.scenarioFamilyId ?? null,
+        risk: item.risk,
+        contentHash: taskContentHash(item),
+        mode: project.mode,
+      }))).onConflictDoNothing({
+        target: [tasksTable.projectId, tasksTable.externalId],
+      }).returning({ externalId: tasksTable.externalId });
+
+      // This read occurs after all unique-key contenders have settled. Throwing
+      // here rolls back every row this request inserted, not merely the conflict.
+      const persisted = await tx.select().from(tasksTable).where(and(
+        eq(tasksTable.projectId, project.id),
+        inArray(tasksTable.externalId, [...seen]),
+      ));
+      const byExternalId = new Map(persisted.map((task) => [task.externalId, task]));
+      for (const item of inputs as ImportTask[]) {
+        const row = byExternalId.get(item.externalId);
+        if (!row || !sameTaskContent(row, item)) {
+          throw Object.assign(new Error(`Conflicting content for external ID ${item.externalId}; existing task was not overwritten`), {
+            code: "IMPORT_CONFLICT",
+          });
+        }
+      }
+      return inserted.length;
+    });
+    res.json({ imported, unchanged: inputs.length - imported, total: inputs.length });
+  } catch (error) {
+    if (error instanceof Error && (error as Error & { code?: string }).code === "IMPORT_CONFLICT") {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    throw error;
   }
-  if (inserts.length) await db.insert(tasksTable).values(inserts);
-  res.json({ imported: inserts.length, unchanged, total: inputs.length });
 });
 
 router.post("/reviewflow/evaluate", async (req, res): Promise<void> => {
@@ -440,16 +540,15 @@ router.post("/reviewflow/evaluate", async (req, res): Promise<void> => {
   }
   if (mode === "live" && ownerConsent !== true) { res.status(403).json({ error: "Live Jev requires explicit owner consent" }); return; }
   if (!await requireProjectAccess(req, res, context, context.userId || mode === "live" ? ["owner"] : undefined)) return;
-  if (mode === "live" && project.mode !== "live") {
-    await db.update(projectsTable).set({ mode: "live" }).where(eq(projectsTable.id, project.id));
-    project.mode = "live";
-  }
   const tasks = await db.select().from(tasksTable).where(and(eq(tasksTable.projectId, project.id), inArray(tasksTable.id, taskIds)));
-  const queued = await enqueueEvaluationJobs({
-    projectId: project.id,
-    taskIds: tasks.map((task) => task.id),
-    mode,
-  });
+  const scopedTaskIds = tasks.map((task) => task.id);
+  const queued = mode === "live"
+    ? await enqueueLiveJobsWithProjectLock(project.id, scopedTaskIds)
+    : await enqueueEvaluationJobs({ projectId: project.id, taskIds: scopedTaskIds, mode });
+  if (queued === null) {
+    res.status(429).json({ error: `At most ${MAX_ACTIVE_LIVE_JOBS_PER_PROJECT} live evaluations may be active per project` });
+    return;
+  }
   res.status(202).json({ processed: 0, failed: 0, queued, mode });
 });
 
@@ -474,13 +573,18 @@ router.post("/reviewflow/reviews", async (req, res): Promise<void> => {
   const { project } = context;
   const { taskId, version, action, correctedLabel, reason, evidenceExcerpt, activeMs } = req.body ?? {};
   const [task] = await db.select().from(tasksTable).where(and(eq(tasksTable.id, taskId),eq(tasksTable.projectId,project.id)));
-  const [proposal] = await db.select().from(proposalsTable).where(eq(proposalsTable.taskId, taskId));
+  const [proposal] = await db.select().from(proposalsTable).where(and(
+    eq(proposalsTable.taskId, taskId),
+    eq(proposalsTable.projectId, project.id),
+  ));
   if (!task || !proposal) { res.status(404).json({ error:"Review item not found" }); return; }
   if (task.version !== version) { res.status(409).json({ error:"This task changed in another session. Reload before submitting." }); return; }
   if (!["accept","correct","escalate"].includes(action)) { res.status(400).json({ error:"Invalid action" }); return; }
   if (action === "correct" && (!LABELS.includes(correctedLabel) || !reason?.trim())) { res.status(400).json({ error:"Corrections require a label and reason" }); return; }
   if (action === "escalate" && !reason?.trim()) { res.status(400).json({ error:"Escalations require a reason" }); return; }
+  if (task.status === "finalized") { res.status(409).json({ error:"This task already has a final decision" }); return; }
   if (task.status === "escalated" && action === "escalate") { res.status(409).json({ error:"This task is already escalated" }); return; }
+  if (!["proposed", "in_review", "escalated"].includes(task.status)) { res.status(409).json({ error:"This task is not reviewable" }); return; }
   const isLive = task.mode === "live" || project.mode === "live";
   const escalationResolution = isEscalationResolution(task.status, action);
   const allowedRoles = escalationResolution
@@ -491,13 +595,26 @@ router.post("/reviewflow/reviews", async (req, res): Promise<void> => {
   if (!await requireProjectAccess(req, res, context, allowedRoles, { allowDemo: !escalationResolution })) return;
   if (evidenceExcerpt && !task.evidence.includes(evidenceExcerpt)) { res.status(400).json({ error:"Evidence excerpt must appear verbatim in supplied evidence" }); return; }
   const finalLabel = action === "accept" ? proposal.label : action === "correct" ? correctedLabel : null;
-  await db.transaction(async (tx) => {
+  const committed = await db.transaction(async (tx) => {
+    const claimed = await tx.update(tasksTable).set({
+      status: action === "escalate" ? "escalated" : "finalized",
+      finalLabel,
+      version: sql`${tasksTable.version} + 1`,
+    }).where(and(
+      eq(tasksTable.id, taskId),
+      eq(tasksTable.projectId, project.id),
+      eq(tasksTable.version, version),
+      ...(task.status === "escalated"
+        ? [eq(tasksTable.status, "escalated")]
+        : [inArray(tasksTable.status, ["proposed", "in_review"])]),
+    )).returning({ id: tasksTable.id });
+    if (!claimed.length) return false;
     await tx.insert(reviewsTable).values({ id:randomUUID(),projectId:project.id,taskId,proposalId:proposal.id,reviewerId:identity(req),
       action,label:finalLabel,reason:reason ?? null,evidenceExcerpt:evidenceExcerpt ?? null,activeMs,taskVersion:version });
-    await tx.update(tasksTable).set({ status: action === "escalate" ? "escalated" : "finalized",finalLabel,version:sql`${tasksTable.version} + 1` })
-      .where(and(eq(tasksTable.id,taskId),eq(tasksTable.version,version)));
     await tx.insert(eventsTable).values({ id:randomUUID(),projectId:project.id,actorId:identity(req),type:`review.${action}`,entityId:taskId,payload:{ reason:reason ?? null } });
+    return true;
   });
+  if (!committed) { res.status(409).json({ error:"This task changed in another session. Reload before submitting." }); return; }
   const updated = (await taskViews(project.id)).find((t) => t.id === taskId); res.json(updated);
 });
 
@@ -551,15 +668,10 @@ router.get("/reviewflow/releases/:id/download", async (req,res):Promise<void> =>
   if (!await requireProjectAccess(req, res, context, release.mode === "live" ? RELEASE_ROLES : undefined)) return;
   res.setHeader("content-type","application/x-ndjson");res.setHeader("content-disposition",`attachment; filename=\"${release.name.replace(/[^a-z0-9_-]/gi,"_")}.jsonl\"`);res.send(release.jsonl);
 });
-router.get("/reviewflow/audits",async(req,res):Promise<void>=>{
-  const context = await ensureProject(req);
-  if (!await requireProjectAccess(req, res, context)) return;
-  const rows=await db.select().from(auditsTable).where(eq(auditsTable.projectId,context.project.id));
-  res.json(rows.map((a)=>({...a,createdAt:a.createdAt.toISOString(),updatedAt:undefined,projectId:undefined,auditorId:undefined,samplingFrameHash:undefined})));
-});
-
 router.post("/reviewflow/audits", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req);
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context, REVIEW_ROLES)) return;
+  const { project } = context;
   const actorId = identity(req);
   const requestedSize = Number(req.body?.sampleSize);
   const independent = req.body?.independent !== false;
@@ -661,12 +773,16 @@ router.post("/reviewflow/audits", async (req, res): Promise<void> => {
 });
 
 router.get("/reviewflow/audits", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req);
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context)) return;
+  const { project } = context;
   res.json(await auditSummary(project.id));
 });
 
 router.get("/reviewflow/audits/:id", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req);
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context, REVIEW_ROLES)) return;
+  const { project } = context;
   const id = String(req.params.id);
   const actorId = identity(req);
   const [audit] = await db.select().from(auditsTable).where(and(eq(auditsTable.id, id), eq(auditsTable.projectId, project.id)));
@@ -699,7 +815,9 @@ router.get("/reviewflow/audits/:id", async (req, res): Promise<void> => {
 });
 
 router.post("/reviewflow/audits/:id/decisions", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req);
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context, REVIEW_ROLES)) return;
+  const { project } = context;
   const id = String(req.params.id);
   const actorId = identity(req);
   const { auditItemId, label, reason } = req.body ?? {};
@@ -719,8 +837,8 @@ router.post("/reviewflow/audits/:id/decisions", async (req, res): Promise<void> 
   const decisionId = randomUUID();
   let disputeId: string | null = null;
   let status = audit.status;
-  await db.transaction(async (tx) => {
-    await tx.insert(auditDecisionsTable).values({
+  const decisionCommitted = await db.transaction(async (tx) => {
+    const claimed = await tx.insert(auditDecisionsTable).values({
       id: decisionId,
       auditId: audit.id,
       auditItemId: item.id,
@@ -730,7 +848,10 @@ router.post("/reviewflow/audits/:id/decisions", async (req, res): Promise<void> 
       reason: reason?.trim() || null,
       selfCheck,
       included: !selfCheck,
-    });
+    }).onConflictDoNothing({
+      target: [auditDecisionsTable.auditItemId, auditDecisionsTable.auditorId],
+    }).returning({ id: auditDecisionsTable.id });
+    if (!claimed.length) return false;
     if (!selfCheck && label !== item.originalLabel) {
       disputeId = randomUUID();
       await tx.insert(auditDisputesTable).values({
@@ -758,12 +879,16 @@ router.post("/reviewflow/audits/:id/decisions", async (req, res): Promise<void> 
       id: randomUUID(), projectId: project.id, actorId, type: "audit.decision.submitted", entityId: audit.id,
       payload: { auditItemId: item.id, selfCheck, included: !selfCheck, disputeId },
     });
+    return true;
   });
+  if (!decisionCommitted) { res.status(409).json({ error: "This audit item already has a decision" }); return; }
   res.status(201).json({ id: decisionId, auditId: audit.id, auditItemId: item.id, taskId: item.taskId, label, selfCheck, included: !selfCheck, disputeId, status });
 });
 
 router.get("/reviewflow/audits/:id/adjudication", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req);
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context, RELEASE_ROLES)) return;
+  const { project } = context;
   const auditId = String(req.params.id);
   const actorId = identity(req);
   const [audit] = await db.select().from(auditsTable).where(and(eq(auditsTable.id, auditId), eq(auditsTable.projectId, project.id)));
@@ -808,7 +933,9 @@ router.get("/reviewflow/audits/:id/adjudication", async (req, res): Promise<void
 });
 
 router.post("/reviewflow/audits/:id/disputes/:disputeId/adjudicate", async (req, res): Promise<void> => {
-  const { project } = await ensureProject(req);
+  const context = await ensureProject(req);
+  if (!await requireProjectAccess(req, res, context, RELEASE_ROLES)) return;
+  const { project } = context;
   const auditId = String(req.params.id);
   const disputeId = String(req.params.disputeId);
   const actorId = identity(req);
@@ -821,10 +948,14 @@ router.post("/reviewflow/audits/:id/disputes/:disputeId/adjudicate", async (req,
   const [item] = await db.select().from(auditItemsTable).where(eq(auditItemsTable.id, dispute.auditItemId));
   if (item?.originalReviewerId === actorId) { res.status(403).json({ error: "The original reviewer cannot adjudicate this disagreement" }); return; }
   if (dispute.status !== "pending") { res.status(409).json({ error: "This disagreement has already been adjudicated" }); return; }
-  await db.transaction(async (tx) => {
-    await tx.update(auditDisputesTable).set({
+  const adjudicated = await db.transaction(async (tx) => {
+    const claimed = await tx.update(auditDisputesTable).set({
       status: "resolved", adjudicatorId: actorId, resolvedLabel, reason: reason?.trim() || null,
-    }).where(eq(auditDisputesTable.id, dispute.id));
+    }).where(and(
+      eq(auditDisputesTable.id, dispute.id),
+      eq(auditDisputesTable.status, "pending"),
+    )).returning({ id: auditDisputesTable.id });
+    if (!claimed.length) return false;
     const [pending] = await tx.select({ id: auditDisputesTable.id }).from(auditDisputesTable)
       .where(and(eq(auditDisputesTable.auditId, audit.id), eq(auditDisputesTable.status, "pending")));
     const items = await tx.select({ id: auditItemsTable.id }).from(auditItemsTable).where(eq(auditItemsTable.auditId, audit.id));
@@ -840,7 +971,9 @@ router.post("/reviewflow/audits/:id/disputes/:disputeId/adjudicate", async (req,
       id: randomUUID(), projectId: project.id, actorId, type: "audit.dispute.adjudicated", entityId: dispute.id,
       payload: { auditId, resolvedLabel },
     });
+    return true;
   });
+  if (!adjudicated) { res.status(409).json({ error: "This disagreement has already been adjudicated" }); return; }
   res.json({ id: dispute.id, auditId, auditItemId: dispute.auditItemId, taskId: dispute.taskId, originalLabel: dispute.originalLabel, auditLabel: dispute.auditLabel, status: "resolved", resolvedLabel, adjudicatorId: actorId });
 });
 
