@@ -190,6 +190,7 @@ export const EvaluateResultMode = {
 export interface EvaluateResult {
   processed: number;
   failed: number;
+  queued: number;
   mode: EvaluateResultMode;
 }
 

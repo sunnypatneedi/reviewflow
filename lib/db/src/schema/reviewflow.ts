@@ -5,6 +5,7 @@ import {
   pgTable,
   text,
   timestamp,
+  index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -65,12 +66,17 @@ export const jobsTable = pgTable("rf_jobs", {
   projectId: text("project_id").notNull(),
   taskId: text("task_id").notNull(),
   status: text("status").notNull().default("queued"),
+  mode: text("mode").notNull().default("demo"),
   attempts: integer("attempts").notNull().default(0),
+  availableAt: timestamp("available_at", { withTimezone: true }).notNull().defaultNow(),
   leaseOwner: text("lease_owner"),
   leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
   lastError: text("last_error"),
   ...timestamps,
-});
+}, (table) => [
+  uniqueIndex("rf_jobs_task_mode_unique").on(table.taskId, table.mode),
+  index("rf_jobs_claim_index").on(table.status, table.availableAt, table.leaseExpiresAt),
+]);
 
 export const proposalsTable = pgTable("rf_proposals", {
   id: text("id").primaryKey(),

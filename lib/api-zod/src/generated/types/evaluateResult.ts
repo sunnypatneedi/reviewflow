@@ -10,5 +10,6 @@ import type { EvaluateResultMode } from './evaluateResultMode';
 export interface EvaluateResult {
   processed: number;
   failed: number;
+  queued: number;
   mode: EvaluateResultMode;
 }

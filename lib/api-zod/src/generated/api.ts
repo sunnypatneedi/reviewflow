@@ -175,6 +175,7 @@ export const EvaluateTasksBody = zod.object({
 export const EvaluateTasksResponse = zod.object({
   "processed": zod.number().int(),
   "failed": zod.number().int(),
+  "queued": zod.number().int(),
   "mode": zod.enum(['demo', 'live'])
 })
 

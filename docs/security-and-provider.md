@@ -4,6 +4,7 @@
 - Live task content is sent only after authenticated owner consent.
 - Demo mode never makes paid requests.
 - Live failures never substitute deterministic demo output.
+- Evaluation jobs retry only transient provider failures. `401` and invalid requests are terminal; `429` and `529` respect `Retry-After` before the next bounded attempt.
 - The pinned request model is `jev-1.13.0`; the provider's actual returned model ID is preserved.
 - Choice probabilities must be finite, within `[0,1]`, and sum to approximately one.
 - Noul is read from `noul`, not from a confidence field.

@@ -1,0 +1,1 @@
+- [Raw SQL claim rows](raw-sql-claim-aliases.md) — Drizzle raw SQL results need explicit quoted camelCase aliases before use as typed rows.

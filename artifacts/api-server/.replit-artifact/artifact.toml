@@ -30,3 +30,26 @@ NODE_ENV = "production"
 
 [services.production.health.startup]
 path = "/api/healthz"
+
+[[services]]
+localPort = 8099
+name = "Evaluation Worker"
+
+[services.development]
+run = "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/api-server run worker"
+
+[services.production]
+
+[services.production.build]
+args = ["pnpm", "--filter", "@workspace/api-server", "run", "build"]
+
+[services.production.build.env]
+NODE_ENV = "production"
+
+[services.production.run]
+args = ["node", "--enable-source-maps", "artifacts/api-server/dist/worker.mjs"]
+
+[services.production.run.env]
+PORT = "8099"
+WORKER_PORT = "8099"
+NODE_ENV = "production"

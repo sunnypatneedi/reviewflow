@@ -72,6 +72,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EvaluateResult" }
+        "202":
+          description: Evaluation jobs queued for the supervised worker
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EvaluateResult" }
         "401": { description: Live credentials missing }
         "502": { description: "Provider failure; never simulated" }
   /reviewflow/review/next:
@@ -263,10 +268,11 @@ components:
         ownerConsent: { type: boolean }
     EvaluateResult:
       type: object
-      required: [processed, failed, mode]
+      required: [processed, failed, queued, mode]
       properties:
         processed: { type: integer }
         failed: { type: integer }
+        queued: { type: integer }
         mode: { type: string, enum: [demo, live] }
     ReviewItem:
       type: object
