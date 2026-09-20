@@ -11,7 +11,13 @@ import {
   proposalsTable,
   tasksTable,
 } from "@workspace/db";
-import { simulated, ProviderError, type EvaluationTask } from "./evaluation";
+import {
+  evaluateTask,
+  getRetryDelayMs,
+  simulated,
+  ProviderError,
+  type EvaluationTask,
+} from "./evaluation";
 import { enqueueEvaluationJobs, EvaluationWorker } from "./evaluation-worker";
 
 const createdProjectIds: string[] = [];
@@ -175,4 +181,128 @@ test("an expired lease on the final attempt becomes terminal without another pro
   assert.equal(providerCalled, false);
   assert.equal(job?.status, "failed");
   assert.equal(job?.attempts, 1);
+});
+
+test("live provider transport classifies retryable failures without network access", async () => {
+  const task = {
+    question: "What is the return window?",
+    evidence: "Items may be returned within 30 days.",
+    candidateAnswer: "The return window is 30 days.",
+  } as EvaluationTask;
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.TYPESAFE_API_KEY;
+  const requests: RequestInit[] = [];
+  process.env.TYPESAFE_API_KEY = "transport-test-key";
+
+  try {
+    const cases: Array<{
+      name: string;
+      response?: Response;
+      error?: Error;
+      retryable: boolean;
+      status?: number;
+      retryAfterMs?: number;
+      retryAfterAtLeastMs?: number;
+    }> = [
+      {
+        name: "401 authentication failure",
+        response: new Response("", { status: 401 }),
+        retryable: false,
+        status: 401,
+      },
+      {
+        name: "invalid 422 request",
+        response: new Response("", { status: 422 }),
+        retryable: false,
+        status: 422,
+      },
+      {
+        name: "429 seconds-based rate limit",
+        response: new Response("", { status: 429, headers: { "retry-after": "7" } }),
+        retryable: true,
+        status: 429,
+        retryAfterMs: 7_000,
+      },
+      {
+        name: "529 HTTP-date rate limit",
+        response: new Response("", {
+          status: 529,
+          headers: { "retry-after": new Date(Date.now() + 10_000).toUTCString() },
+        }),
+        retryable: true,
+        status: 529,
+        retryAfterAtLeastMs: 8_000,
+      },
+      {
+        name: "malformed JSON",
+        response: new Response("{", { status: 200 }),
+        retryable: false,
+        status: 200,
+      },
+      {
+        name: "invalid typed response",
+        response: new Response(JSON.stringify({
+          answers: { label: { choice: "supported" } },
+        }), { status: 200 }),
+        retryable: false,
+        status: 200,
+      },
+      {
+        name: "transient 503 response",
+        response: new Response("", { status: 503 }),
+        retryable: true,
+        status: 503,
+      },
+      {
+        name: "transient network failure",
+        error: new Error("socket closed"),
+        retryable: true,
+      },
+    ];
+
+    for (const currentCase of cases) {
+      globalThis.fetch = async (_input, init) => {
+        requests.push(init ?? {});
+        if (currentCase.error) throw currentCase.error;
+        return currentCase.response!;
+      };
+
+      const result = evaluateTask(task, "live");
+      if (currentCase.name === "transient network failure") {
+        await assert.rejects(result, (error: unknown) => {
+          assert.ok(error instanceof ProviderError);
+          assert.equal(error.retryable, currentCase.retryable);
+          assert.equal(error.status, currentCase.status);
+          return true;
+        });
+        continue;
+      }
+
+      await assert.rejects(result, (error: unknown) => {
+        assert.ok(error instanceof ProviderError);
+        assert.equal(error.retryable, currentCase.retryable);
+        assert.equal(error.status, currentCase.status);
+        if (currentCase.retryAfterMs !== undefined) {
+          assert.equal(error.retryAfterMs, currentCase.retryAfterMs);
+          assert.equal(getRetryDelayMs(error, 1), currentCase.retryAfterMs);
+        } else if (currentCase.retryAfterAtLeastMs !== undefined) {
+          assert.ok((error.retryAfterMs ?? 0) >= currentCase.retryAfterAtLeastMs);
+          assert.ok(getRetryDelayMs(error, 1) >= currentCase.retryAfterAtLeastMs);
+        } else {
+          assert.equal(error.retryAfterMs, undefined);
+        }
+        return true;
+      }, currentCase.name);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.TYPESAFE_API_KEY;
+    else process.env.TYPESAFE_API_KEY = originalKey;
+  }
+
+  assert.equal(requests.length, 8);
+  assert.ok(requests.every((request) => request.method === "POST"));
+  assert.ok(requests.every((request) => request.headers instanceof Headers
+    ? request.headers.get("authorization") === "Bearer transport-test-key"
+    : (request.headers as Record<string, string>).authorization === "Bearer transport-test-key"));
 });
