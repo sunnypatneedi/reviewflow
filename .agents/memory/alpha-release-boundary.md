@@ -23,3 +23,12 @@ are distinct.
 
 **How to apply:** Treat write rejection as an unresolved repository/integration
 permission boundary, preserve the verified candidate, and do not claim publication.
+
+Connector OAuth is not automatically available to shell Git or GitHub CLI.
+
+**Why:** The connector authenticated successfully while shell Git had no credential
+helper and GitHub CLI had no authenticated session.
+
+**How to apply:** Keep direct-push remotes and credential helpers confined to the
+sanitized checkout. If connector writes remain unavailable, request any direct-Git
+credential through Secrets, never chat, shell output, or remote URLs.
