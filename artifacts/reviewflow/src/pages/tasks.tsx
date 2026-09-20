@@ -1,5 +1,15 @@
-import { useState } from "react";
-import { useListTasks, useImportTasks, useEvaluateTasks, getListTasksQueryKey, getGetMetricsQueryKey } from "@workspace/api-client-react";
+import { useMemo, useState } from "react";
+import {
+  useListTasks,
+  useImportTasks,
+  useEvaluateTasks,
+  useListEvaluationJobs,
+  useRetryEvaluationJob,
+  getListTasksQueryKey,
+  getGetMetricsQueryKey,
+  getListEvaluationJobsQueryKey,
+  type EvaluationJob,
+} from "@workspace/api-client-react";
 import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,14 +18,44 @@ import { formatDate } from "@/lib/utils";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 
 export default function Tasks() {
-  const { data: tasks, isLoading } = useListTasks();
+  const { data: tasks, isLoading } = useListTasks({
+    query: { queryKey: getListTasksQueryKey(), refetchInterval: 3000 },
+  });
   const importTasks = useImportTasks();
   const evaluateTasks = useEvaluateTasks();
+  const retryEvaluationJob = useRetryEvaluationJob();
   
   const [importJson, setImportJson] = useState("");
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [evalMode, setEvalMode] = useState<'demo'|'live'>('demo');
   const [consent, setConsent] = useState(false);
+  const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
+  const taskIds = useMemo(() => tasks?.map((task) => task.id) ?? [], [tasks]);
+  const { data: evaluationJobs = [], isLoading: jobsLoading } = useListEvaluationJobs(
+    { taskIds },
+    {
+      query: {
+        queryKey: getListEvaluationJobsQueryKey({ taskIds }),
+        enabled: taskIds.length > 0,
+        refetchInterval: (query) => (
+          query.state.data?.some((job) => job.status === "queued" || job.status === "running")
+            ? 1500
+            : false
+        ),
+      },
+    },
+  );
+  const jobsByTask = useMemo(() => {
+    const grouped = new Map<string, EvaluationJob[]>();
+    for (const job of evaluationJobs) {
+      const current = grouped.get(job.taskId) ?? [];
+      current.push(job);
+      grouped.set(job.taskId, current);
+    }
+    return grouped;
+  }, [evaluationJobs]);
+  const activeJobCount = evaluationJobs.filter((job) => job.status === "queued" || job.status === "running").length;
+  const failedJobCount = evaluationJobs.filter((job) => job.status === "failed").length;
 
   const handleImport = () => {
     try {
@@ -50,6 +90,52 @@ export default function Tasks() {
     });
   };
 
+  const handleRetry = (job: EvaluationJob) => {
+    if (job.mode === "live" && !consent) {
+      setEvalMode("live");
+      return;
+    }
+    setRetryingJobId(job.id);
+    retryEvaluationJob.mutate({
+      data: { taskId: job.taskId, mode: job.mode, ownerConsent: consent },
+    }, {
+      onSettled: () => setRetryingJobId(null),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListEvaluationJobsQueryKey({ taskIds }) });
+        queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetMetricsQueryKey() });
+      },
+    });
+  };
+
+  const renderJobStatus = (job: EvaluationJob) => {
+    const statusClass = {
+      queued: "bg-slate-100 text-slate-700",
+      running: "bg-blue-100 text-blue-700",
+      succeeded: "bg-emerald-100 text-emerald-700",
+      failed: "bg-red-100 text-red-700",
+    }[job.status];
+    return (
+      <div key={job.id} className="flex items-center gap-1.5 text-[10px]">
+        <span className={`px-1.5 py-0.5 rounded uppercase font-semibold tracking-wider ${statusClass}`}>
+          {job.mode} · {job.status}
+        </span>
+        {job.status === "failed" && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 px-2 text-[10px]"
+            disabled={retryingJobId === job.id || (job.mode === "live" && !consent)}
+            title={job.mode === "live" && !consent ? "Select Live mode and confirm consent before retrying" : undefined}
+            onClick={() => handleRetry(job)}
+          >
+            {retryingJobId === job.id ? "Retrying…" : "Retry"}
+          </Button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
       <div className="flex justify-between items-end">
@@ -61,6 +147,18 @@ export default function Tasks() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-4">
+          {(activeJobCount > 0 || failedJobCount > 0) && (
+            <div className="flex items-center justify-between rounded-md border border-border bg-card px-4 py-3 text-sm">
+              <span>
+                {activeJobCount > 0
+                  ? `${activeJobCount} evaluation${activeJobCount === 1 ? "" : "s"} in progress`
+                  : "Evaluation failures need attention"}
+              </span>
+              {failedJobCount > 0 && (
+                <span className="text-xs text-red-600">{failedJobCount} failed</span>
+              )}
+            </div>
+          )}
           <div className="border border-border rounded-md bg-card">
             <Table>
               <TableHeader>
@@ -68,6 +166,7 @@ export default function Tasks() {
                   <TableHead className="w-12"></TableHead>
                   <TableHead>Ext ID</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Evaluation</TableHead>
                   <TableHead>Mode</TableHead>
                   <TableHead>Risk</TableHead>
                   <TableHead>Created</TableHead>
@@ -75,7 +174,7 @@ export default function Tasks() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-4">Loading tasks...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-4">Loading tasks...</TableCell></TableRow>
                 ) : tasks?.map(task => (
                   <TableRow key={task.id}>
                     <TableCell>
@@ -98,6 +197,16 @@ export default function Tasks() {
                       </span>
                     </TableCell>
                     <TableCell>
+                      <div className="space-y-1">
+                        {jobsByTask.get(task.id)?.map(renderJobStatus)}
+                        {!jobsByTask.has(task.id) && (
+                          <span className="text-xs text-muted-foreground">
+                            {jobsLoading ? "Loading…" : "Not evaluated"}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       {task.mode === 'demo' ? <SimulatedBadge mode={task.mode} /> : <span className="text-xs">Live</span>}
                     </TableCell>
                     <TableCell className="capitalize text-xs">{task.risk}</TableCell>
@@ -105,7 +214,7 @@ export default function Tasks() {
                   </TableRow>
                 ))}
                 {tasks?.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No tasks found. Import some to begin.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No tasks found. Import some to begin.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

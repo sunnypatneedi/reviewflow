@@ -194,6 +194,7 @@ export interface EvaluateResult {
   mode: EvaluateResultMode;
 }
 
+export type EvaluationRetryInputMode = typeof EvaluationRetryInputMode[keyof typeof EvaluationRetryInputMode];
 export interface ReviewItem {
   task: Task;
   routingReasons: string[];
@@ -335,6 +336,16 @@ export interface Bootstrap {
   releases: Release[];
 }
 
+export type ListEvaluationJobsParams = {
+/**
+ * Task IDs in the selected evaluation batch.
+ * @minItems 1
+ * @maxItems 200
+ */
+taskIds: string[];
+mode?: ListEvaluationJobsMode;
+};
+
 
 export interface AuditAdjudicationDispute {
   id: string;
@@ -429,3 +440,49 @@ export interface AuditItem {
   /** @nullable */
   decision: AuditTaskDecision | null;
 }
+
+export const EvaluationRetryInputMode = {
+  demo: 'demo',
+  live: 'live',
+} as const;
+
+export const EvaluationJobStatus = {
+  queued: 'queued',
+  running: 'running',
+  succeeded: 'succeeded',
+  failed: 'failed',
+} as const;
+
+export const EvaluationJobMode = {
+  demo: 'demo',
+  live: 'live',
+} as const;
+
+export type EvaluationJobStatus = typeof EvaluationJobStatus[keyof typeof EvaluationJobStatus];
+
+export const ListEvaluationJobsMode = {
+  demo: 'demo',
+  live: 'live',
+} as const;
+
+export interface EvaluationJob {
+  id: string;
+  taskId: string;
+  mode: EvaluationJobMode;
+  status: EvaluationJobStatus;
+  attempts: number;
+  /** @nullable */
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type EvaluationJobMode = typeof EvaluationJobMode[keyof typeof EvaluationJobMode];
+
+export interface EvaluationRetryInput {
+  taskId: string;
+  mode: EvaluationRetryInputMode;
+  ownerConsent: boolean;
+}
+
+export type ListEvaluationJobsMode = typeof ListEvaluationJobsMode[keyof typeof ListEvaluationJobsMode];

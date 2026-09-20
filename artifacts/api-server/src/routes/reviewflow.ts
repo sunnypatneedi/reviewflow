@@ -261,6 +261,69 @@ router.get("/reviewflow/tasks", async (req, res): Promise<void> => {
   const { project } = await ensureProject(req); res.json(await taskViews(project.id));
 });
 
+router.get("/reviewflow/evaluation-jobs", async (req, res): Promise<void> => {
+  const { project } = await ensureProject(req);
+  const rawTaskIds = Array.isArray(req.query.taskIds)
+    ? req.query.taskIds.flatMap((value) => String(value).split(","))
+    : String(req.query.taskIds ?? "").split(",");
+  const taskIds = [...new Set(rawTaskIds.map((value) => value.trim()).filter(Boolean))];
+  const mode = req.query.mode ? String(req.query.mode) : undefined;
+  if (!taskIds.length || taskIds.length > 200 || (mode && !["demo", "live"].includes(mode))) {
+    res.status(400).json({ error: "taskIds must contain 1–200 task IDs and mode must be demo or live" });
+    return;
+  }
+
+  const jobs = await db.select().from(jobsTable).where(and(
+    eq(jobsTable.projectId, project.id),
+    inArray(jobsTable.taskId, taskIds),
+    ...(mode ? [eq(jobsTable.mode, mode)] : []),
+  ));
+  res.json(jobs.map((job) => ({
+    id: job.id,
+    taskId: job.taskId,
+    mode: job.mode,
+    status: job.status,
+    attempts: job.attempts,
+    lastError: job.status === "failed" ? job.lastError : null,
+    createdAt: job.createdAt.toISOString(),
+    updatedAt: job.updatedAt.toISOString(),
+  })));
+});
+
+router.post("/reviewflow/evaluation-jobs/retry", async (req, res): Promise<void> => {
+  const { project } = await ensureProject(req);
+  const { taskId, mode, ownerConsent } = req.body ?? {};
+  if (typeof taskId !== "string" || !taskId || !["demo", "live"].includes(mode)) {
+    res.status(400).json({ error: "A taskId and evaluation mode are required" });
+    return;
+  }
+  if (mode === "live" && (!isAuthenticated(req) || ownerConsent !== true)) {
+    res.status(403).json({ error: "Live retries require authentication and explicit owner consent" });
+    return;
+  }
+  if (mode === "live" && !process.env.TYPESAFE_API_KEY) {
+    res.status(401).json({ error: "Live Jev credentials are not configured" });
+    return;
+  }
+
+  const [job] = await db.select().from(jobsTable).where(and(
+    eq(jobsTable.projectId, project.id),
+    eq(jobsTable.taskId, taskId),
+    eq(jobsTable.mode, mode),
+  ));
+  if (!job) {
+    res.status(404).json({ error: "Evaluation job not found" });
+    return;
+  }
+  if (job.status !== "failed") {
+    res.status(409).json({ error: "Only terminally failed evaluation jobs can be retried" });
+    return;
+  }
+
+  const queued = await enqueueEvaluationJobs({ projectId: project.id, taskIds: [taskId], mode });
+  res.status(202).json({ processed: 0, failed: 0, queued, mode });
+});
+
 router.post("/reviewflow/tasks/import", async (req, res): Promise<void> => {
   const { project } = await ensureProject(req);
   const inputs = Array.isArray(req.body?.tasks) ? req.body.tasks : [];

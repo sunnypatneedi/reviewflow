@@ -158,7 +158,7 @@ export const ListTasksResponseItem = zod.object({
 })
 export const ListTasksResponse = zod.array(ListTasksResponseItem)
 
-
+export const listEvaluationJobsQueryTaskIdsMax = 200;
 export const evaluateTasksBodyTaskIdsMax = 25;
 
 
@@ -494,4 +494,35 @@ export const CreateAuditBody = zod.object({
   "seed": zod.string().max(createAuditBodySeedMax).nullish(),
   "independent": zod.boolean(),
   "required": zod.boolean()
+})
+
+export const ListEvaluationJobsResponseItem = zod.object({
+  "id": zod.string(),
+  "taskId": zod.string(),
+  "mode": zod.enum(['demo', 'live']),
+  "status": zod.enum(['queued', 'running', 'succeeded', 'failed']),
+  "attempts": zod.number().int(),
+  "lastError": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+export const ListEvaluationJobsResponse = zod.array(ListEvaluationJobsResponseItem)
+
+export const RetryEvaluationJobBody = zod.object({
+  "taskId": zod.string(),
+  "mode": zod.enum(['demo', 'live']),
+  "ownerConsent": zod.boolean()
+})
+
+export const RetryEvaluationJobResponse = zod.object({
+  "processed": zod.number().int(),
+  "failed": zod.number().int(),
+  "queued": zod.number().int(),
+  "mode": zod.enum(['demo', 'live'])
+})
+
+export const ListEvaluationJobsQueryParams = zod.object({
+  "taskIds": zod.array(zod.coerce.string()).min(1).max(listEvaluationJobsQueryTaskIdsMax).describe('Task IDs in the selected evaluation batch.'),
+  "mode": zod.enum(['demo', 'live']).optional()
 })

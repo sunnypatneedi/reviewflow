@@ -57,6 +57,54 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/Task" }
+  /reviewflow/evaluation-jobs:
+    get:
+      operationId: listEvaluationJobs
+      tags: [reviewflow]
+      parameters:
+        - in: query
+          name: taskIds
+          required: true
+          description: Task IDs in the selected evaluation batch.
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 200
+            items: { type: string }
+          style: form
+          explode: false
+        - in: query
+          name: mode
+          required: false
+          schema: { type: string, enum: [demo, live] }
+      responses:
+        "200":
+          description: Evaluation jobs scoped to the current project and requested tasks.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EvaluationJob" }
+        "400": { description: Invalid task batch filter }
+  /reviewflow/evaluation-jobs/retry:
+    post:
+      operationId: retryEvaluationJob
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EvaluationRetryInput" }
+      responses:
+        "202":
+          description: The selected failed job was re-enqueued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EvaluateResult" }
+        "401": { description: Live credentials missing }
+        "403": { description: Live consent or authentication required }
+        "404": { description: Evaluation job not found in the current project }
+        "409": { description: Only terminally failed jobs can be retried }
   /reviewflow/evaluate:
     post:
       operationId: evaluateTasks
@@ -369,6 +417,25 @@ components:
         failed: { type: integer }
         queued: { type: integer }
         mode: { type: string, enum: [demo, live] }
+    EvaluationRetryInput:
+      type: object
+      required: [taskId, mode, ownerConsent]
+      properties:
+        taskId: { type: string }
+        mode: { type: string, enum: [demo, live] }
+        ownerConsent: { type: boolean }
+    EvaluationJob:
+      type: object
+      required: [id, taskId, mode, status, attempts, lastError, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        taskId: { type: string }
+        mode: { type: string, enum: [demo, live] }
+        status: { type: string, enum: [queued, running, succeeded, failed] }
+        attempts: { type: integer }
+        lastError: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     ReviewItem:
       type: object
       required: [task, routingReasons]
