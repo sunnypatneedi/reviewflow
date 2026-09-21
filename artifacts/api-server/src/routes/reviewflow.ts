@@ -28,6 +28,7 @@ import {
 import { enqueueEvaluationJobs, MAX_ACTIVE_LIVE_JOBS_PER_PROJECT } from "../evaluation-worker";
 import { MODEL } from "../evaluation";
 import type { RuntimeConfig } from "../config/runtime";
+import { registerTraceRoutes } from "./traces";
 import {
   RELEASE_ROLES,
   REVIEW_ROLES,
@@ -1062,5 +1063,7 @@ router.post("/reviewflow/audits/:id/disputes/:disputeId/adjudicate", async (req,
   if (!adjudicated) { res.status(409).json({ error: "This disagreement has already been adjudicated" }); return; }
   res.json({ id: dispute.id, auditId, auditItemId: dispute.auditItemId, taskId: dispute.taskId, originalLabel: dispute.originalLabel, auditLabel: dispute.auditLabel, status: "resolved", resolvedLabel, adjudicatorId: actorId });
 });
+
+registerTraceRoutes(router, { ensureProject, requireProjectAccess, identity });
 
 export default router;

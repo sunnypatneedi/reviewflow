@@ -13,6 +13,7 @@ process's `PORT` value on its command line as shown below.
 
 - Node.js 24
 - pnpm 10
+- Python 3.11+ (`python3` on `PATH`) for the integrated Trace2Preference validator
 - PostgreSQL 16 (the SQL may work on nearby versions, but they are not the
   repository's configured baseline)
 - `createdb` or equivalent PostgreSQL administration access
@@ -46,6 +47,28 @@ The migration command deliberately ignores `DATABASE_URL` and uses only
 These are guardrails, not proof that a database is empty. Create a **new,
 disposable database** and inspect the target yourself. Never aim this runner at
 an existing application or user database.
+
+## Explicit additive development enablement
+
+For an **existing development** ReviewFlow database whose original schema is
+already present, an operator may review and explicitly run:
+
+```bash
+node lib/db/scripts/enable-traces.mjs --confirm-additive-trace-schema
+```
+
+This separate opt-in command uses `DATABASE_URL`, refuses production/deployment
+mode and missing prerequisite schema, and adds only the trace table/index.
+It validates an existing trace table rather than replacing it; incompatible
+schemas fail transactionally. It does not seed, migrate existing records, or
+run automatically at startup. Review the target and arrange a backup under
+your normal operational process first. Do not mark a real working database
+disposable to bypass the migration runner.
+
+Regression tests for this command run in a second throwaway PostgreSQL cluster,
+including idempotence, preservation of existing synthetic records, and refusal
+of an incompatible table. The full verification harness never targets your
+working database.
 
 ## Run the demo
 
@@ -95,6 +118,14 @@ pnpm run dev:proxy
 Open `http://localhost:8080`. The proxy sends `/api` to Express and everything
 else, including Vite's WebSocket, to the web process. The worker must remain
 running for queued evaluations to advance.
+
+The **Trace2Preference** navigation entry is separate from the original evidence
+labeling pages. Start with its explicitly scripted synthetic sample, or import
+your own authorized export using the [trace format](trace-contract.md). The API
+invokes the Python package; it is a required runtime component for this workload,
+not a replacement for the TypeScript application. Python uses only its standard
+library. Run the API from the documented workspace/package scripts so it can
+locate the included package.
 
 Demo sessions are separated with a signed HTTP-only cookie. A stable
 `SESSION_SECRET` preserves that session across API restarts. Production mode

@@ -120,6 +120,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Optional SPEAR interoperability exercise
+
+`scripts/spear-capture.mjs` is an original opt-in local harness for the separately
+obtained `sunnypatneedi/spear` repository, pinned to
+`ff300b3f9cfda7cf1f58fea9794d7174447202a6`. SPEAR is AGPL-3.0-only,
+copyright Sunny Patneedi. No SPEAR source or runtime is vendored, included in
+the application dependency graph, or relicensed by ReviewFlow. Obtain its
+[license and corresponding source](https://github.com/sunnypatneedi/spear/tree/ff300b3f9cfda7cf1f58fea9794d7174447202a6)
+from upstream and observe its obligations independently. See
+[capture boundaries](docs/spear-capture.md).
+
 ## Fonts, samples, and repository assets
 
 The web artifacts use system UI, serif, and monospace stacks. They do not

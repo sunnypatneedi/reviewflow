@@ -8,7 +8,16 @@ if [ "${REVIEWFLOW_ISOLATED_READY:-}" != "1" ]; then
 fi
 
 node scripts/assert-isolated-database.mjs
+command -v python3 >/dev/null 2>&1 || {
+  echo "Python 3.11+ is required for Trace2Preference validation" >&2
+  exit 1
+}
+PYTHONPATH=python python3 -m unittest discover -s python/tests -v
 pnpm install --frozen-lockfile
+# The additive-operator regression deliberately creates an incompatible table.
+# Run it in a second throwaway cluster, never in this harness's migration target.
+REVIEWFLOW_TEST_PGPORT= sh scripts/with-isolated-postgres.sh \
+  node lib/db/scripts/enable-traces.test.mjs
 pnpm --filter @workspace/db run migrate
 
 # Recreate project-reference declarations rather than accepting stale outputs.
@@ -31,11 +40,13 @@ cleanup_services() {
 }
 trap cleanup_services EXIT HUP INT TERM
 
-APP_MODE=demo TRUSTED_ORIGINS=http://localhost:8080 \
+APP_MODE=demo LIVE_INFERENCE_ENABLED=false TRUSTED_ORIGINS=http://localhost:8080 \
+  DEMO_PROJECT_CREATION_WINDOW_MAX=100 \
   SESSION_SECRET=isolated-verification-session-secret PORT="$api_port" \
   node --enable-source-maps artifacts/api-server/dist/index.mjs >"$log_dir/api.log" 2>&1 &
 api_pid=$!
-SESSION_SECRET=isolated-verification-session-secret WORKER_PORT="$worker_port" \
+APP_MODE=demo LIVE_INFERENCE_ENABLED=false \
+  SESSION_SECRET=isolated-verification-session-secret WORKER_PORT="$worker_port" \
   node --enable-source-maps artifacts/api-server/dist/worker.mjs >"$log_dir/worker.log" 2>&1 &
 worker_pid=$!
 
@@ -52,3 +63,6 @@ throw new Error("API did not become ready");
 REVIEWFLOW_E2E_ISOLATED=1 REVIEWFLOW_E2E_ORIGIN=http://localhost:8080 \
   REVIEWFLOW_BASE_URL="http://127.0.0.1:$api_port/api" \
   node scripts/reviewflow-e2e.mjs
+REVIEWFLOW_E2E_ISOLATED=1 REVIEWFLOW_E2E_ORIGIN=http://localhost:8080 \
+  REVIEWFLOW_BASE_URL="http://127.0.0.1:$api_port/api" \
+  node scripts/trace-e2e.mjs

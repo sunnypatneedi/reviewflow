@@ -3,11 +3,15 @@ name: Alpha source release boundary
 description: Why public source uses a sanitized root and tests use disposable databases.
 ---
 
-Publish only a reviewed allowlisted source snapshot as a new public root commit;
-preserve workspace history privately rather than pushing internal history/remotes.
+Publish only a reviewed allowlisted source snapshot. The initial public release
+uses a sanitized root; subsequent releases must be incremental commits atop the
+latest existing public branch, never a replacement root or private-history merge.
+Preserve workspace history privately rather than pushing internal history/remotes.
 
 **Why:** The workspace includes prompt attachments, agent context, and unrelated
-design scaffolding that are not part of the requested open-source alpha.
+design scaffolding that are not part of the requested open-source alpha. Once a
+public release exists, replacing its history would discard independent remote
+work and obscure the workload's incremental provenance.
 
 **How to apply:** Rebuild and scan the exact candidate after changes. Verify from
 that candidate on a separately initialized disposable PostgreSQL cluster, never

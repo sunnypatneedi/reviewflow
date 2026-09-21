@@ -1,11 +1,12 @@
 import { Link, useLocation } from "wouter";
 import { useClerk, useUser } from "@clerk/react";
-import { LayoutDashboard, ListTodo, CheckSquare, ShieldCheck, Tag, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, ListTodo, CheckSquare, ShieldCheck, Tag, Settings, LogOut, GitCompareArrows } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
+  { href: "/traces", label: "Trace2Preference", icon: GitCompareArrows },
   { href: "/review", label: "Review", icon: CheckSquare },
   { href: "/audits", label: "Audits", icon: ShieldCheck },
   { href: "/releases", label: "Releases", icon: Tag },

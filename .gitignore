@@ -53,3 +53,9 @@ Thumbs.db
 .env.*
 !.env.example
 releases/
+
+# Python validation tooling: source only, never local environments or bytecode
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
