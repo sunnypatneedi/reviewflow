@@ -41,6 +41,7 @@ const allowedFiles = [
   "package.json",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
+  "python",
   "scripts",
   "screenshots/reviewflow-review.png",
   "tsconfig.base.json",
@@ -60,6 +61,10 @@ const excludedNames = new Set([
   "dist",
   "mockup-sandbox",
   "node_modules",
+  "__pycache__",
+  ".pytest_cache",
+  ".venv",
+  "venv",
   "releases",
 ]);
 
@@ -67,6 +72,7 @@ const excludedFilePatterns = [
   /(?:^|\/)(?:npm-debug|yarn-error|testem|libpeerconnection)\.log$/i,
   /\.(?:dump|log|trace)$/i,
   /\.tsbuildinfo$/i,
+  /\.py[co]$/i,
 ];
 
 function isWithin(parent, child) {

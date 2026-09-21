@@ -1,9 +1,10 @@
 # Source publication review
 
-This repository's current Git history is private and must not be published or
-rewritten. A public repository should start from the reviewed source candidate
-as a new root commit after verification. The working history is preserved
-locally and is deliberately excluded from the public-source archive.
+The workspace Git history is private and must not be published or rewritten.
+The alpha already exists at https://github.com/sunnypatneedi/reviewflow with
+sanitized root `c906f276fdb484b9bf8c40adaebf0f2d04bc5c3c`. New work must be an
+incremental commit based on the latest public history, not another root or
+replacement repository. The private working history remains excluded.
 
 ## Candidate boundary
 
@@ -21,12 +22,14 @@ The explicit allowlist is:
   `SECURITY.md`, `THIRD_PARTY_NOTICES.md`, `.github`, and `docs`;
 - the original synthetic review capture `screenshots/reviewflow-review.png`;
 - application source: `artifacts/api-server` and `artifacts/reviewflow`;
-- shared and operational source: `lib` and `scripts`.
+- shared and operational source: `lib`, `scripts`, and the new `python`
+  Trace2Preference package (not the user's separately developed Python kit).
 
 The copier rejects symlinks and special files. It excludes `.agents`, `.cache`,
 `.config`, `.git`, `.local`, `.replit`, `.replit-artifact`, `.replitignore`,
 `attached_assets`, `artifacts/mockup-sandbox`, old screenshots, `node_modules`,
-`dist`, `releases`, TypeScript build metadata, logs, runtime traces, and dumps
+`dist`, `releases`, TypeScript build metadata, Python bytecode and local virtual
+environments, logs, runtime traces, and dumps
 at any depth. Account configuration, the old overview screenshot, prompt
 attachments, mockup-only code, generated build output, and local runtime state
 therefore cannot enter the candidate. Workspace globs may still mention the
@@ -54,10 +57,16 @@ excluded mockup package; pnpm tolerates an unmatched workspace glob.
    archive, Git metadata, excluded path, symlink, or special file.
 6. Run install, typecheck, test, and build checks from the extracted candidate.
    A secret scan alone is not a publication approval.
-7. After the parent explicitly approves the final snapshot, initialize a new
-   Git repository in staging and create one sanitized root commit. Never copy
-   `.git`, publish existing refs, rewrite the private repository, or add its
-   remotes.
+7. Clone the existing public repository into a separate temporary checkout.
+   Record its current HEAD and inspect any commits newer than the verified base.
+   Compare the staged allowlisted source against that checkout; apply only the
+   reviewed incremental changes. Do not remove unknown remote files or overwrite
+   unrelated remote work. Commit on the public history after all checks pass.
+   Scan the complete history exposed by this new commit, not just its diff.
+8. Recheck remote HEAD before a normal, non-forced push. If it advanced, stop and
+   reconcile the new work before verification/publication. Never copy private
+   `.git`, publish workspace refs, rewrite private history, or use a force push.
+   Credentials belong only in Secrets/credential helpers, never remote URLs.
 
 ## Review record
 

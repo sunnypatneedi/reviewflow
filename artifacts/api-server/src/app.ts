@@ -47,6 +47,7 @@ if (config.appMode === "clerk") {
 }
 app.use(cors({ credentials: true, origin: corsOrigin(config.trustedOrigins) }));
 app.use(cookieParser(config.sessionSecret));
+app.use("/api/reviewflow/traces", express.json({ limit: "8mb" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 if (config.appMode === "clerk") {

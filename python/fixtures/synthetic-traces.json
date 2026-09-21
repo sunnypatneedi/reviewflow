@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "runs": [
+    {
+      "id": "synthetic-a",
+      "scenarioId": "hello-1",
+      "groupId": "hello-family",
+      "task": "Return a short greeting",
+      "decisionPoint": "assistant-response-1",
+      "context": {"complete": true, "messages": [{"role": "user", "content": "Return a short greeting"}], "tools": [], "parameters": {}},
+      "response": "Hello!",
+      "events": [{"type": "scripted_input", "content": "Return a short greeting"}, {"type": "scripted_response", "content": "Hello!"}],
+      "provenance": {"source": "checked-in synthetic fixture", "capture": "scripted; no model executed"},
+      "candidateIdentity": "script-a",
+      "kind": "scripted"
+    },
+    {
+      "id": "synthetic-b",
+      "scenarioId": "hello-1",
+      "groupId": "hello-family",
+      "task": "Return a short greeting",
+      "decisionPoint": "assistant-response-1",
+      "context": {"complete": true, "messages": [{"role": "user", "content": "Return a short greeting"}], "tools": [], "parameters": {}},
+      "response": "Greetings.",
+      "events": [{"type": "scripted_input", "content": "Return a short greeting"}, {"type": "scripted_response", "content": "Greetings."}],
+      "provenance": {"source": "checked-in synthetic fixture", "capture": "scripted; no model executed"},
+      "candidateIdentity": "script-b",
+      "kind": "scripted"
+    },
+    {
+      "id": "partial-telemetry",
+      "scenarioId": "telemetry-1",
+      "groupId": "telemetry-family",
+      "task": "Observable event only; model context unavailable",
+      "decisionPoint": "unknown",
+      "events": [{"type": "synthetic_security_event", "description": "Fixture only, not an executed security event"}],
+      "provenance": {"source": "checked-in synthetic fixture", "capture": "not SPEAR"},
+      "kind": "telemetry"
+    }
+  ]
+}

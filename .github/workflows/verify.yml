@@ -7,7 +7,7 @@ on:
 
 jobs:
   isolated-verification:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
@@ -37,4 +37,12 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Make local PostgreSQL tools available
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-16
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
       - run: sh scripts/verify-isolated.sh
