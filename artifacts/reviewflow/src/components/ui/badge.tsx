@@ -7,8 +7,7 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        neutral:
-          "border-transparent bg-fill-subtle text-text-secondary",
+        neutral: "border-transparent bg-fill-subtle text-text-secondary",
         warn: "border-transparent bg-warn-wash text-warn",
         danger: "border-transparent bg-danger-wash text-danger",
       },
@@ -20,7 +19,8 @@ const badgeVariants = cva(
 );
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends
+    React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}
 
 function Badge({ className, variant, ...props }: BadgeProps) {

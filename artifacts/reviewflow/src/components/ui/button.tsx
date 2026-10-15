@@ -9,14 +9,12 @@ export const buttonVariants = cva(
       variant: {
         default:
           "bg-fill-inverse text-text-inverse hover:bg-fill-inverse-hover",
-        secondary:
-          "bg-fill-subtle text-text-primary hover:bg-fill-emphasis",
+        secondary: "bg-fill-subtle text-text-primary hover:bg-fill-emphasis",
         ghost:
           "bg-transparent text-text-secondary hover:bg-fill-subtle hover:text-text-primary",
         outline:
           "border border-line-strong bg-surface-base text-text-primary hover:bg-fill-subtle",
-        destructive:
-          "bg-danger text-text-inverse hover:bg-danger",
+        destructive: "bg-danger text-text-inverse hover:bg-danger",
       },
       size: {
         default: "min-h-11 h-11 px-4 py-2",
@@ -33,7 +31,8 @@ export const buttonVariants = cva(
 );
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+  extends
+    React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
 }

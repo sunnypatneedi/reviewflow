@@ -43,9 +43,7 @@ export function ReviewPageHeader({
             <b className="text-text-primary font-semibold tabular-nums">
               {decided}
             </b>
-            <span>
-              of {total} decided
-            </span>
+            <span>of {total} decided</span>
           </span>
         ) : null}
 

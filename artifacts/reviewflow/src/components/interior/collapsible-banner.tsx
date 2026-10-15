@@ -5,8 +5,18 @@ import { useCallback, useId, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 const EASE = [0.23, 1, 0.32, 1] as const;
-const DISCLOSE = { type: "spring", stiffness: 190, damping: 30, mass: 1 } as const;
-const NUDGE = { type: "spring", stiffness: 700, damping: 46, mass: 0.5 } as const;
+const DISCLOSE = {
+  type: "spring",
+  stiffness: 190,
+  damping: 30,
+  mass: 1,
+} as const;
+const NUDGE = {
+  type: "spring",
+  stiffness: 700,
+  damping: 46,
+  mass: 0.5,
+} as const;
 const INSTANT = { duration: 0 } as const;
 
 export type BannerState = "open" | "folded" | "dismissed";
@@ -77,7 +87,13 @@ export function useCollapsibleBanner({
 }
 
 const NOTICE_GLYPH = (
-  <svg width="16" height="16" viewBox="0 0 256 256" fill="none" aria-hidden="true">
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 256 256"
+    fill="none"
+    aria-hidden="true"
+  >
     <circle cx="128" cy="128" r="96" stroke="currentColor" strokeWidth="16" />
     <polyline
       points="120 120 128 120 128 176 136 176"
@@ -91,7 +107,13 @@ const NOTICE_GLYPH = (
 );
 
 const CARET_DOWN = (
-  <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 256 256"
+    fill="none"
+    aria-hidden="true"
+  >
     <polyline
       points="208 96 128 176 48 96"
       stroke="currentColor"
@@ -103,7 +125,13 @@ const CARET_DOWN = (
 );
 
 const CLOSE = (
-  <svg width="13" height="13" viewBox="0 0 256 256" fill="none" aria-hidden="true">
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 256 256"
+    fill="none"
+    aria-hidden="true"
+  >
     <line
       x1="200"
       y1="56"
@@ -162,12 +190,13 @@ export function CollapsibleBanner({
   const bodyId = `${uid}-body`;
   const titleId = `${uid}-title`;
 
-  const { state, open, dismissed, toggle, fold, dismiss } = useCollapsibleBanner({
-    state: controlled,
-    defaultState,
-    onStateChange,
-    onDismiss,
-  });
+  const { state, open, dismissed, toggle, fold, dismiss } =
+    useCollapsibleBanner({
+      state: controlled,
+      defaultState,
+      onStateChange,
+      onDismiss,
+    });
 
   const hasBody = Boolean(description || children || action);
 

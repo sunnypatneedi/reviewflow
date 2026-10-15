@@ -156,9 +156,7 @@ export default function Review() {
           ? `Corrected ${externalId}`
           : `Escalated ${externalId}`;
     const detail =
-      action === "escalate"
-        ? "Waiting for release access"
-        : labelTitle(label);
+      action === "escalate" ? "Waiting for release access" : labelTitle(label);
 
     // Ship without Undo — no revert endpoint exists (documented).
     toast.custom(() => <SuccessToastBody title={title} detail={detail} />, {

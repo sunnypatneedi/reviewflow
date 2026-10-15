@@ -4,8 +4,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
-const CELL = { type: "spring", stiffness: 520, damping: 34, mass: 0.45 } as const;
-const CROSSFADE = { type: "spring", stiffness: 260, damping: 34, mass: 0.8 } as const;
+const CELL = {
+  type: "spring",
+  stiffness: 520,
+  damping: 34,
+  mass: 0.45,
+} as const;
+const CROSSFADE = {
+  type: "spring",
+  stiffness: 260,
+  damping: 34,
+  mass: 0.8,
+} as const;
 const INSTANT = { duration: 0 } as const;
 
 export type AsyncActionStatus = "idle" | "pending" | "success" | "error";
@@ -160,8 +170,18 @@ function AlertMark() {
       aria-hidden="true"
       className="shrink-0"
     >
-      <path d="M6 2.9v3.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      <path d="M6 9.05h.01" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      <path
+        d="M6 2.9v3.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <path
+        d="M6 9.05h.01"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -198,7 +218,6 @@ export function LoadingButton({
   });
 
   const fade = reduced ? INSTANT : CROSSFADE;
-
 
   const label =
     status === "pending"
@@ -277,7 +296,11 @@ export function LoadingButton({
       </motion.button>
 
       <span role="status" aria-live="polite" className="sr-only">
-        {status === "success" ? successLabel : status === "error" ? errorLabel : ""}
+        {status === "success"
+          ? successLabel
+          : status === "error"
+            ? errorLabel
+            : ""}
       </span>
     </>
   );

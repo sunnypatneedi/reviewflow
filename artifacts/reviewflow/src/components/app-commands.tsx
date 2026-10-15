@@ -135,7 +135,10 @@ export function AppCommands() {
               ["/", "Open command menu"],
               ["?", "Open this help"],
             ].map(([keys, desc]) => (
-              <li key={keys} className="flex items-center justify-between gap-4">
+              <li
+                key={keys}
+                className="flex items-center justify-between gap-4"
+              >
                 <span className="text-text-secondary">{desc}</span>
                 <Kbd>{keys}</Kbd>
               </li>

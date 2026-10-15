@@ -7,7 +7,11 @@ import {
   CommandList,
   CommandShortcut,
 } from "@/components/ui/command";
-import { labelTitle, REVIEW_LABELS, type ReviewLabel } from "@/lib/review-decision";
+import {
+  labelTitle,
+  REVIEW_LABELS,
+  type ReviewLabel,
+} from "@/lib/review-decision";
 import { useTheme } from "next-themes";
 
 export function CommandMenu({

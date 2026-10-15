@@ -50,7 +50,11 @@ export function ReviewLoading({
   children: React.ReactNode;
 }) {
   return (
-    <div className="h-full flex flex-col min-h-0" role="status" aria-label="Loading next task">
+    <div
+      className="h-full flex flex-col min-h-0"
+      role="status"
+      aria-label="Loading next task"
+    >
       <ReviewPageHeader
         awaiting={awaiting}
         decided={decided}

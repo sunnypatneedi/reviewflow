@@ -10,7 +10,8 @@ const SETUP_DOCS_URL =
 export default function Settings() {
   const { data: config, isLoading } = useGetBootstrap();
 
-  if (isLoading) return <div className="p-8 text-muted-foreground">Loading settings...</div>;
+  if (isLoading)
+    return <div className="p-8 text-muted-foreground">Loading settings...</div>;
 
   const credentialsMissing = config?.liveCredentialConfigured === false;
 
@@ -18,25 +19,37 @@ export default function Settings() {
     <div className="p-8 max-w-4xl mx-auto space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground mt-2">Workbench configuration and policy status</p>
+        <p className="text-muted-foreground mt-2">
+          Workbench configuration and policy status
+        </p>
       </div>
 
       <div className="grid gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base uppercase tracking-wider text-muted-foreground">Project Profile</CardTitle>
+            <CardTitle className="text-base uppercase tracking-wider text-muted-foreground">
+              Project Profile
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <div className="text-sm font-medium text-muted-foreground mb-1">Project Name</div>
-                <div className="text-lg font-semibold">{config?.projectName}</div>
+                <div className="text-sm font-medium text-muted-foreground mb-1">
+                  Project Name
+                </div>
+                <div className="text-lg font-semibold">
+                  {config?.projectName}
+                </div>
               </div>
               <div>
-                <div className="text-sm font-medium text-muted-foreground mb-1">Active Mode</div>
+                <div className="text-sm font-medium text-muted-foreground mb-1">
+                  Active Mode
+                </div>
                 <div className="text-lg flex items-center gap-2">
-                  <span className="capitalize font-semibold">{config?.mode}</span>
-                  <SimulatedBadge mode={config?.mode as 'demo' | 'live'} />
+                  <span className="capitalize font-semibold">
+                    {config?.mode}
+                  </span>
+                  <SimulatedBadge mode={config?.mode as "demo" | "live"} />
                 </div>
               </div>
             </div>
@@ -45,25 +58,39 @@ export default function Settings() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base uppercase tracking-wider text-muted-foreground">Model & Policies</CardTitle>
+            <CardTitle className="text-base uppercase tracking-wider text-muted-foreground">
+              Model & Policies
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <div className="text-sm font-medium text-muted-foreground mb-1">Provider & Model</div>
-                <div className="text-base font-mono bg-fill-subtle px-3 py-1.5 rounded-md inline-block border border-line-hairline">{config?.providerModel}</div>
+                <div className="text-sm font-medium text-muted-foreground mb-1">
+                  Provider & Model
+                </div>
+                <div className="text-base font-mono bg-fill-subtle px-3 py-1.5 rounded-md inline-block border border-line-hairline">
+                  {config?.providerModel}
+                </div>
               </div>
               <div>
-                <div className="text-sm font-medium text-muted-foreground mb-1">Shadow Policy Version</div>
-                <div className="text-base font-mono bg-fill-subtle px-3 py-1.5 rounded-md inline-block border border-line-hairline">{config?.shadowPolicyVersion}</div>
+                <div className="text-sm font-medium text-muted-foreground mb-1">
+                  Shadow Policy Version
+                </div>
+                <div className="text-base font-mono bg-fill-subtle px-3 py-1.5 rounded-md inline-block border border-line-hairline">
+                  {config?.shadowPolicyVersion}
+                </div>
               </div>
               <div className="col-span-2 pt-4 border-t border-line-hairline space-y-3">
-                <div className="text-sm font-medium text-muted-foreground">Live API Credentials</div>
+                <div className="text-sm font-medium text-muted-foreground">
+                  Live API Credentials
+                </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <div
                     className={cn(
                       "w-3 h-3 rounded-full",
-                      config?.liveCredentialConfigured ? "bg-fill-bar" : "bg-danger",
+                      config?.liveCredentialConfigured
+                        ? "bg-fill-bar"
+                        : "bg-danger",
                     )}
                   />
                   <span className="text-sm font-medium">
@@ -77,7 +104,10 @@ export default function Settings() {
                     href={SETUP_DOCS_URL}
                     target="_blank"
                     rel="noreferrer"
-                    className={cn(buttonVariants({ variant: "default" }), "inline-flex")}
+                    className={cn(
+                      buttonVariants({ variant: "default" }),
+                      "inline-flex",
+                    )}
                   >
                     Open setup documentation
                   </a>

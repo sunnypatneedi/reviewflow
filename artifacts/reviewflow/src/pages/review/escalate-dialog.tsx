@@ -81,7 +81,10 @@ export function EscalateDialog({
 
         <div>
           <div className="flex items-baseline justify-between gap-3 mb-2">
-            <label htmlFor="escalate-reason" className="text-small font-semibold">
+            <label
+              htmlFor="escalate-reason"
+              className="text-small font-semibold"
+            >
               {copy.label}
             </label>
             <span className="text-caption text-text-primary font-medium">

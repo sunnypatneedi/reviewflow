@@ -20,7 +20,12 @@ import {
 import { cn } from "@/lib/utils";
 import type { Proposal } from "@workspace/api-client-react";
 
-const CELL = { type: "spring", stiffness: 520, damping: 34, mass: 0.45 } as const;
+const CELL = {
+  type: "spring",
+  stiffness: 520,
+  damping: 34,
+  mass: 0.45,
+} as const;
 
 function ActionStack({
   proposal,
@@ -143,7 +148,10 @@ function ActionStack({
             sticky && "max-[860px]:col-span-2",
           )}
         >
-          <AlertTriangle className="size-4 mt-0.5 shrink-0" aria-hidden="true" />
+          <AlertTriangle
+            className="size-4 mt-0.5 shrink-0"
+            aria-hidden="true"
+          />
           Routing asks for escalation: the evidence may be redirecting the
           evaluator.
         </p>
@@ -389,7 +397,10 @@ export function DecisionPanel({
 
           <div className="mb-4">
             <div className="flex items-baseline justify-between gap-3 mb-2">
-              <label htmlFor="review-reason" className="text-small font-semibold">
+              <label
+                htmlFor="review-reason"
+                className="text-small font-semibold"
+              >
                 {copy.label}
               </label>
               <span
@@ -442,7 +453,10 @@ export function DecisionPanel({
         </fieldset>
 
         {evidenceExcerpt ? (
-          <div className="mb-4 text-caption text-text-secondary" aria-live="polite">
+          <div
+            className="mb-4 text-caption text-text-secondary"
+            aria-live="polite"
+          >
             <div className="flex items-center gap-2 text-small text-text-primary font-medium">
               <span>✓ Cited evidence</span>
               <button

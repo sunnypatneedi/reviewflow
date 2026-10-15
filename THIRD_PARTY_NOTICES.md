@@ -11,19 +11,19 @@ The following table was generated from the installed dependency graph with
 values are package entries reported by pnpm, not inferred licenses.
 
 | SPDX/license value reported by package metadata | Production entries | Development entries |
-|---|---:|---:|
-| MIT | 119 | 339 |
-| Apache-2.0 | 2 | 7 |
-| ISC | 7 | 28 |
-| BSD-2-Clause | 1 | 3 |
-| BSD-3-Clause | 1 | 5 |
-| 0BSD | 1 | 1 |
-| Unlicense | 1 | 1 |
-| Python-2.0 | 0 | 1 |
-| CC-BY-4.0 | 0 | 1 |
-| MPL-2.0 | 0 | 1 |
-| BlueOak-1.0.0 | 0 | 1 |
-| MIT AND ISC | 0 | 1 |
+| ----------------------------------------------- | -----------------: | ------------------: |
+| MIT                                             |                119 |                 339 |
+| Apache-2.0                                      |                  2 |                   7 |
+| ISC                                             |                  7 |                  28 |
+| BSD-2-Clause                                    |                  1 |                   3 |
+| BSD-3-Clause                                    |                  1 |                   5 |
+| 0BSD                                            |                  1 |                   1 |
+| Unlicense                                       |                  1 |                   1 |
+| Python-2.0                                      |                  0 |                   1 |
+| CC-BY-4.0                                       |                  0 |                   1 |
+| MPL-2.0                                         |                  0 |                   1 |
+| BlueOak-1.0.0                                   |                  0 |                   1 |
+| MIT AND ISC                                     |                  0 |                   1 |
 
 Neither command reported an `Unknown` license entry in the regenerated,
 installed graph. The earlier unknown-license Replit SDK and optional Vite
