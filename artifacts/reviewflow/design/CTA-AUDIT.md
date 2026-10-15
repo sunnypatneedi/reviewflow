@@ -1,25 +1,35 @@
-# ReviewFlow v4 — Primary CTA audit
+# ReviewFlow v4 — Primary CTA audit (polish pass)
 
-Rule: **exactly one ink-filled primary CTA per screen**. Secondary actions use outline / secondary / ghost / text.
+Rule: **exactly one ink-filled primary CTA per screen/state**. Secondary actions use outline / ghost / text.
 
-| Screen                        | Primary CTA                                                                                               | Notes                                                            |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Overview                      | **Continue reviewing** / **Start review** → `/review`                                                     | Label depends on `metrics.proposed`. Retry on error stays ghost. |
-| Tasks                         | **Run evaluation** (has tasks); **Import JSONL** (empty queue)                                            | Exactly one filled at a time. Per-row Retry is outline.          |
-| Trace2Preference              | **Validate & import** / **Confirm returned decision** / **Record human preference** / **Save correction** | Context-dependent sole primary; release/kit/assist stay outline. |
-| Review (default)              | **Accept · {label}**                                                                                      | Ink-filled; Escalate secondary.                                  |
-| Review (label changed)        | **Correct to {label}**                                                                                    | Same primary slot.                                               |
-| Review (injection ≥ 0.5)      | **Escalate…**                                                                                             | Escalate becomes the ink-filled primary; Accept demotes.         |
-| Review (offline)              | **Offline · can't submit** (disabled)                                                                     | Sole primary, disabled.                                          |
-| Review (409 conflict)         | **Load latest**                                                                                           | Replaces submit as the primary.                                  |
-| Review (network/submit error) | **Retry**                                                                                                 | Sole primary above the actions.                                  |
-| Review (no proposal)          | **Check again**                                                                                           | Sole primary.                                                    |
-| Review (empty / queue clear)  | **Check for new tasks**                                                                                   | **Open Tasks** is secondary.                                     |
-| Review (load error)           | **Try again**                                                                                             | **Open Tasks** is secondary.                                     |
-| Audits                        | **Create audit** (list); **Submit/Resolve** (detail)                                                      | Create demotes while detail is selected.                         |
-| Releases                      | **Cut release**                                                                                           | Sole filled CTA.                                                 |
-| Settings                      | **Open setup documentation** (credentials missing only)                                                   | Otherwise read-only — no invented save CTA.                      |
+| Screen | Primary CTA | Notes |
+| --- | --- | --- |
+| Overview | **Continue reviewing** / **Start review** → `/review` | Label depends on pending queue. Load error → **Retry**. |
+| Tasks | **Run evaluation** (has tasks); **Import JSONL** (empty) | Exactly one filled. SearchField for filter (N of M). Narrow sticky primary. |
+| Trace2Preference | **Validate & import** / **Confirm returned decision** / **Record human preference** / **Save correction** | Context-dependent. Release/reconcile behind confirm dialogs (outline triggers). |
+| Review | **Accept · {label}** / **Correct to {label}** | Escalate secondary; injection ≥0.5 swaps Escalate to primary. |
+| Review · offline | **Offline · can't submit** (disabled) | Sole primary slot. |
+| Review · 409 | **Load latest** | Replaces submit. |
+| Review · network error | **Retry** | Sole primary. |
+| Review · no proposal | **Check again** | Sole primary. |
+| Review · empty | **Check for new tasks** | Open Tasks secondary. |
+| Review · load error | **Try again** | Open Tasks secondary. |
+| Audits | **Create audit** (list); **Submit/Resolve** (detail) | Create demotes while detail selected. |
+| Releases | **Cut release** | Confirm dialog before irreversible cut. |
+| Settings | **Open setup documentation** (credentials missing only) | Otherwise read-only. |
+| 404 | **Go to Overview** → `/` | Keeps app shell + theme. |
+| Error boundary | **Try again** | Keeps app shell + theme. |
 
 ## Undo
 
-Shipped the success toast **without Undo**. No `POST /reviewflow/review/:taskId/revert` endpoint was added (needs product/API sign-off: same reviewer, within 10s, task unchanged, audited).
+Success toast ships **without Undo** (no revert endpoint).
+
+## Polish layout / system
+
+- Framed column `--frame-max: 1200px` with L/R hairlines; page hatch behind
+- Sticky 56px glass header (85% paper + blur); mono one-line footer
+- Shadows resolve to `none`; separation via 1px dividers / shared borders
+- Type roles: sans UI/headings · serif reading · mono 11px uppercase labels (`--label-track`)
+- Radii: control/button/input 6px · panel 8px · band/cell 0 · pill/circle for dots
+- Motion: `rf-enter` 0.25s / 4px rise; theme 0.25s; `scroll-padding-top: 80px`; reduced-motion respected
+- Theme: system until toggled, `rf.theme` persisted, FOUC script before paint
