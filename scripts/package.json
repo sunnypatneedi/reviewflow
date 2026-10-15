@@ -4,10 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "node --check reviewflow-e2e.mjs && node --check same-origin-proxy.mjs && node --check package-source.mjs"
+    "typecheck": "node --check reviewflow-e2e.mjs && node --check same-origin-proxy.mjs && node --check package-source.mjs && node --check llm-as-judge.mjs && node --check playwright-smoke.mjs",
+    "judge": "node llm-as-judge.mjs",
+    "smoke:ui": "node playwright-smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "playwright": "^1.55.0",
     "tsx": "catalog:"
   }
 }

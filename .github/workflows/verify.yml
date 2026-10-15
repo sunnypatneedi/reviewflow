@@ -45,4 +45,12 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-16
           echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
+      - run: pnpm install --frozen-lockfile
+      - name: ReviewFlow design tokens + stylelint
+        working-directory: artifacts/reviewflow
+        run: |
+          pnpm tokens
+          git diff --exit-code src/styles/tokens.css design/tokens-contrast.md
+          pnpm stylelint "src/**/*.css"
+          pnpm lint
       - run: sh scripts/verify-isolated.sh

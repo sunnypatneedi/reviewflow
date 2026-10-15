@@ -1,0 +1,199 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-15T03:57:58.353Z",
+  "origin": "http://127.0.0.1:5280",
+  "outDir": "/opt/cursor/artifacts/screenshots/merge-readiness",
+  "durationMs": 14510,
+  "passed": true,
+  "checkCount": 16,
+  "failCount": 0,
+  "screenshotCount": 15,
+  "checks": [
+    {
+      "name": "api-healthz",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "nav-overview-desktop",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/"
+    },
+    {
+      "name": "nav-tasks-desktop",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/tasks"
+    },
+    {
+      "name": "nav-review-desktop",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/review"
+    },
+    {
+      "name": "nav-traces-desktop",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/traces"
+    },
+    {
+      "name": "nav-audits-desktop",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/audits"
+    },
+    {
+      "name": "nav-releases-desktop",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/releases"
+    },
+    {
+      "name": "nav-settings-desktop",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/settings"
+    },
+    {
+      "name": "nav-overview-narrow",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/"
+    },
+    {
+      "name": "nav-tasks-narrow",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/tasks"
+    },
+    {
+      "name": "nav-review-narrow",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/review"
+    },
+    {
+      "name": "nav-traces-narrow",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/traces"
+    },
+    {
+      "name": "nav-audits-narrow",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/audits"
+    },
+    {
+      "name": "nav-releases-narrow",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/releases"
+    },
+    {
+      "name": "nav-settings-narrow",
+      "ok": true,
+      "status": 200,
+      "url": "http://127.0.0.1:5280/settings"
+    },
+    {
+      "name": "review-primary-cta",
+      "ok": true,
+      "primaryCount": 1
+    }
+  ],
+  "screenshots": [
+    {
+      "route": "overview",
+      "viewport": "desktop",
+      "path": "overview-desktop.png",
+      "status": 200
+    },
+    {
+      "route": "tasks",
+      "viewport": "desktop",
+      "path": "tasks-desktop.png",
+      "status": 200
+    },
+    {
+      "route": "review",
+      "viewport": "desktop",
+      "path": "review-desktop.png",
+      "status": 200
+    },
+    {
+      "route": "traces",
+      "viewport": "desktop",
+      "path": "traces-desktop.png",
+      "status": 200
+    },
+    {
+      "route": "audits",
+      "viewport": "desktop",
+      "path": "audits-desktop.png",
+      "status": 200
+    },
+    {
+      "route": "releases",
+      "viewport": "desktop",
+      "path": "releases-desktop.png",
+      "status": 200
+    },
+    {
+      "route": "settings",
+      "viewport": "desktop",
+      "path": "settings-desktop.png",
+      "status": 200
+    },
+    {
+      "route": "overview",
+      "viewport": "narrow",
+      "path": "overview-narrow.png",
+      "status": 200
+    },
+    {
+      "route": "tasks",
+      "viewport": "narrow",
+      "path": "tasks-narrow.png",
+      "status": 200
+    },
+    {
+      "route": "review",
+      "viewport": "narrow",
+      "path": "review-narrow.png",
+      "status": 200
+    },
+    {
+      "route": "traces",
+      "viewport": "narrow",
+      "path": "traces-narrow.png",
+      "status": 200
+    },
+    {
+      "route": "audits",
+      "viewport": "narrow",
+      "path": "audits-narrow.png",
+      "status": 200
+    },
+    {
+      "route": "releases",
+      "viewport": "narrow",
+      "path": "releases-narrow.png",
+      "status": 200
+    },
+    {
+      "route": "settings",
+      "viewport": "narrow",
+      "path": "settings-narrow.png",
+      "status": 200
+    },
+    {
+      "route": "review",
+      "viewport": "desktop-after-eval",
+      "path": "review-desktop-after-eval.png",
+      "status": 200
+    }
+  ]
+}

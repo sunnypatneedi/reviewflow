@@ -1,15 +1,27 @@
-import { Link } from "wouter";
+import { useLocation } from "wouter";
+import { AppLayout } from "@/components/layout";
+import { EmptyState } from "@/components/empty-state";
+
+function resolveAuthMode(): "demo" | "clerk" {
+  const configured = import.meta.env.VITE_APP_MODE;
+  if (configured === "clerk" || configured === "demo") return configured;
+  return import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ? "clerk" : "demo";
+}
 
 export default function NotFound() {
+  const [, setLocation] = useLocation();
+
   return (
-    <div className="flex h-screen items-center justify-center bg-background text-foreground">
-      <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold font-mono text-primary">404</h1>
-        <p className="text-muted-foreground text-lg">The requested path could not be found.</p>
-        <Link href="/" className="inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground h-10 px-6 font-medium shadow hover:bg-primary/90 transition-colors">
-          Return to Dashboard
-        </Link>
+    <AppLayout authMode={resolveAuthMode()}>
+      <div className="p-6 min-[861px]:p-8">
+        <EmptyState
+          eyebrow="404"
+          heading="Page not found"
+          description="The requested path could not be found."
+          actionLabel="Go to Overview"
+          onAction={() => setLocation("/")}
+        />
       </div>
-    </div>
+    </AppLayout>
   );
 }

@@ -1,0 +1,52 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "ignoreFiles": ["src/styles/tokens.css"],
+  "rules": {
+    "color-no-hex": true,
+    "color-named": "never",
+    "function-disallowed-list": [
+      "rgb",
+      "rgba",
+      "hsl",
+      "hsla",
+      "oklch",
+      "oklab",
+      "lab",
+      "lch",
+      "color-mix",
+      "color"
+    ],
+    "declaration-property-value-allowed-list": {
+      "z-index": ["/^var\\(--layer-/", "auto", "0"],
+      "opacity": ["0", "1", "/^var\\(/"],
+      "box-shadow": ["none", "var(--shadow)"],
+      "font-size": ["/^var\\(--/", "inherit"],
+      "transition-duration": ["/^var\\(--dur-/", "0s"],
+      "animation-duration": ["/^var\\(--dur-/"]
+    },
+    "import-notation": null,
+    "at-rule-empty-line-before": null,
+    "rule-empty-line-before": null,
+    "custom-property-empty-line-before": null,
+    "custom-property-pattern": null,
+    "no-invalid-position-at-import-rule": null,
+    "at-rule-prelude-no-invalid": null,
+    "at-rule-no-unknown": [
+      true,
+      {
+        "ignoreAtRules": [
+          "tailwind",
+          "apply",
+          "layer",
+          "config",
+          "theme",
+          "custom-variant",
+          "utility",
+          "plugin",
+          "source",
+          "variant"
+        ]
+      }
+    ]
+  }
+}

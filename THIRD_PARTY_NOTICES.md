@@ -11,19 +11,19 @@ The following table was generated from the installed dependency graph with
 values are package entries reported by pnpm, not inferred licenses.
 
 | SPDX/license value reported by package metadata | Production entries | Development entries |
-|---|---:|---:|
-| MIT | 119 | 339 |
-| Apache-2.0 | 2 | 7 |
-| ISC | 7 | 28 |
-| BSD-2-Clause | 1 | 3 |
-| BSD-3-Clause | 1 | 5 |
-| 0BSD | 1 | 1 |
-| Unlicense | 1 | 1 |
-| Python-2.0 | 0 | 1 |
-| CC-BY-4.0 | 0 | 1 |
-| MPL-2.0 | 0 | 1 |
-| BlueOak-1.0.0 | 0 | 1 |
-| MIT AND ISC | 0 | 1 |
+| ----------------------------------------------- | -----------------: | ------------------: |
+| MIT                                             |                119 |                 339 |
+| Apache-2.0                                      |                  2 |                   7 |
+| ISC                                             |                  7 |                  28 |
+| BSD-2-Clause                                    |                  1 |                   3 |
+| BSD-3-Clause                                    |                  1 |                   5 |
+| 0BSD                                            |                  1 |                   1 |
+| Unlicense                                       |                  1 |                   1 |
+| Python-2.0                                      |                  0 |                   1 |
+| CC-BY-4.0                                       |                  0 |                   1 |
+| MPL-2.0                                         |                  0 |                   1 |
+| BlueOak-1.0.0                                   |                  0 |                   1 |
+| MIT AND ISC                                     |                  0 |                   1 |
 
 Neither command reported an `Unknown` license entry in the regenerated,
 installed graph. The earlier unknown-license Replit SDK and optional Vite
@@ -154,3 +154,34 @@ the candidate package or this notice inventory.
 
 No other application image, audio, video, copied SVG, or vendored font assets
 were found in the inspected source paths.
+
+## interior micro-interactions
+
+interior — https://github.com/ddoemonn/interior — MIT License — Copyright (c) 2026 ozzy
+
+Files vendored in `artifacts/reviewflow/src/components/interior/` (modified).
+Imports were changed from `motion/react` to `framer-motion` (already in the ReviewFlow dependency graph).
+
+```text
+MIT License
+
+Copyright (c) 2026 ozzy
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

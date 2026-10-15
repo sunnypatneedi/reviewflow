@@ -3,7 +3,9 @@ import {
   type ComponentType,
   type ErrorInfo,
   type ReactNode,
-} from 'react';
+} from "react";
+import { AppLayout } from "@/components/layout";
+import { EmptyState } from "@/components/empty-state";
 
 export interface ErrorFallbackProps {
   error: Error;
@@ -25,7 +27,7 @@ function toError(value: unknown): Error {
   if (value instanceof Error) {
     return value;
   }
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     return new Error(value);
   }
   try {
@@ -36,31 +38,25 @@ function toError(value: unknown): Error {
 }
 
 function DefaultFallback({ error, resetError }: ErrorFallbackProps) {
+  // Always demo chrome: this fallback may render outside ClerkProvider.
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 p-6">
-      <div className="max-w-lg w-full text-center">
-        <h1 className="text-xl font-semibold text-gray-900">
-          Something went wrong
-        </h1>
-        <p className="mt-2 text-sm text-gray-600">
-          This part of the app hit an error. The rest of the app is still
-          running.
-        </p>
-        {/* Dev only: messages can carry API responses and other internals. */}
-        {import.meta.env.DEV ? (
-          <pre className="mt-4 overflow-x-auto rounded bg-gray-100 p-3 text-left text-xs text-gray-800">
-            {error.message || String(error)}
-          </pre>
-        ) : null}
-        <button
-          type="button"
-          onClick={resetError}
-          className="mt-4 rounded bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700"
+    <AppLayout authMode="demo">
+      <div className="p-6 min-[861px]:p-8">
+        <EmptyState
+          eyebrow="Error"
+          heading="Something went wrong"
+          description="This part of the app hit an error. Reload to try again."
+          actionLabel="Try again"
+          onAction={resetError}
         >
-          Try again
-        </button>
+          {import.meta.env.DEV ? (
+            <pre className="mt-2 w-full overflow-x-auto border border-line-hairline bg-fill-subtle p-3 text-left type-caption text-text-secondary">
+              {error.message || String(error)}
+            </pre>
+          ) : null}
+        </EmptyState>
       </div>
-    </div>
+    </AppLayout>
   );
 }
 
@@ -76,7 +72,7 @@ export class ErrorBoundary extends Component<
 
   componentDidCatch(error: unknown, info: ErrorInfo): void {
     console.error(
-      'ErrorBoundary caught an error:',
+      "ErrorBoundary caught an error:",
       toError(error),
       info.componentStack,
     );

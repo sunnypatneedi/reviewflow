@@ -2,8 +2,8 @@ export function SimulatedBadge({ mode }: { mode: "demo" | "live" }) {
   if (mode !== "demo") return null;
   return (
     <span
-      className="inline-flex items-center rounded px-1.5 py-1 text-[10px] font-semibold uppercase tracking-[0.06em] bg-warn-wash text-warn"
-      title="Proposal mode: demo"
+      className="inline-flex items-center h-6 rounded-full px-2.5 type-caption font-medium bg-warn-wash text-warn"
+      title="Proposal mode: demo. Output comes from the simulator, not a live model."
     >
       Simulated
     </span>

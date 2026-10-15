@@ -18,6 +18,23 @@ export const LABEL_TITLES: Record<ReviewLabel, string> = {
   insufficient_evidence: "Insufficient evidence",
 };
 
+export const SUBMIT_SHORTCUT = {
+  mac: "⌘ ↵",
+  other: "Ctrl ↵",
+} as const;
+
+export type SessionSummary = {
+  decided: number;
+  corrected: number;
+  escalated: number;
+};
+
+export type QueueProgress = {
+  decided: number;
+  total: number;
+  awaiting: number;
+};
+
 export function labelTitle(label: ReviewLabel): string {
   return LABEL_TITLES[label];
 }
@@ -41,41 +58,67 @@ export function primaryButtonLabel(
   return `Correct to ${labelTitle(selected)}`;
 }
 
-export function reasonRequirementHint(
-  action: Exclude<ReviewDecisionAction, "escalate">,
-): string {
-  return action === "accept"
-    ? "Needed to correct or escalate"
-    : "Required to correct";
+export function reasonFieldCopy(action: ReviewDecisionAction): {
+  label: string;
+  hint: string;
+  help: string;
+} {
+  switch (action) {
+    case "accept":
+      return {
+        label: "Reason",
+        hint: "Optional to accept",
+        help: "Not saved when you accept.",
+      };
+    case "correct":
+      return {
+        label: "Reason for correction",
+        hint: "Required",
+        help: "Saved with the correction.",
+      };
+    case "escalate":
+      return {
+        label: "Reason for escalation",
+        hint: "Required",
+        help: "",
+      };
+    default: {
+      const _exhaustive: never = action;
+      return _exhaustive;
+    }
+  }
 }
 
+/**
+ * Help / invalid copy for a reason field. Pass the field's own action so an
+ * escalate dialog never reports "Add a reason to correct." and vice versa.
+ */
 export function reasonHelpText(args: {
-  action: Exclude<ReviewDecisionAction, "escalate">;
+  action: ReviewDecisionAction;
   attempt: ReviewAttempt;
   reason: string;
 }): { message: string; invalid: boolean } {
   const trimmed = args.reason.trim();
+  const copy = reasonFieldCopy(args.action);
+
+  // Accept never invalidates. Escalate errors only from the dialog field;
+  // correct errors only from the rail field on a primary attempt.
   const invalid =
     !trimmed &&
-    !!args.attempt &&
-    (args.attempt === "escalate" ||
-      (args.attempt === "primary" && args.action === "correct"));
+    ((args.action === "correct" && args.attempt === "primary") ||
+      (args.action === "escalate" && args.attempt === "escalate"));
 
   if (invalid) {
     return {
       invalid: true,
       message:
-        args.attempt === "escalate"
+        args.action === "escalate"
           ? "Add a reason to escalate."
           : "Add a reason to correct.",
     };
   }
 
-  if (args.action === "accept") {
-    return { invalid: false, message: "Not saved when you accept." };
-  }
-
-  return { invalid: false, message: "" };
+  return { invalid: false, message: copy.help };
 }
 
 export function isPrimaryBlocked(
@@ -87,6 +130,34 @@ export function isPrimaryBlocked(
 
 export function canEscalate(reason: string): boolean {
   return Boolean(reason.trim());
+}
+
+export function isMacPlatform(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const uaData = (
+    navigator as Navigator & {
+      userAgentData?: { platform?: string };
+    }
+  ).userAgentData;
+  const platform = uaData?.platform ?? navigator.platform ?? "";
+  return /mac|iphone|ipad|ipod/i.test(platform);
+}
+
+export function submitShortcutLabel(): string {
+  return isMacPlatform() ? SUBMIT_SHORTCUT.mac : SUBMIT_SHORTCUT.other;
+}
+
+export function progressFromMetrics(m: {
+  finalized: number;
+  escalated: number;
+  total: number;
+  proposed: number;
+}): QueueProgress {
+  return {
+    decided: m.finalized + m.escalated,
+    total: m.total,
+    awaiting: m.proposed,
+  };
 }
 
 /** Prefer the server's `error` field when present; otherwise strip the HTTP prefix. */
@@ -117,6 +188,17 @@ export function friendlyReviewError(error: unknown): string {
   return stripped || raw;
 }
 
+export function isConflictError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const status = (error as { status?: number }).status;
+  if (status === 409) return true;
+  const message = friendlyReviewError(error).toLowerCase();
+  return (
+    message.includes("changed in another session") ||
+    message.includes("already has a final")
+  );
+}
+
 export function formatProbability(value: number | undefined): string {
   if (value == null || Number.isNaN(value)) return "—";
   return `${Math.round(value * 100)}%`;
@@ -129,4 +211,9 @@ export function formatConfidence(value: number): string {
 export function riskTitle(risk: string): string {
   const lower = risk.toLowerCase();
   return `${lower.charAt(0).toUpperCase()}${lower.slice(1)} risk`;
+}
+
+export function flashKey(key: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("rf:key", { detail: key }));
 }
