@@ -233,11 +233,11 @@ export default function Audits() {
                     onClick={() => setSelectedAuditId(audit.id)}
                   >
                     <TableCell>
-                      <span className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded text-meta uppercase font-semibold tracking-wider">
+                      <span className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded type-meta uppercase font-semibold tracking-wider">
                         {audit.status}
                       </span>
                       {audit.required && (
-                        <span className="ml-2 text-meta text-muted-foreground">
+                        <span className="ml-2 type-meta text-muted-foreground">
                           required
                         </span>
                       )}

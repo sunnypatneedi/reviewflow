@@ -24,14 +24,17 @@ const THEME_VALUES = ["light", "dark", "plum"] as const;
 
 function ThemeQueryBootstrap() {
   const { setTheme } = useTheme();
-  const applied = useRef(false);
+  const applied = useRef<string | null>(null);
 
   useEffect(() => {
-    if (applied.current) return;
     const param = new URLSearchParams(window.location.search).get("theme");
-    if (param && (THEME_VALUES as readonly string[]).includes(param)) {
+    if (
+      param &&
+      (THEME_VALUES as readonly string[]).includes(param) &&
+      applied.current !== param
+    ) {
       setTheme(param);
-      applied.current = true;
+      applied.current = param;
     }
   }, [setTheme]);
 
@@ -68,10 +71,9 @@ if (appMode === "clerk" && !clerkPubKey) {
 const clerkAppearance = {
   cssLayerName: "clerk",
   variables: {
-    colorPrimary: "hsl(221, 83%, 53%)",
-    colorBackground: "hsl(0, 0%, 100%)",
-    fontFamily:
-      "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    colorPrimary: "var(--fill-inverse)",
+    colorBackground: "var(--surface-base)",
+    fontFamily: "var(--font-sans)",
   },
   elements: {
     rootBox: "w-full flex justify-center",

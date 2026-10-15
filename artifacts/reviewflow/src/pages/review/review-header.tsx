@@ -24,7 +24,7 @@ export function ReviewPageHeader({
     <header className="sticky top-0 z-sticky flex items-center gap-4 h-14 px-4 min-[861px]:px-8 border-b border-line-hairline shrink-0 bg-surface-glass backdrop-blur">
       <h1 className="text-base font-semibold tracking-tight">Review</h1>
 
-      <div className="ml-auto flex items-center gap-3 text-small text-text-secondary">
+      <div className="ml-auto flex items-center gap-3 type-small text-text-secondary">
         <span aria-live="polite" className="inline-flex items-center gap-1.5">
           {awaiting == null ? (
             "…"
@@ -71,7 +71,7 @@ export function ReviewPageHeader({
           <button
             type="button"
             onClick={onOpenCommands}
-            className="hidden min-[861px]:inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-small text-text-secondary hover:bg-fill-subtle hover:text-text-primary"
+            className="hidden min-[861px]:inline-flex items-center gap-1.5 rounded-md px-2 py-1 type-small text-text-secondary hover:bg-fill-subtle hover:text-text-primary"
             aria-label="Open command menu"
           >
             <span>Commands</span>
@@ -82,7 +82,7 @@ export function ReviewPageHeader({
         <button
           type="button"
           onClick={onOpenShortcuts}
-          className="hidden min-[861px]:inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-small text-text-secondary hover:bg-fill-subtle hover:text-text-primary"
+          className="hidden min-[861px]:inline-flex items-center gap-1.5 rounded-md px-2 py-1 type-small text-text-secondary hover:bg-fill-subtle hover:text-text-primary"
           aria-label="Keyboard shortcuts"
         >
           <Kbd data-key="?">?</Kbd>

@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-small font-medium transition-[background-color,color,transform] duration-[length:var(--dur-fast)] ease-[var(--ease-standard)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:bg-fill-subtle disabled:text-text-secondary disabled:border disabled:border-line-border active:translate-y-px",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md type-small font-medium transition-[background-color,color,transform] duration-[length:var(--dur-fast)] ease-[var(--ease-standard)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:bg-fill-subtle disabled:text-text-secondary disabled:border disabled:border-line-border active:translate-y-px",
   {
     variants: {
       variant: {
@@ -18,8 +18,8 @@ export const buttonVariants = cva(
       },
       size: {
         default: "min-h-11 h-11 px-4 py-2",
-        sm: "min-h-9 h-9 rounded-md px-3 text-small",
-        lg: "min-h-[52px] h-[52px] rounded-md px-5 text-body",
+        sm: "min-h-9 h-9 rounded-md px-3 type-small",
+        lg: "min-h-[52px] h-[52px] rounded-md px-5 type-body",
         icon: "size-11",
       },
     },
@@ -42,7 +42,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     void asChild;
     return (
       <button
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={cn(buttonVariants({ variant, size }), className)}
         ref={ref}
         {...props}
       />

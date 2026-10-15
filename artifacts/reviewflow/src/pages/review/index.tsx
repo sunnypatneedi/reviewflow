@@ -57,8 +57,8 @@ function SuccessToastBody({
           ✓
         </span>
         <div className="min-w-0">
-          <p className="text-small font-medium">{title}</p>
-          <p className="text-caption mt-0.5 text-text-inverse">{detail}</p>
+          <p className="type-small font-medium">{title}</p>
+          <p className="type-caption mt-0.5 text-text-inverse">{detail}</p>
         </div>
       </div>
       <div className="rf-toast-life" aria-hidden="true" />

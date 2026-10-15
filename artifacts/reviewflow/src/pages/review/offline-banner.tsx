@@ -10,14 +10,14 @@ export function OfflineBanner({ onRetry, className = "" }: OfflineBannerProps) {
       role="status"
       className={`rounded-md border border-line-border bg-warn-wash px-4 py-3 text-warn ${className}`.trim()}
     >
-      <p className="text-small font-medium text-warn">You're offline</p>
-      <p className="mt-1 text-caption text-text-secondary">
+      <p className="type-small font-medium text-warn">You're offline</p>
+      <p className="mt-1 type-caption text-text-secondary">
         Decisions can't be saved. Your work on this task stays here until you
         reconnect.
       </p>
       <button
         type="button"
-        className="mt-2 text-small font-medium text-warn underline underline-offset-2"
+        className="mt-2 type-small font-medium text-warn underline underline-offset-2"
         onClick={onRetry}
       >
         Try again

@@ -36,13 +36,13 @@ export function PropertyList({
             row.className,
           )}
         >
-          <dt className="flex items-center gap-2 pl-2 text-caption text-text-muted whitespace-nowrap">
+          <dt className="flex items-center gap-2 pl-2 type-caption text-text-muted whitespace-nowrap">
             {row.label}
           </dt>
           <dd
             className={cn(
-              "min-w-0 flex items-center gap-2 text-small text-text-primary",
-              row.mono && "font-mono text-mono overflow-wrap-anywhere",
+              "min-w-0 flex items-center gap-2 type-small text-text-primary",
+              row.mono && "font-mono type-mono overflow-wrap-anywhere",
               row.danger && "text-danger font-semibold",
             )}
           >

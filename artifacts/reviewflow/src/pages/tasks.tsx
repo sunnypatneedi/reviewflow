@@ -149,7 +149,7 @@ export default function Tasks() {
       failed: "bg-danger-wash text-danger",
     }[job.status];
     return (
-      <div key={job.id} className="flex items-center gap-1.5 text-meta">
+      <div key={job.id} className="flex items-center gap-1.5 type-meta">
         <span
           className={`px-1.5 py-0.5 rounded uppercase font-semibold tracking-wider ${statusClass}`}
         >
@@ -159,7 +159,7 @@ export default function Tasks() {
           <Button
             variant="outline"
             size="sm"
-            className="h-6 px-2 text-meta"
+            className="h-6 px-2 type-meta"
             disabled={
               retryingJobId === job.id || (job.mode === "live" && !consent)
             }
@@ -249,7 +249,7 @@ export default function Tasks() {
                         {task.externalId}
                       </TableCell>
                       <TableCell>
-                        <span className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded text-meta uppercase font-semibold tracking-wider">
+                        <span className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded type-meta uppercase font-semibold tracking-wider">
                           {task.status.replace("_", " ")}
                         </span>
                       </TableCell>

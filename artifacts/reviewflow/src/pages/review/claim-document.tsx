@@ -98,16 +98,16 @@ export function ClaimDocument({
 
   return (
     <article className="max-w-[680px] enter" aria-label="Task">
-      <p className="text-kicker uppercase tracking-[0.08em] text-text-muted mb-2">
+      <p className="type-kicker uppercase tracking-[0.08em] text-text-muted mb-2">
         Question
       </p>
-      <p className="font-serif italic text-lead text-text-primary mb-10">
+      <p className="font-serif italic type-lead text-text-primary mb-10">
         {item.task.question}
       </p>
 
-      <p className="text-kicker uppercase tracking-[0.08em] text-text-muted mb-2 flex flex-wrap items-center gap-2">
+      <p className="type-kicker uppercase tracking-[0.08em] text-text-muted mb-2 flex flex-wrap items-center gap-2">
         <span>Candidate answer</span>
-        <span className="inline-flex items-center gap-1.5 h-6 rounded-full px-2.5 text-caption font-medium bg-fill-subtle text-text-secondary normal-case tracking-normal">
+        <span className="inline-flex items-center gap-1.5 h-6 rounded-full px-2.5 type-caption font-medium bg-fill-subtle text-text-secondary normal-case tracking-normal">
           <span
             className="size-1.5 rounded-full bg-current"
             aria-hidden="true"
@@ -117,17 +117,17 @@ export function ClaimDocument({
         <SimulatedBadge mode={item.task.mode} />
       </p>
 
-      <h1 className="font-serif text-display text-balance mb-8">
+      <h1 className="font-serif type-display text-balance mb-8">
         {item.task.candidateAnswer}
       </h1>
 
-      <div className="group mb-2 flex items-center gap-2 text-meta text-text-muted">
-        <span className="font-mono text-mono text-text-primary">
+      <div className="group mb-2 flex items-center gap-2 type-meta text-text-muted">
+        <span className="font-mono type-mono text-text-primary">
           {item.task.externalId}
         </span>
         <button
           type="button"
-          className="reveal text-small text-text-secondary hover:text-text-primary underline-offset-2 hover:underline"
+          className="reveal type-small text-text-secondary hover:text-text-primary underline-offset-2 hover:underline"
           onClick={() => copy(item.task.externalId)}
         >
           {status === "copied" ? "Copied" : "Copy ID"}
@@ -147,7 +147,7 @@ export function ClaimDocument({
             value: proposal ? (
               <>
                 <b className="font-semibold">{labelTitle(proposedLabel)}</b>
-                <span className="text-meta text-text-muted ml-2">
+                <span className="type-meta text-text-muted ml-2">
                   {formatConfidence(proposal.confidence)}
                 </span>
               </>
@@ -168,7 +168,7 @@ export function ClaimDocument({
             action: proposal ? (
               <button
                 type="button"
-                className="text-small text-text-secondary hover:text-text-primary"
+                className="type-small text-text-secondary hover:text-text-primary"
                 aria-label="Copy model name"
                 onClick={() => copy(proposal.model)}
               >
@@ -218,7 +218,7 @@ export function ClaimDocument({
         <h2
           id="why-heading"
           className={cn(
-            "text-small font-semibold",
+            "type-small font-semibold",
             highInjection ? "text-danger" : "text-text-primary",
           )}
         >
@@ -226,7 +226,7 @@ export function ClaimDocument({
         </h2>
         <ul className="col-start-2 space-y-0.5 list-none">
           {item.routingReasons.map((reasonText) => (
-            <li key={reasonText} className="text-small text-text-secondary">
+            <li key={reasonText} className="type-small text-text-secondary">
               {reasonText}
             </li>
           ))}
@@ -237,7 +237,7 @@ export function ClaimDocument({
         <div className="flex items-center justify-between gap-3 mb-3">
           <h2
             id="evidence-heading"
-            className="text-kicker uppercase tracking-[0.08em] text-text-muted"
+            className="type-kicker uppercase tracking-[0.08em] text-text-muted"
           >
             Evidence
           </h2>
@@ -266,7 +266,7 @@ export function ClaimDocument({
             ref={evidenceRef}
             onMouseUp={captureSelection}
             onKeyUp={captureSelection}
-            className="font-serif text-lead border-l-[3px] border-fill-inverse pl-6 whitespace-pre-wrap text-text-primary selection:bg-fill-emphasis"
+            className="font-serif type-lead border-l-[3px] border-fill-inverse pl-6 whitespace-pre-wrap text-text-primary selection:bg-fill-emphasis"
           >
             {renderEvidence()}
           </blockquote>
@@ -274,7 +274,7 @@ export function ClaimDocument({
           {pendingSelection && citePos && !evidenceExcerpt ? (
             <button
               type="button"
-              className="absolute z-popover inline-flex items-center gap-2 rounded-md bg-fill-inverse text-text-inverse text-small px-3 h-9 shadow-surface"
+              className="absolute z-popover inline-flex items-center gap-2 rounded-md bg-fill-inverse text-text-inverse type-small px-3 h-9 shadow-surface"
               style={{ top: citePos.top, left: citePos.left }}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyCite(pendingSelection)}
@@ -285,11 +285,11 @@ export function ClaimDocument({
         </div>
 
         {!evidenceExcerpt ? (
-          <p className="mt-3 pl-6 text-caption text-text-muted">
+          <p className="mt-3 pl-6 type-caption text-text-muted">
             Select text in the evidence to cite it with your decision.
           </p>
         ) : (
-          <p className="mt-3 pl-6 text-caption text-text-secondary">
+          <p className="mt-3 pl-6 type-caption text-text-secondary">
             Cited in decision.{" "}
             <button
               type="button"

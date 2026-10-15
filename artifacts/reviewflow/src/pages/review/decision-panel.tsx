@@ -88,7 +88,9 @@ function ActionStack({
       disabled={offline || !proposal || pending}
       onClick={onSubmitPrimary}
     >
-      <span className="truncate">{pending ? "Saving…" : primaryLabel}</span>
+      <span className="min-w-0 flex-1 truncate text-left">
+        {pending ? "Saving…" : primaryLabel}
+      </span>
       {proposal && !offline && !pending ? (
         <Kbd
           data-key="enter"
@@ -116,7 +118,7 @@ function ActionStack({
         <div
           role="alert"
           className={cn(
-            "rounded-md px-4 py-3 text-small",
+            "rounded-md px-4 py-3 type-small",
             conflict ? "bg-warn-wash text-warn" : "bg-danger-wash text-danger",
             sticky && "max-[860px]:col-span-2",
           )}
@@ -144,7 +146,7 @@ function ActionStack({
       {showEscalatePrimary ? (
         <p
           className={cn(
-            "flex items-start gap-2 text-small text-danger",
+            "flex items-start gap-2 type-small text-danger",
             sticky && "max-[860px]:col-span-2",
           )}
         >
@@ -169,7 +171,7 @@ function ActionStack({
         </>
       )}
 
-      <p className="hidden min-[861px]:flex flex-wrap gap-x-3 gap-y-1 text-caption text-text-muted">
+      <p className="hidden min-[861px]:flex flex-wrap gap-x-3 gap-y-1 type-caption text-text-muted">
         <span className="inline-flex items-center gap-1">
           <Kbd data-key="/">/</Kbd> Commands
         </span>
@@ -284,14 +286,14 @@ export function DecisionPanel({
           stickyActions && "pb-32 min-[861px]:pb-5",
         )}
       >
-        <h2 id="decision-heading" className="text-headline mb-1">
+        <h2 id="decision-heading" className="type-headline mb-1">
           Your decision
         </h2>
 
         {!proposal ? (
           <div
             role="alert"
-            className="mb-5 rounded-md bg-fill-subtle px-4 py-3 text-small"
+            className="mb-5 rounded-md bg-fill-subtle px-4 py-3 type-small"
           >
             <b className="font-semibold block text-text-primary">
               Review needs a proposal
@@ -304,7 +306,7 @@ export function DecisionPanel({
             </Button>
           </div>
         ) : (
-          <p className="text-small text-text-secondary mb-5">
+          <p className="type-small text-text-secondary mb-5">
             Model proposes{" "}
             <b className="text-text-primary font-semibold">
               {labelTitle(proposedLabel)}
@@ -341,7 +343,7 @@ export function DecisionPanel({
                 <label
                   key={label}
                   className={cn(
-                    "relative grid grid-cols-[24px_1fr_auto] gap-3 items-center min-h-[52px] px-3 pl-4 rounded-md cursor-pointer text-small font-medium text-text-secondary transition-colors",
+                    "relative grid grid-cols-[24px_1fr_auto] gap-3 items-center min-h-[52px] px-3 pl-4 rounded-md cursor-pointer type-small font-medium text-text-secondary transition-colors",
                     selected && "text-text-primary font-semibold",
                     !proposal && "cursor-not-allowed text-text-muted",
                   )}
@@ -364,12 +366,12 @@ export function DecisionPanel({
                   <span className="truncate">
                     {labelTitle(label)}
                     {isModel ? (
-                      <span className="ml-1.5 font-normal text-caption text-text-muted">
+                      <span className="ml-1.5 font-normal type-caption text-text-muted">
                         Model
                       </span>
                     ) : null}
                   </span>
-                  <span className="flex items-center gap-3 font-mono text-meta tabular-nums text-text-secondary">
+                  <span className="flex items-center gap-3 font-mono type-meta tabular-nums text-text-secondary">
                     {probability != null ? (
                       <span
                         className="w-10 h-1 rounded-pill bg-fill-emphasis overflow-hidden"
@@ -399,13 +401,13 @@ export function DecisionPanel({
             <div className="flex items-baseline justify-between gap-3 mb-2">
               <label
                 htmlFor="review-reason"
-                className="text-small font-semibold"
+                className="type-small font-semibold"
               >
                 {copy.label}
               </label>
               <span
                 className={cn(
-                  "text-caption text-text-muted",
+                  "type-caption text-text-muted",
                   fieldAction === "correct" && "text-text-primary font-medium",
                 )}
               >
@@ -430,14 +432,14 @@ export function DecisionPanel({
                 event.currentTarget.classList.remove("animate-rf-nudge");
               }}
               className={cn(
-                "min-h-28 resize-y text-small border-line-strong shadow-none focus-visible:ring-ring",
+                "min-h-28 resize-y type-small border-line-strong shadow-none focus-visible:ring-ring",
                 help.invalid && "border-danger",
                 nudgeReason && "animate-rf-nudge",
               )}
             />
             <div
               id="review-reason-help"
-              className="mt-2 flex justify-between gap-3 min-h-5 text-caption text-text-muted"
+              className="mt-2 flex justify-between gap-3 min-h-5 type-caption text-text-muted"
             >
               <span
                 className={cn(help.invalid && "text-danger font-medium")}
@@ -454,10 +456,10 @@ export function DecisionPanel({
 
         {evidenceExcerpt ? (
           <div
-            className="mb-4 text-caption text-text-secondary"
+            className="mb-4 type-caption text-text-secondary"
             aria-live="polite"
           >
-            <div className="flex items-center gap-2 text-small text-text-primary font-medium">
+            <div className="flex items-center gap-2 type-small text-text-primary font-medium">
               <span>✓ Cited evidence</span>
               <button
                 type="button"
@@ -467,7 +469,7 @@ export function DecisionPanel({
                 Remove
               </button>
             </div>
-            <q className="mt-1 block not-italic rounded-md bg-fill-subtle px-2.5 py-1.5 text-small text-text-primary">
+            <q className="mt-1 block not-italic rounded-md bg-fill-subtle px-2.5 py-1.5 type-small text-text-primary">
               {evidenceExcerpt}
             </q>
           </div>

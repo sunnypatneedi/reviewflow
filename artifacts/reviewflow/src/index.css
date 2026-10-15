@@ -99,43 +99,6 @@
   --font-serif: var(--font-serif);
   --font-mono: var(--font-mono);
 
-  --text-display: var(--display-size);
-  --text-display--line-height: var(--display-line);
-  --text-display--font-weight: var(--display-weight);
-  --text-display--letter-spacing: var(--display-track);
-  --text-headline: var(--headline-size);
-  --text-headline--line-height: var(--headline-line);
-  --text-headline--font-weight: var(--headline-weight);
-  --text-headline--letter-spacing: var(--headline-track);
-  --text-lead: var(--lead-size);
-  --text-lead--line-height: var(--lead-line);
-  --text-lead--font-weight: var(--lead-weight);
-  --text-lead--letter-spacing: var(--lead-track);
-  --text-body: var(--body-size);
-  --text-body--line-height: var(--body-line);
-  --text-body--font-weight: var(--body-weight);
-  --text-body--letter-spacing: var(--body-track);
-  --text-small: var(--small-size);
-  --text-small--line-height: var(--small-line);
-  --text-small--font-weight: var(--small-weight);
-  --text-small--letter-spacing: var(--small-track);
-  --text-caption: var(--caption-size);
-  --text-caption--line-height: var(--caption-line);
-  --text-caption--font-weight: var(--caption-weight);
-  --text-caption--letter-spacing: var(--caption-track);
-  --text-kicker: var(--kicker-size);
-  --text-kicker--line-height: var(--kicker-line);
-  --text-kicker--font-weight: var(--kicker-weight);
-  --text-kicker--letter-spacing: var(--kicker-track);
-  --text-meta: var(--meta-size);
-  --text-meta--line-height: var(--meta-line);
-  --text-meta--font-weight: var(--meta-weight);
-  --text-meta--letter-spacing: var(--meta-track);
-  --text-mono: var(--mono-size);
-  --text-mono--line-height: var(--mono-line);
-  --text-mono--font-weight: var(--mono-weight);
-  --text-mono--letter-spacing: var(--mono-track);
-
   --spacing: 4px;
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
@@ -167,6 +130,72 @@
 }
 @utility z-toast {
   z-index: var(--layer-toast);
+}
+
+@utility type-display {
+  font-family: var(--display-family);
+  font-size: var(--display-size);
+  line-height: var(--display-line);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-track);
+}
+@utility type-headline {
+  font-family: var(--headline-family);
+  font-size: var(--headline-size);
+  line-height: var(--headline-line);
+  font-weight: var(--headline-weight);
+  letter-spacing: var(--headline-track);
+}
+@utility type-lead {
+  font-family: var(--lead-family);
+  font-size: var(--lead-size);
+  line-height: var(--lead-line);
+  font-weight: var(--lead-weight);
+  letter-spacing: var(--lead-track);
+}
+@utility type-body {
+  font-family: var(--body-family);
+  font-size: var(--body-size);
+  line-height: var(--body-line);
+  font-weight: var(--body-weight);
+  letter-spacing: var(--body-track);
+}
+@utility type-small {
+  font-family: var(--small-family);
+  font-size: var(--small-size);
+  line-height: var(--small-line);
+  font-weight: var(--small-weight);
+  letter-spacing: var(--small-track);
+}
+@utility type-caption {
+  font-family: var(--caption-family);
+  font-size: var(--caption-size);
+  line-height: var(--caption-line);
+  font-weight: var(--caption-weight);
+  letter-spacing: var(--caption-track);
+}
+@utility type-kicker {
+  font-family: var(--kicker-family);
+  font-size: var(--kicker-size);
+  line-height: var(--kicker-line);
+  font-weight: var(--kicker-weight);
+  letter-spacing: var(--kicker-track);
+  text-transform: uppercase;
+}
+@utility type-meta {
+  font-family: var(--meta-family);
+  font-size: var(--meta-size);
+  line-height: var(--meta-line);
+  font-weight: var(--meta-weight);
+  letter-spacing: var(--meta-track);
+  font-variant-numeric: tabular-nums;
+}
+@utility type-mono {
+  font-family: var(--mono-family);
+  font-size: var(--mono-size);
+  line-height: var(--mono-line);
+  font-weight: var(--mono-weight);
+  letter-spacing: var(--mono-track);
 }
 
 @utility reveal {

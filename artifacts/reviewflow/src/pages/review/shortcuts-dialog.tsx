@@ -44,14 +44,14 @@ export function ShortcutsDialog({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <section>
-            <h3 className="text-kicker uppercase tracking-[0.08em] text-text-muted mb-2">
+            <h3 className="type-kicker uppercase tracking-[0.08em] text-text-muted mb-2">
               Decide
             </h3>
             <ul>
               {DECIDE.map(([keys, desc]) => (
                 <li
                   key={keys}
-                  className="flex items-center justify-between gap-4 min-h-10 border-b border-line-hairline last:border-0 text-small text-text-secondary"
+                  className="flex items-center justify-between gap-4 min-h-10 border-b border-line-hairline last:border-0 type-small text-text-secondary"
                 >
                   <span>{desc}</span>
                   <Kbd>{keys === "submit" ? submit : keys}</Kbd>
@@ -61,14 +61,14 @@ export function ShortcutsDialog({
           </section>
 
           <section>
-            <h3 className="text-kicker uppercase tracking-[0.08em] text-text-muted mb-2">
+            <h3 className="type-kicker uppercase tracking-[0.08em] text-text-muted mb-2">
               Evidence
             </h3>
             <ul>
               {EVIDENCE.map(([keys, desc]) => (
                 <li
                   key={keys}
-                  className="flex items-center justify-between gap-4 min-h-10 border-b border-line-hairline last:border-0 text-small text-text-secondary"
+                  className="flex items-center justify-between gap-4 min-h-10 border-b border-line-hairline last:border-0 type-small text-text-secondary"
                 >
                   <span>{desc}</span>
                   <Kbd>{keys}</Kbd>
@@ -78,7 +78,7 @@ export function ShortcutsDialog({
           </section>
         </div>
 
-        <p className="text-caption text-text-muted border-t border-line-hairline pt-3">
+        <p className="type-caption text-text-muted border-t border-line-hairline pt-3">
           ⌘ Command (Ctrl on Windows and Linux) · ↵ Enter
         </p>
       </DialogContent>

@@ -83,11 +83,11 @@ export function EscalateDialog({
           <div className="flex items-baseline justify-between gap-3 mb-2">
             <label
               htmlFor="escalate-reason"
-              className="text-small font-semibold"
+              className="type-small font-semibold"
             >
               {copy.label}
             </label>
-            <span className="text-caption text-text-primary font-medium">
+            <span className="type-caption text-text-primary font-medium">
               {copy.hint}
             </span>
           </div>
@@ -105,14 +105,14 @@ export function EscalateDialog({
               setNudge(false);
             }}
             className={cn(
-              "min-h-28 resize-y text-small border-line-strong",
+              "min-h-28 resize-y type-small border-line-strong",
               help.invalid && "border-danger",
               nudge && "animate-rf-nudge",
             )}
           />
           <div
             id="escalate-reason-help"
-            className="mt-2 min-h-5 text-caption text-text-muted"
+            className="mt-2 min-h-5 type-caption text-text-muted"
             aria-live="polite"
           >
             <span className={cn(help.invalid && "text-danger font-medium")}>

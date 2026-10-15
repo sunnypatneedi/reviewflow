@@ -26,7 +26,7 @@ function Kbd({ className, children, ...props }: KbdProps) {
       data-slot="kbd"
       data-hit={hit ? "" : undefined}
       className={cn(
-        "bg-surface-base text-text-secondary pointer-events-none inline-flex h-5 w-fit min-w-5 select-none items-center justify-center gap-1 rounded-sm border border-line-border border-b-2 px-1 font-sans text-kicker font-medium transition-[background-color,color,transform] duration-[length:var(--dur-fast)] ease-[var(--ease-standard)] motion-reduce:transition-none",
+        "bg-surface-base text-text-secondary pointer-events-none inline-flex h-5 w-fit min-w-5 select-none items-center justify-center gap-1 rounded-sm border border-line-border border-b-2 px-1 font-sans type-kicker font-medium transition-[background-color,color,transform] duration-[length:var(--dur-fast)] ease-[var(--ease-standard)] motion-reduce:transition-none",
         "data-[hit]:bg-fill-inverse data-[hit]:text-text-inverse data-[hit]:border-fill-inverse data-[hit]:translate-y-px",
         "[&_svg:not([class*='size-'])]:size-3",
         className,

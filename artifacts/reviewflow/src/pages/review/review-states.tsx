@@ -107,8 +107,8 @@ export function QueueClear({
           <span className="inline-flex size-12 items-center justify-center rounded-full bg-fill-subtle text-text-primary mb-6">
             <Check className="size-6" strokeWidth={2} aria-hidden="true" />
           </span>
-          <h2 className="font-serif text-display mb-3">Queue clear.</h2>
-          <p className="text-small text-text-secondary mb-8">
+          <h2 className="font-serif type-display mb-3">Queue clear.</h2>
+          <p className="type-small text-text-secondary mb-8">
             All {total} tasks have a decision. Nothing is waiting for review.
           </p>
           <PropertyList
@@ -138,7 +138,7 @@ export function QueueClear({
             </Button>
             <Link
               href="/tasks"
-              className="inline-flex items-center justify-center min-h-[52px] h-[52px] px-5 rounded-md bg-fill-subtle text-text-primary text-body font-medium hover:bg-fill-emphasis"
+              className="inline-flex items-center justify-center min-h-[52px] h-[52px] px-5 rounded-md bg-fill-subtle text-text-primary type-body font-medium hover:bg-fill-emphasis"
             >
               Open Tasks
             </Link>
@@ -167,10 +167,10 @@ export function LoadError({
       />
       <div className="flex-1 flex items-center justify-center px-6 py-16">
         <div className="max-w-md w-full text-center" role="alert">
-          <h2 className="font-serif text-display mb-3">
+          <h2 className="font-serif type-display mb-3">
             Couldn&apos;t load the next task
           </h2>
-          <p className="text-small text-text-secondary mb-8">
+          <p className="type-small text-text-secondary mb-8">
             Check your connection and try again.
           </p>
           <Button type="button" size="lg" onClick={onRetry}>
