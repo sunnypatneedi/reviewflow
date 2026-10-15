@@ -8,8 +8,8 @@ import {
   getGetNextReviewQueryKey,
   getGetMetricsQueryKey,
 } from "@workspace/api-client-react";
-import { CollapsibleBanner } from "@/components/interior/collapsible-banner";
 import { queryClient } from "@/lib/queryClient";
+import { OfflineBanner } from "./offline-banner";
 import { ActiveTimeTracker } from "@/lib/active-time";
 import {
   type ReviewAttempt,
@@ -137,7 +137,6 @@ export default function Review() {
     setNudgeReason(false);
     submitReview.reset();
     queueMicrotask(() => caseHeadingRef.current?.focus());
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on task change only
   }, [item?.task.id]);
 
   const reloadQueue = useCallback(() => {
@@ -340,19 +339,8 @@ export default function Review() {
   );
 
   const offlineBanner = !online ? (
-    <CollapsibleBanner
-      dismissible={false}
-      title="You're offline"
-      description="Decisions can't be saved. Your work on this task stays here until you reconnect."
-      action={
-        <button
-          type="button"
-          className="text-small font-medium underline underline-offset-2"
-          onClick={() => refetch()}
-        >
-          Try again
-        </button>
-      }
+    <OfflineBanner
+      onRetry={() => refetch()}
       className="mx-4 min-[861px]:mx-8 mt-3"
     />
   ) : null;

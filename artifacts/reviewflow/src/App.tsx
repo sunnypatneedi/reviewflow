@@ -69,26 +69,26 @@ const clerkAppearance = {
   },
   elements: {
     rootBox: "w-full flex justify-center",
-    cardBox: "bg-white rounded-2xl w-[440px] max-w-full overflow-hidden shadow-xl border border-gray-100",
+    cardBox: "bg-surface-base rounded-2xl w-[440px] max-w-full overflow-hidden shadow-surface border border-line-hairline",
     card: "!shadow-none !border-0 !bg-transparent !rounded-none",
     footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    headerTitle: "text-2xl font-bold tracking-tight text-slate-900",
-    headerSubtitle: "text-slate-500",
-    formButtonPrimary: "bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors",
-    formFieldInput: "border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-900",
-    formFieldLabel: "text-sm font-medium text-slate-700",
-    footerActionLink: "text-blue-600 hover:text-blue-700 font-medium",
-    footerActionText: "text-slate-500",
-    socialButtonsBlockButtonText: "text-slate-700 font-medium",
-    socialButtonsBlockButton: "border border-gray-200 hover:bg-gray-50 text-slate-700 font-medium py-2 px-4 rounded-md transition-colors",
-    dividerText: "text-slate-400",
-    dividerLine: "bg-gray-200",
+    headerTitle: "text-2xl font-bold tracking-tight text-text-primary",
+    headerSubtitle: "text-text-muted",
+    formButtonPrimary: "bg-fill-inverse hover:bg-fill-inverse-hover text-text-inverse font-medium py-2 px-4 rounded-md transition-colors",
+    formFieldInput: "border-line-border rounded-md focus:ring-2 focus:ring-ring focus:border-transparent text-text-primary",
+    formFieldLabel: "text-sm font-medium text-text-secondary",
+    footerActionLink: "text-text-primary hover:text-text-secondary font-medium underline",
+    footerActionText: "text-text-muted",
+    socialButtonsBlockButtonText: "text-text-secondary font-medium",
+    socialButtonsBlockButton: "border border-line-border hover:bg-fill-subtle text-text-secondary font-medium py-2 px-4 rounded-md transition-colors",
+    dividerText: "text-text-muted",
+    dividerLine: "bg-fill-subtle",
   },
 };
 
 function SignInPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-surface-base px-4">
       <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
     </div>
   );
@@ -96,7 +96,7 @@ function SignInPage() {
 
 function SignUpPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-surface-base px-4">
       <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
     </div>
   );

@@ -52,4 +52,5 @@ jobs:
           pnpm tokens
           git diff --exit-code src/styles/tokens.css design/tokens-contrast.md
           pnpm stylelint "src/**/*.css"
+          pnpm lint
       - run: sh scripts/verify-isolated.sh

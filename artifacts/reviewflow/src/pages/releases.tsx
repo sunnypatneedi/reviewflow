@@ -59,7 +59,7 @@ export default function Releases() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 border border-border rounded-md bg-card shadow-sm">
+        <div className="lg:col-span-2 border border-border rounded-md bg-card shadow-surface">
           <Table>
             <TableHeader>
               <TableRow>
@@ -97,7 +97,7 @@ export default function Releases() {
           </Table>
         </div>
 
-        <div className="bg-card border border-border p-5 rounded-md space-y-5 shadow-sm">
+        <div className="bg-card border border-border p-5 rounded-md space-y-5 shadow-surface">
           <h3 className="font-semibold text-sm">Cut New Release</h3>
           <div className="space-y-4">
             <div>

@@ -111,13 +111,13 @@ export default function Tasks() {
 
   const renderJobStatus = (job: EvaluationJob) => {
     const statusClass = {
-      queued: "bg-slate-100 text-slate-700",
-      running: "bg-blue-100 text-blue-700",
-      succeeded: "bg-emerald-100 text-emerald-700",
-      failed: "bg-red-100 text-red-700",
+      queued: "bg-fill-subtle text-text-secondary",
+      running: "bg-fill-emphasis text-text-primary",
+      succeeded: "bg-fill-subtle text-text-primary",
+      failed: "bg-danger-wash text-danger",
     }[job.status];
     return (
-      <div key={job.id} className="flex items-center gap-1.5 text-[10px]">
+      <div key={job.id} className="flex items-center gap-1.5 text-meta">
         <span className={`px-1.5 py-0.5 rounded uppercase font-semibold tracking-wider ${statusClass}`}>
           {job.mode} · {job.status}
         </span>
@@ -125,7 +125,7 @@ export default function Tasks() {
           <Button
             variant="outline"
             size="sm"
-            className="h-6 px-2 text-[10px]"
+            className="h-6 px-2 text-meta"
             disabled={retryingJobId === job.id || (job.mode === "live" && !consent)}
             title={job.mode === "live" && !consent ? "Select Live mode and confirm consent before retrying" : undefined}
             onClick={() => handleRetry(job)}
@@ -156,7 +156,7 @@ export default function Tasks() {
                   : "Evaluation failures need attention"}
               </span>
               {failedJobCount > 0 && (
-                <span className="text-xs text-red-600">{failedJobCount} failed</span>
+                <span className="text-xs text-danger">{failedJobCount} failed</span>
               )}
             </div>
           )}
@@ -198,7 +198,7 @@ export default function Tasks() {
                     </TableCell>
                     <TableCell className="font-mono text-xs">{task.externalId}</TableCell>
                     <TableCell>
-                      <span className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded text-[10px] uppercase font-semibold tracking-wider">
+                      <span className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded text-meta uppercase font-semibold tracking-wider">
                         {task.status.replace('_', ' ')}
                       </span>
                     </TableCell>
@@ -228,7 +228,7 @@ export default function Tasks() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-card border border-border p-4 rounded-md space-y-4 shadow-sm">
+          <div className="bg-card border border-border p-4 rounded-md space-y-4 shadow-surface">
             <h3 className="font-semibold text-sm">Import Tasks (JSONL)</h3>
             <Textarea 
               className="font-mono text-xs min-h-[150px] resize-none" 
@@ -249,7 +249,7 @@ export default function Tasks() {
             )}
           </div>
 
-          <div className="bg-card border border-border p-4 rounded-md space-y-4 shadow-sm">
+          <div className="bg-card border border-border p-4 rounded-md space-y-4 shadow-surface">
             <h3 className="font-semibold text-sm flex justify-between items-center">
               Evaluate Selected 
               <span className="text-muted-foreground font-normal">{selectedTasks.size} tasks</span>
@@ -268,9 +268,9 @@ export default function Tasks() {
             </div>
 
             {evalMode === 'live' && (
-              <div className="flex items-start gap-2 pt-2 bg-amber-50 p-3 rounded-md border border-amber-200">
-                <input type="checkbox" id="consent" className="mt-1 accent-amber-600" checked={consent} onChange={e => setConsent(e.target.checked)} />
-                <label htmlFor="consent" className="text-xs text-amber-900 leading-tight">
+              <div className="flex items-start gap-2 pt-2 bg-warn-wash p-3 rounded-md border border-line-border">
+                <input type="checkbox" id="consent" className="mt-1 accent-warn" checked={consent} onChange={e => setConsent(e.target.checked)} />
+                <label htmlFor="consent" className="text-xs text-warn leading-tight">
                   I explicitly authorize hitting the live API for these tasks, incurring real usage costs.
                 </label>
               </div>

@@ -109,7 +109,7 @@ export default function Audits() {
         </p>
       </div>
 
-      <section className="border border-border rounded-md bg-card p-5 shadow-sm space-y-4">
+      <section className="border border-border rounded-md bg-card p-5 shadow-surface space-y-4">
         <div>
           <h2 className="font-semibold">Create an audit assignment</h2>
           <p className="text-sm text-muted-foreground mt-1">
@@ -149,7 +149,7 @@ export default function Audits() {
       </section>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(420px,1.2fr)] gap-8 items-start">
-        <section className="border border-border rounded-md bg-card shadow-sm overflow-hidden">
+        <section className="border border-border rounded-md bg-card shadow-surface overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
@@ -170,10 +170,10 @@ export default function Audits() {
                   onClick={() => setSelectedAuditId(audit.id)}
                 >
                   <TableCell>
-                    <span className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded text-[10px] uppercase font-semibold tracking-wider">
+                    <span className="px-2 py-0.5 bg-secondary text-secondary-foreground rounded text-meta uppercase font-semibold tracking-wider">
                       {audit.status}
                     </span>
-                    {audit.required && <span className="ml-2 text-[10px] text-muted-foreground">required</span>}
+                    {audit.required && <span className="ml-2 text-meta text-muted-foreground">required</span>}
                   </TableCell>
                   <TableCell className="font-medium">
                     {audit.completedItems}/{audit.sampleSize}
@@ -193,7 +193,7 @@ export default function Audits() {
           </Table>
         </section>
 
-        <section className="border border-border rounded-md bg-card p-5 shadow-sm min-h-[280px]">
+        <section className="border border-border rounded-md bg-card p-5 shadow-surface min-h-[280px]">
           {!selectedAuditId ? (
             <div className="h-full min-h-[240px] flex items-center justify-center text-sm text-muted-foreground">
               Select an audit to review its blind work items.
