@@ -90,12 +90,7 @@ export default function Tasks() {
     const q = search.trim().toLowerCase();
     if (!q) return list;
     return list.filter((task) => {
-      const haystack = [
-        task.externalId,
-        task.status,
-        task.mode,
-        task.risk,
-      ]
+      const haystack = [task.externalId, task.status, task.mode, task.risk]
         .join(" ")
         .toLowerCase();
       return haystack.includes(q);
@@ -269,13 +264,13 @@ export default function Tasks() {
               {activeJobCount > 0
                 ? `${activeJobCount} evaluation${activeJobCount === 1 ? "" : "s"} in progress`
                 : "Evaluation failures need attention"}
-              {failedJobCount > 0
-                ? ` · ${failedJobCount} failed`
-                : null}
+              {failedJobCount > 0 ? ` · ${failedJobCount} failed` : null}
             </Notice>
           )}
           {retryEvaluationJob.isError ? (
-            <InlineError message={`Retry failed: ${retryEvaluationJob.error.message}`} />
+            <InlineError
+              message={`Retry failed: ${retryEvaluationJob.error.message}`}
+            />
           ) : null}
 
           <div className="border border-line-hairline overflow-hidden">
@@ -416,9 +411,7 @@ export default function Tasks() {
                 id="eval-mode"
                 className="h-11 w-full border border-line-border bg-surface-base rounded-[length:var(--radius-input)] px-3 type-small focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 value={evalMode}
-                onChange={(e) =>
-                  setEvalMode(e.target.value as "demo" | "live")
-                }
+                onChange={(e) => setEvalMode(e.target.value as "demo" | "live")}
               >
                 <option value="demo">Demo (Simulated)</option>
                 <option value="live">Live (Real API)</option>

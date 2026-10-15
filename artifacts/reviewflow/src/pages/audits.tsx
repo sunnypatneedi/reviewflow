@@ -36,13 +36,7 @@ type Label = (typeof LABELS)[number];
 const labelTitle = (label: string) => label.replaceAll("_", " ");
 
 export default function Audits() {
-  const {
-    data: audits,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useListAudits();
+  const { data: audits, isLoading, isError, error, refetch } = useListAudits();
   const createAudit = useCreateAudit();
   const submitDecision = useSubmitAuditDecision();
   const adjudicateDispute = useAdjudicateAuditDispute();
@@ -442,9 +436,8 @@ export default function Audits() {
                     Audit work items
                   </h2>
                   <p className="type-meta text-text-muted mt-1">
-                    Seed{" "}
-                    <span className="font-mono">{selectedAudit.seed}</span> ·
-                    frame {selectedAudit.samplingFrameHash.slice(0, 12)}…
+                    Seed <span className="font-mono">{selectedAudit.seed}</span>{" "}
+                    · frame {selectedAudit.samplingFrameHash.slice(0, 12)}…
                   </p>
                 </div>
                 <span className="type-meta text-text-muted">

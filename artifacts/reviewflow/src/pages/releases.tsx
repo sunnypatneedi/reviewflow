@@ -250,9 +250,7 @@ export default function Releases() {
               </AlertDialogContent>
             </AlertDialog>
             {createRelease.isError ? (
-              <InlineError
-                message={createRelease.error.message}
-              />
+              <InlineError message={createRelease.error.message} />
             ) : null}
           </div>
         </div>

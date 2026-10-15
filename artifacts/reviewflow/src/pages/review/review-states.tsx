@@ -181,7 +181,10 @@ export function LoadError({
           >
             <Link
               href="/tasks"
-              className={cn(buttonVariants({ variant: "outline" }), "inline-flex")}
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "inline-flex",
+              )}
             >
               Open Tasks
             </Link>

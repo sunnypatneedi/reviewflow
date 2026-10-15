@@ -177,9 +177,7 @@ export default function Traces() {
     }
   };
   const loadError =
-    error ||
-    (list.error || detail.error || releases.error)?.message ||
-    "";
+    error || (list.error || detail.error || releases.error)?.message || "";
 
   return (
     <div className="p-6 min-[861px]:p-8 space-y-6">
@@ -320,7 +318,11 @@ export default function Traces() {
             </span>
           </div>
           {list.isLoading ? (
-            <div className="p-4 space-y-3" role="status" aria-label="Loading comparisons">
+            <div
+              className="p-4 space-y-3"
+              role="status"
+              aria-label="Loading comparisons"
+            >
               {Array.from({ length: 4 }).map((_, index) => (
                 <div key={index} className="space-y-2">
                   <Skeleton className="h-4 w-3/4" />
@@ -449,8 +451,8 @@ export default function Traces() {
             <AlertDialogHeader>
               <AlertDialogTitle>Create immutable release?</AlertDialogTitle>
               <AlertDialogDescription>
-                Release “{name.trim()}” is a permanent snapshot. Earlier
-                exports stay unchanged; this cut cannot be edited.
+                Release “{name.trim()}” is a permanent snapshot. Earlier exports
+                stay unchanged; this cut cannot be edited.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -471,7 +473,11 @@ export default function Traces() {
           </AlertDialogContent>
         </AlertDialog>
         {releases.isLoading ? (
-          <div className="space-y-2" role="status" aria-label="Loading releases">
+          <div
+            className="space-y-2"
+            role="status"
+            aria-label="Loading releases"
+          >
             <Skeleton className="h-4 w-1/2" />
             <Skeleton className="h-4 w-2/3" />
           </div>
@@ -662,7 +668,10 @@ export default function Traces() {
           >
             Reconcile & stage annotations
           </Button>
-          <AlertDialog open={confirmReconcile} onOpenChange={setConfirmReconcile}>
+          <AlertDialog
+            open={confirmReconcile}
+            onOpenChange={setConfirmReconcile}
+          >
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Reconcile annotations?</AlertDialogTitle>

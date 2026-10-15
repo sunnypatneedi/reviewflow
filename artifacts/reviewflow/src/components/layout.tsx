@@ -31,7 +31,10 @@ const NAV_ITEMS = [
 function BrandMark({ className }: { className?: string }) {
   return (
     <span
-      className={cn("inline-block size-3.5 shrink-0 rounded-sm bg-fill-inverse", className)}
+      className={cn(
+        "inline-block size-3.5 shrink-0 rounded-sm bg-fill-inverse",
+        className,
+      )}
       aria-hidden="true"
     />
   );

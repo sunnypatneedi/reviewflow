@@ -28,7 +28,13 @@ function DefinitionRow({
 }
 
 export default function Settings() {
-  const { data: config, isLoading, isError, error, refetch } = useGetBootstrap();
+  const {
+    data: config,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useGetBootstrap();
 
   if (isLoading) {
     return (

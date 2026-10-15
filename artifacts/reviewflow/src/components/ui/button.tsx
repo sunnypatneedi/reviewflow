@@ -10,12 +10,14 @@ export const buttonVariants = cva(
         default:
           "bg-fill-inverse text-text-inverse hover:bg-fill-inverse-hover h-11 min-h-11 px-4",
         main: "bg-fill-inverse text-text-inverse hover:bg-fill-inverse-hover h-11 min-h-11 px-4",
-        secondary: "bg-fill-subtle text-text-primary hover:bg-fill-emphasis h-11 min-h-11 px-4",
+        secondary:
+          "bg-fill-subtle text-text-primary hover:bg-fill-emphasis h-11 min-h-11 px-4",
         ghost:
           "bg-transparent text-text-secondary hover:bg-fill-subtle hover:text-text-primary h-9 min-h-9 px-3",
         outline:
           "border border-line-strong bg-surface-base text-text-primary hover:bg-fill-subtle h-9 min-h-9 px-3",
-        destructive: "bg-danger text-text-inverse hover:bg-danger h-11 min-h-11 px-4",
+        destructive:
+          "bg-danger text-text-inverse hover:bg-danger h-11 min-h-11 px-4",
         icon: "bg-transparent text-text-secondary hover:bg-fill-subtle hover:text-text-primary size-8 min-h-8 min-w-8 p-0",
       },
       size: {

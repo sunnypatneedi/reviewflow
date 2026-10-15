@@ -145,7 +145,9 @@ export default function Home() {
           <h1 className="type-headline text-text-primary">Overview</h1>
           <p className="type-small text-text-secondary">
             Project: {bootstrap?.projectName} · Model:{" "}
-            <span className="font-mono type-meta">{bootstrap?.providerModel}</span>
+            <span className="font-mono type-meta">
+              {bootstrap?.providerModel}
+            </span>
           </p>
         </div>
         <Link
