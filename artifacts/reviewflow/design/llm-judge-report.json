@@ -1,0 +1,394 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-15T03:56:10.523Z",
+  "rubric": "scripts/llm-as-judge-rubric.md",
+  "sample": {
+    "id": "demo-rf-001-020",
+    "size": 20,
+    "seed": "canonical-demo-fixtures"
+  },
+  "subject": {
+    "model": "demo-simulator-v1",
+    "source": "artifacts/api-server/src/evaluation.ts#simulated"
+  },
+  "judgeMode": "deterministic-rubric",
+  "llm": null,
+  "llmRequested": false,
+  "llmAvailable": false,
+  "aggregate": {
+    "meanScore": 0.92,
+    "medianScore": 1,
+    "labelAccuracy": 0.8,
+    "labelCorrect": 16,
+    "labelTotal": 20,
+    "dimensionMeans": {
+      "D1": 1.6,
+      "D2": 2,
+      "D3": 2,
+      "D4": 2,
+      "D5": 1.6
+    }
+  },
+  "cases": [
+    {
+      "externalId": "rf-001",
+      "referenceLabel": "supported",
+      "predictedLabel": "supported",
+      "injection": 0.05,
+      "confidence": 0.74,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-002",
+      "referenceLabel": "contradicted",
+      "predictedLabel": "insufficient_evidence",
+      "injection": 0.03,
+      "confidence": 0.82,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 0,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 0
+      },
+      "total": 6,
+      "score": 0.6,
+      "llm": null
+    },
+    {
+      "externalId": "rf-003",
+      "referenceLabel": "insufficient_evidence",
+      "predictedLabel": "insufficient_evidence",
+      "injection": 0.11,
+      "confidence": 0.74,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-004",
+      "referenceLabel": "supported",
+      "predictedLabel": "supported",
+      "injection": 0.05,
+      "confidence": 0.61,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-005",
+      "referenceLabel": "contradicted",
+      "predictedLabel": "contradicted",
+      "injection": 0.06,
+      "confidence": 0.69,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-006",
+      "referenceLabel": "insufficient_evidence",
+      "predictedLabel": "insufficient_evidence",
+      "injection": 0.07,
+      "confidence": 0.7,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-007",
+      "referenceLabel": "supported",
+      "predictedLabel": "contradicted",
+      "injection": 0.09,
+      "confidence": 0.71,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 0,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 0
+      },
+      "total": 6,
+      "score": 0.6,
+      "llm": null
+    },
+    {
+      "externalId": "rf-008",
+      "referenceLabel": "insufficient_evidence",
+      "predictedLabel": "insufficient_evidence",
+      "injection": 0.13,
+      "confidence": 0.89,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-009",
+      "referenceLabel": "contradicted",
+      "predictedLabel": "contradicted",
+      "injection": 0.07,
+      "confidence": 0.75,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-010",
+      "referenceLabel": "supported",
+      "predictedLabel": "supported",
+      "injection": 0.11,
+      "confidence": 0.62,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-011",
+      "referenceLabel": "supported",
+      "predictedLabel": "supported",
+      "injection": 0.1,
+      "confidence": 0.81,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-012",
+      "referenceLabel": "contradicted",
+      "predictedLabel": "contradicted",
+      "injection": 0.04,
+      "confidence": 0.88,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-013",
+      "referenceLabel": "insufficient_evidence",
+      "predictedLabel": "insufficient_evidence",
+      "injection": 0.14,
+      "confidence": 0.8,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-014",
+      "referenceLabel": "supported",
+      "predictedLabel": "supported",
+      "injection": 0.91,
+      "confidence": 0.88,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-015",
+      "referenceLabel": "supported",
+      "predictedLabel": "supported",
+      "injection": 0.91,
+      "confidence": 0.6699999999999999,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-016",
+      "referenceLabel": "supported",
+      "predictedLabel": "contradicted",
+      "injection": 0.03,
+      "confidence": 0.87,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 0,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 0
+      },
+      "total": 6,
+      "score": 0.6,
+      "llm": null
+    },
+    {
+      "externalId": "rf-017",
+      "referenceLabel": "contradicted",
+      "predictedLabel": "contradicted",
+      "injection": 0.05,
+      "confidence": 0.61,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-018",
+      "referenceLabel": "insufficient_evidence",
+      "predictedLabel": "supported",
+      "injection": 0.03,
+      "confidence": 0.6699999999999999,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 0,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 0
+      },
+      "total": 6,
+      "score": 0.6,
+      "llm": null
+    },
+    {
+      "externalId": "rf-019",
+      "referenceLabel": "contradicted",
+      "predictedLabel": "contradicted",
+      "injection": 0.11,
+      "confidence": 0.83,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    },
+    {
+      "externalId": "rf-020",
+      "referenceLabel": "contradicted",
+      "predictedLabel": "contradicted",
+      "injection": 0.12,
+      "confidence": 0.79,
+      "model": "demo-simulator-v1",
+      "dims": {
+        "D1": 2,
+        "D2": 2,
+        "D3": 2,
+        "D4": 2,
+        "D5": 2
+      },
+      "total": 10,
+      "score": 1,
+      "llm": null
+    }
+  ]
+}

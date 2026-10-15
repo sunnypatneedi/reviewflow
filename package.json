@@ -12,6 +12,8 @@
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "verify:isolated": "sh scripts/verify-isolated.sh",
+    "judge": "pnpm --filter @workspace/scripts run judge",
+    "smoke:ui": "pnpm --filter @workspace/scripts run smoke:ui",
     "package:source": "node scripts/package-source.mjs"
   },
   "private": true,
