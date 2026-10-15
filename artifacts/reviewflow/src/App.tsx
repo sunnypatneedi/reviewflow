@@ -229,8 +229,10 @@ function App() {
         storageKey="rf.theme"
         disableTransitionOnChange={false}
       >
-        <ThemeQueryBootstrap />
-        {appMode === "clerk" ? <ClerkApp /> : <AppRoutes />}
+        <ErrorBoundary>
+          <ThemeQueryBootstrap />
+          {appMode === "clerk" ? <ClerkApp /> : <AppRoutes />}
+        </ErrorBoundary>
       </ThemeProvider>
     </QueryClientProvider>
   );

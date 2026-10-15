@@ -13,6 +13,27 @@
     <meta name="twitter:title" content="ReviewFlow" />
     <meta name="twitter:description" content="Experimental human-in-the-loop review workflow for synthetic evidence-grounding tasks." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("rf.theme");
+          var theme = stored;
+          if (theme === "light" || theme === "dark" || theme === "plum") {
+            document.documentElement.setAttribute("data-theme", theme);
+          } else {
+            var prefersDark =
+              window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches;
+            document.documentElement.setAttribute(
+              "data-theme",
+              prefersDark ? "dark" : "light",
+            );
+          }
+        } catch (_) {
+          /* ignore storage / media errors before paint */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

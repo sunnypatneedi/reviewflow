@@ -26,7 +26,7 @@ export function ThemeToggle() {
     run();
     window.setTimeout(
       () => document.documentElement.classList.remove("theming"),
-      450,
+      250,
     );
   };
 
@@ -45,7 +45,7 @@ export function ThemeToggle() {
           key={value}
           value={value}
           aria-label={label}
-          className="size-11 min-w-11 p-0 data-[state=on]:bg-fill-emphasis"
+          className="size-8 min-w-8 p-0 data-[state=on]:bg-fill-emphasis"
         >
           <Icon className="size-4" />
         </ToggleGroupItem>

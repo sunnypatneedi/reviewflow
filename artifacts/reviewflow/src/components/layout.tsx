@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AppCommands } from "@/components/app-commands";
+import { Button } from "@/components/ui/button";
 
 const NAV_ITEMS = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
@@ -26,45 +28,54 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
+function BrandMark({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn("inline-block size-3.5 shrink-0 rounded-sm bg-fill-inverse", className)}
+      aria-hidden="true"
+    />
+  );
+}
+
 function ClerkAccount() {
   const { signOut } = useClerk();
   const { user } = useUser();
   return (
-    <div className="p-4 border-t border-line-hairline">
-      <div className="flex items-center justify-between mb-4 px-2">
-        <div className="flex items-center gap-2 overflow-hidden">
-          <div className="w-8 h-8 rounded-full bg-fill-subtle border border-line-hairline flex items-center justify-center text-xs font-semibold text-text-secondary shrink-0">
-            {user?.firstName?.charAt(0) ||
-              user?.emailAddresses[0]?.emailAddress?.charAt(0) ||
-              "U"}
+    <div className="border-t border-line-hairline p-4">
+      <div className="mb-3 flex items-center gap-2 overflow-hidden px-1">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-line-hairline bg-fill-subtle type-mono text-text-secondary">
+          {user?.firstName?.charAt(0) ||
+            user?.emailAddresses[0]?.emailAddress?.charAt(0) ||
+            "U"}
+        </div>
+        <div className="min-w-0 truncate type-caption text-text-muted">
+          <div className="truncate font-medium text-text-primary">
+            {user?.fullName || "User"}
           </div>
-          <div className="text-xs truncate text-text-muted">
-            <div className="font-medium text-text-primary truncate">
-              {user?.fullName || "User"}
-            </div>
-            <div className="truncate">
-              {user?.primaryEmailAddress?.emailAddress}
-            </div>
+          <div className="truncate">
+            {user?.primaryEmailAddress?.emailAddress}
           </div>
         </div>
       </div>
-      <button
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full"
         onClick={() => signOut()}
-        className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-fill-subtle rounded-md transition-colors"
       >
-        <LogOut className="w-4 h-4" />
+        <LogOut className="size-4" />
         Sign out
-      </button>
+      </Button>
     </div>
   );
 }
 
 function DemoAccount() {
   return (
-    <div className="p-4 border-t border-line-hairline">
-      <p className="flex items-center gap-2 text-xs text-text-secondary px-1">
+    <div className="border-t border-line-hairline px-4 py-3">
+      <p className="flex items-center gap-2 type-caption text-text-secondary">
         <span
-          className="inline-block size-1.5 rounded-full bg-warn shrink-0"
+          className="inline-block size-1.5 shrink-0 rounded-full bg-warn"
           aria-hidden="true"
         />
         Isolated synthetic demo
@@ -81,7 +92,7 @@ function NavLinks({
   onNavigate?: () => void;
 }) {
   return (
-    <nav className="p-3 space-y-0.5" aria-label="Primary">
+    <nav className="space-y-0.5 p-3" aria-label="Primary">
       {NAV_ITEMS.map((item) => {
         const isActive = location === item.href;
         const Icon = item.icon;
@@ -91,14 +102,14 @@ function NavLinks({
             href={item.href}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-3 px-3 py-[7px] rounded-md text-sm font-medium transition-colors",
+              "flex items-center gap-3 rounded-[length:var(--radius-control)] px-3 py-[7px] type-small font-medium transition-colors",
               isActive
-                ? "bg-sidebar-accent text-text-primary font-semibold"
-                : "text-text-secondary hover:text-text-primary hover:bg-fill-subtle",
+                ? "bg-fill-emphasis font-semibold text-text-primary"
+                : "text-text-secondary hover:bg-fill-subtle hover:text-text-primary",
             )}
             aria-current={isActive ? "page" : undefined}
           >
-            <Icon className="w-4 h-4" />
+            <Icon className="size-4 shrink-0" />
             {item.label}
           </Link>
         );
@@ -118,77 +129,61 @@ export function AppLayout({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    <div className="flex min-[861px]:h-screen w-full bg-surface-base text-text-primary min-[861px]:overflow-hidden">
-      <aside className="hidden min-[861px]:flex w-52 border-r border-line-hairline bg-fill-subtle flex-col justify-between flex-shrink-0">
-        <div>
-          <div className="h-14 flex items-center px-5 border-b border-line-hairline">
-            <h1 className="font-semibold text-base tracking-tight text-text-primary flex items-center gap-2.5">
-              <div
-                className="w-4 h-4 bg-fill-inverse rounded"
-                aria-hidden="true"
-              />
-              ReviewFlow
-            </h1>
-          </div>
-          <NavLinks location={location} />
-        </div>
-        <div className="px-3 pb-3">
-          <ThemeToggle />
-        </div>
-        {authMode === "clerk" ? <ClerkAccount /> : <DemoAccount />}
-      </aside>
-
-      <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <div className="min-[861px]:hidden sticky top-0 z-sticky flex items-center gap-3 h-14 px-4 border-b border-line-hairline shrink-0 bg-surface-glass backdrop-blur">
-          <button
+    <div className="hatch min-h-[100dvh] w-full text-text-primary">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[var(--frame-max)] flex-col border-x border-line-hairline bg-surface-base">
+        <header className="sticky top-0 z-sticky flex h-14 shrink-0 items-center gap-3 border-b border-line-hairline bg-surface-glass px-3 backdrop-blur min-[861px]:gap-4 min-[861px]:px-4">
+          <Button
             type="button"
-            className="inline-flex items-center justify-center size-11 rounded-md text-text-secondary hover:bg-fill-subtle hover:text-text-primary"
+            variant="icon"
+            className="min-[861px]:hidden"
             aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"}
             aria-expanded={mobileNavOpen}
             onClick={() => setMobileNavOpen((open) => !open)}
           >
             {mobileNavOpen ? (
-              <X className="w-5 h-5" />
+              <X className="size-5" />
             ) : (
-              <Menu className="w-5 h-5" />
+              <Menu className="size-5" />
             )}
-          </button>
-          <span className="font-semibold text-sm tracking-tight flex items-center gap-2 flex-1">
-            <span
-              className="w-3.5 h-3.5 bg-fill-inverse rounded-sm"
-              aria-hidden="true"
-            />
+          </Button>
+
+          <Link
+            href="/"
+            className="flex shrink-0 items-center gap-2 type-small font-semibold tracking-tight text-text-primary"
+          >
+            <BrandMark />
             ReviewFlow
-          </span>
-          <ThemeToggle />
-        </div>
+          </Link>
+
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            <AppCommands />
+            <ThemeToggle />
+          </div>
+        </header>
 
         {mobileNavOpen ? (
-          <div className="min-[861px]:hidden fixed inset-0 z-scrim">
+          <div className="fixed inset-0 z-scrim min-[861px]:hidden">
             <button
               type="button"
               className="absolute inset-0 bg-surface-scrim"
               aria-label="Dismiss navigation"
               onClick={() => setMobileNavOpen(false)}
             />
-            <aside className="absolute left-0 top-0 bottom-0 w-64 bg-fill-subtle border-r border-line-hairline flex flex-col justify-between shadow-surface z-dialog">
+            <aside className="absolute bottom-0 left-0 top-0 z-dialog flex w-64 flex-col justify-between border-r border-line-hairline bg-surface-base">
               <div>
-                <div className="h-14 flex items-center justify-between px-5 border-b border-line-hairline">
-                  <span className="font-semibold text-base tracking-tight flex items-center gap-2.5">
-                    <span
-                      className="w-4 h-4 bg-fill-inverse rounded"
-                      aria-hidden="true"
-                    />
+                <div className="flex h-14 items-center justify-between border-b border-line-hairline px-4">
+                  <span className="flex items-center gap-2 type-small font-semibold tracking-tight">
+                    <BrandMark />
                     ReviewFlow
                   </span>
-                  <button
+                  <Button
                     type="button"
-                    className="size-11 inline-flex items-center justify-center rounded-md text-text-secondary hover:bg-fill-subtle"
+                    variant="icon"
                     aria-label="Close navigation"
                     onClick={() => setMobileNavOpen(false)}
                   >
-                    <X className="w-4 h-4" />
-                  </button>
+                    <X className="size-4" />
+                  </Button>
                 </div>
                 <NavLinks
                   location={location}
@@ -200,9 +195,25 @@ export function AppLayout({
           </div>
         ) : null}
 
-        <main className="flex-1 flex flex-col min-h-0 min-[861px]:overflow-hidden bg-surface-base">
-          <div className="flex-1 min-[861px]:overflow-auto">{children}</div>
-        </main>
+        <div className="flex min-h-0 flex-1">
+          <aside className="hidden w-[var(--side)] shrink-0 flex-col justify-between border-r border-line-hairline bg-surface-base min-[861px]:flex">
+            <NavLinks location={location} />
+            {authMode === "clerk" ? <ClerkAccount /> : <DemoAccount />}
+          </aside>
+
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-base">
+            <div className="rf-enter flex-1 min-[861px]:overflow-auto">
+              {children}
+            </div>
+          </main>
+        </div>
+
+        <footer className="shrink-0 border-t border-line-hairline px-4 py-2">
+          <p className="type-mono text-text-muted">
+            ReviewFlow · {authMode === "demo" ? "demo" : "live"} · theme follows
+            system until toggled
+          </p>
+        </footer>
       </div>
     </div>
   );
