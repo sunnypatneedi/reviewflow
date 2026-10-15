@@ -20,6 +20,58 @@ export function originalFinalReview(task: Task, reviews: Review[], version = tas
 }
 
 type Evidence = { audits: Audit[]; items: Item[]; decisions: Decision[]; disputes: Dispute[]; reviews: Review[] };
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export async function readDecisionEvidence(tx: Transaction, projectId: string): Promise<Evidence> {
+  const audits = await tx.select().from(auditsTable).where(eq(auditsTable.projectId, projectId)).orderBy(auditsTable.id);
+  const ids = audits.map(a => a.id);
+  return {
+    audits,
+    items: ids.length ? await tx.select().from(auditItemsTable).where(inArray(auditItemsTable.auditId, ids)) : [],
+    decisions: ids.length ? await tx.select().from(auditDecisionsTable).where(inArray(auditDecisionsTable.auditId, ids)) : [],
+    disputes: ids.length ? await tx.select().from(auditDisputesTable).where(inArray(auditDisputesTable.auditId, ids)) : [],
+    reviews: await tx.select().from(reviewsTable).where(eq(reviewsTable.projectId, projectId)),
+  };
+}
+
+/** Validate an audit because its evidence is used, regardless of required. */
+export function assertAuditEvidence(audit: Audit, evidence: Evidence, phase: "release" | "adjudication" = "release") {
+  const complete = phase === "release";
+  if (complete ? audit.status !== "completed" : !["blocked", "in_progress"].includes(audit.status)) return blocked("supporting audit is revoked, invalid, or incomplete");
+  const selected = evidence.items.filter(i => i.auditId === audit.id).sort((a, b) => a.ordinal - b.ordinal);
+  if (!Number.isInteger(audit.sampleSize) || audit.sampleSize < 1 || selected.length !== audit.sampleSize) return blocked("supporting audit sample evidence is missing");
+  const frame = audit.samplingFrame as ReleaseFrame;
+  if (frame?.version !== "rf-audit-v2" || !Array.isArray(frame.eligible) || frame.eligible.some(row => !row || typeof row !== "object")
+    || samplingFrameHash(frame) !== audit.samplingFrameHash) return blocked("supporting audit frame is missing, changed, or unversioned");
+  const expectedSample = selectDeterministicSample(audit.seed, frame.eligible, audit.sampleSize);
+  if (expectedSample.length !== selected.length || expectedSample.some((row, index) => row.taskId !== selected[index].taskId || selected[index].ordinal !== index + 1)) return blocked("supporting audit sample does not match its committed frame");
+  const decisions = evidence.decisions.filter(d => d.auditId === audit.id);
+  const disputes = evidence.disputes.filter(d => d.auditId === audit.id);
+  if (decisions.some(d => !selected.some(i => i.id === d.auditItemId)) || disputes.some(d => !selected.some(i => i.id === d.auditItemId))) return blocked("supporting audit has unbound evidence");
+  for (const item of selected) {
+    const snapshots = frame.eligible.filter(row => row.taskId === item.taskId);
+    const snapshot = snapshots.length === 1 ? snapshots[0] : undefined;
+    if (!snapshot || snapshot.reviewId !== item.originalReviewId || snapshot.reviewerId !== item.originalReviewerId
+      || snapshot.label !== item.originalLabel || snapshot.contentHash !== item.taskContentHash || snapshot.taskVersion !== item.taskVersion
+      || snapshot.adjudicationId !== item.originalAdjudicationId) return blocked("supporting audit item no longer matches its decision snapshot");
+    const original = evidence.reviews.find(r => r.id === item.originalReviewId && r.taskId === item.taskId && r.projectId === audit.projectId);
+    if (!original) return blocked("supporting audit original review is missing");
+    const rows = decisions.filter(d => d.auditItemId === item.id);
+    if (!complete && !rows.length) continue; // Other selected items may still await review at adjudication entry.
+    const decision = rows.length === 1 ? rows[0] : undefined;
+    if (!decision || !labels.includes(decision.label) || !decision.included || decision.selfCheck || decision.taskId !== item.taskId
+      || decision.auditorId !== audit.auditorId || decision.auditorId === item.originalReviewerId || decision.auditorId === original.reviewerId) return blocked("supporting audit decision is missing, excluded, or not independent");
+    const itemDisputes = disputes.filter(d => d.auditItemId === item.id);
+    if (decision.label === item.originalLabel) {
+      if (itemDisputes.length) return blocked("supporting audit has contradictory disagreement evidence");
+    } else {
+      const dispute = itemDisputes.length === 1 ? itemDisputes[0] : undefined;
+      if (!dispute || dispute.taskId !== item.taskId || dispute.originalLabel !== item.originalLabel || dispute.auditLabel !== decision.label
+        || (complete ? dispute.status !== "resolved" : !["pending", "resolved"].includes(dispute.status))) return blocked("supporting audit disagreement evidence is missing or invalid");
+    }
+  }
+  return selected;
+}
+
 export function resolvedDecision(task: Task, evidence: Evidence) {
   const chain: Dispute[] = [];
   const visit = (version: number, label: string | null, adjudicationId: string | null): Review => {
@@ -36,6 +88,7 @@ export function resolvedDecision(task: Task, evidence: Evidence) {
       || decision.taskId !== task.id || decision.auditorId !== audit.auditorId || !decision.included || decision.selfCheck
       || !dispute.adjudicatorId || dispute.adjudicatorId === audit.auditorId || dispute.adjudicatorId === item.originalReviewerId
       || decision.auditorId === item.originalReviewerId) return blocked("adjudication evidence is missing, revoked, or stale");
+    assertAuditEvidence(audit, evidence);
     chain.push(dispute);
     const original = visit(item.taskVersion, item.originalLabel, item.originalAdjudicationId);
     if (original.id !== item.originalReviewId) return blocked("adjudication review lineage changed");
@@ -98,32 +151,16 @@ export async function createRelease(projectId: string, name: string, includeSour
     if (!project) return blocked("project missing");
     const tasks = await tx.select().from(tasksTable).where(eq(tasksTable.projectId, projectId)).orderBy(tasksTable.id);
     if (!name?.trim() || !tasks.length || tasks.some(t => t.status !== "finalized" || !labels.includes(t.finalLabel ?? ""))) return blocked("all tasks must have a resolved human decision");
-    const audits = await tx.select().from(auditsTable).where(eq(auditsTable.projectId, projectId)).orderBy(auditsTable.id);
-    const auditIds = audits.map(a => a.id);
-    const items = auditIds.length ? await tx.select().from(auditItemsTable).where(inArray(auditItemsTable.auditId, auditIds)) : [];
-    const decisions = auditIds.length ? await tx.select().from(auditDecisionsTable).where(inArray(auditDecisionsTable.auditId, auditIds)) : [];
-    const disputes = auditIds.length ? await tx.select().from(auditDisputesTable).where(inArray(auditDisputesTable.auditId, auditIds)) : [];
-    const reviews = await tx.select().from(reviewsTable).where(eq(reviewsTable.projectId, projectId));
+    const evidence = await readDecisionEvidence(tx, projectId);
+    const { audits, decisions, disputes } = evidence;
     const proposals = await tx.select().from(proposalsTable).where(eq(proposalsTable.projectId, projectId));
-    const evidence = { audits, items, decisions, disputes, reviews };
     if (disputes.some(d => d.status !== "resolved")) return blocked("all audit disagreements need valid adjudication, including optional audits");
     const finalDecisions = new Map(tasks.map(t => [t.id, resolvedDecision(t, evidence)]));
     const required = audits.filter(a => a.required);
     for (const audit of required) {
-      const selected = items.filter(i => i.auditId === audit.id).sort((a, b) => a.ordinal - b.ordinal);
-      if (audit.status !== "completed" || selected.length !== audit.sampleSize || !selected.length) return blocked("required audits must be completed with their selected evidence");
-      const frame = audit.samplingFrame as ReleaseFrame;
-      if (frame?.version !== "rf-audit-v2" || !Array.isArray(frame.eligible) || samplingFrameHash(frame) !== audit.samplingFrameHash) return blocked("required audit frame is missing or unversioned");
-      const expectedSample = selectDeterministicSample(audit.seed, frame.eligible, audit.sampleSize);
-      if (expectedSample.length !== selected.length || expectedSample.some((row, index) => row.taskId !== selected[index].taskId || selected[index].ordinal !== index + 1)) return blocked("required audit sample does not match its committed frame");
+      const selected = assertAuditEvidence(audit, evidence);
       for (const item of selected) {
-        const snapshot = frame.eligible.find(row => row.taskId === item.taskId);
-        if (!snapshot || snapshot.reviewId !== item.originalReviewId || snapshot.reviewerId !== item.originalReviewerId
-          || snapshot.label !== item.originalLabel || snapshot.contentHash !== item.taskContentHash || snapshot.taskVersion !== item.taskVersion
-          || snapshot.adjudicationId !== item.originalAdjudicationId) return blocked("required audit item no longer matches its decision snapshot");
-        const rows = decisions.filter(d => d.auditItemId === item.id && d.auditId === audit.id);
-        const decision = rows.length === 1 ? rows[0] : undefined;
-        if (!decision || !labels.includes(decision.label) || !decision.included || decision.selfCheck || decision.taskId !== item.taskId || decision.auditorId !== audit.auditorId || decision.auditorId === item.originalReviewerId) return blocked("required audit decision evidence is missing or excluded");
+        const decision = decisions.find(d => d.auditItemId === item.id && d.auditId === audit.id)!;
         if (decision.label !== item.originalLabel && !disputes.some(d => d.auditItemId === item.id && d.status === "resolved" && finalDecisions.get(item.taskId)?.chain.some(c => c.id === d.id))) return blocked("required disagreement has no approved decision lineage");
       }
     }

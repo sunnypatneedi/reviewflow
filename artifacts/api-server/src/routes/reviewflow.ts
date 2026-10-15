@@ -25,7 +25,7 @@ import {
 } from "@workspace/db";
 import { enqueueEvaluationJobs, MAX_ACTIVE_LIVE_JOBS_PER_PROJECT } from "../evaluation-worker";
 import { MODEL } from "../evaluation";
-import { createRelease, ReleaseBlocked, releaseSamplingFrame } from "../lib/releases";
+import { assertAuditEvidence, createRelease, readDecisionEvidence, ReleaseBlocked, releaseSamplingFrame, resolvedDecision } from "../lib/releases";
 import type { RuntimeConfig } from "../config/runtime";
 import { registerTraceRoutes } from "./traces";
 import {
@@ -1033,6 +1033,11 @@ router.post("/reviewflow/audits/:id/disputes/:disputeId/adjudicate", async (req,
         || !decision || !decision.included || decision.selfCheck || decision.auditorId !== currentAudit.auditorId
         || decision.taskId !== task.id || decision.label !== currentDispute.auditLabel || currentDispute.originalLabel !== currentItem.originalLabel
         || decision.auditorId === currentItem.originalReviewerId) throw new ReleaseBlocked("Adjudication evidence changed or is not independent. Create a current audit before resolving.");
+      const evidence = await readDecisionEvidence(tx, project.id);
+      assertAuditEvidence(currentAudit, evidence, "adjudication");
+      // Validate any prior correction too: a new adjudication must not launder
+      // revoked or changed evidence from an earlier optional audit in the chain.
+      resolvedDecision(task, evidence);
       await tx.update(auditDisputesTable).set({ status: "resolved", adjudicatorId: actorId, resolvedLabel, reason: reason?.trim() || null }).where(eq(auditDisputesTable.id, dispute.id));
       await tx.update(tasksTable).set({ finalLabel: resolvedLabel, finalAdjudicationId: dispute.id, version: task.version + 1 }).where(eq(tasksTable.id, task.id));
       const pending = await tx.select({ id: auditDisputesTable.id }).from(auditDisputesTable).where(and(eq(auditDisputesTable.auditId, audit.id), eq(auditDisputesTable.status, "pending")));

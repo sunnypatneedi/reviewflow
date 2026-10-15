@@ -287,6 +287,8 @@ test("concurrent audit decisions and adjudications each produce one committed ev
   await db.update(tasksTable).set({ status: "finalized", version: 2, finalLabel: "supported" }).where(eq(tasksTable.id, task.id));
   await db.insert(proposalsTable).values({ id: proposalId, projectId: project.id, taskId: task.id, mode: "demo", requestedModel: "demo-simulator-v1", returnedModel: "demo-simulator-v1", label: "supported", labelProbability: "0.9", probabilities: {}, injectionProbability: "0", complexity: 1, confidence: "0.9", latencyMs: 1, rawResponse: {} });
   await db.insert(reviewsTable).values({ id: reviewId, projectId: project.id, taskId: task.id, proposalId, reviewerId: "different-reviewer", action: "accept", label: "supported", taskVersion: 1, activeMs: 1 });
+  const frame = { version: "rf-audit-v2" as const, eligible: [{ taskId: task.id, contentHash: task.contentHash, taskVersion: 2, reviewId, label: "supported", reviewerId: "different-reviewer", adjudicationId: null }] };
+  const { samplingFrameHash } = await import("../lib/audits");
   const auditId = randomUUID();
   const itemId = randomUUID();
   await db.insert(auditsTable).values({
@@ -295,8 +297,8 @@ test("concurrent audit decisions and adjudications each produce one committed ev
     status: "in_progress",
     sampleSize: 1,
     seed: "race",
-    samplingFrameHash: "frame",
-    samplingFrame: [],
+    samplingFrameHash: samplingFrameHash(frame),
+    samplingFrame: frame,
     independent: true,
     required: false,
     auditorId: actorId,
@@ -330,11 +332,11 @@ test("concurrent audit decisions and adjudications each produce one committed ev
   await db.insert(auditsTable).values({
     id: adjudicationAuditId,
     projectId: project.id,
-    status: "needs_adjudication",
+    status: "blocked",
     sampleSize: 1,
     seed: "adjudication-race",
-    samplingFrameHash: "frame",
-    samplingFrame: [],
+    samplingFrameHash: samplingFrameHash(frame),
+    samplingFrame: frame,
     independent: true,
     required: false,
     auditorId: "different-auditor",

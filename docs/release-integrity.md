@@ -29,6 +29,11 @@ audits cannot both overwrite the same task decision. A stale decision is refused
 Exports validate the complete original-review/adjudication chain and include its
 IDs. Missing, contradictory, revoked or changed evidence blocks a new release;
 the exporter does not fall back to an older label.
+Every supporting audit in that chain must retain its completed status, committed
+frame, deterministic selection, matching snapshots and valid decisions, even
+when marked optional. Adjudication entry checks the same commitments before any
+task mutation and validates prior correction lineage; an unrelated required
+audit cannot replace damaged evidence for an exported correction.
 
 Release checks, provenance, JSONL construction and insertion share one PostgreSQL
 repeatable-read snapshot. A concurrent valid mutation can be observed before or
@@ -44,7 +49,7 @@ or automatically repair/retire those records. Operator-reviewed remediation is
 required if such data exists. Do not run the disposable migration runner against
 an existing application database.
 
-The seven release-integrity HTTP integration tests use synthetic actors and
+The release-integrity HTTP integration tests use synthetic actors and
 records in disposable PostgreSQL. They inspect downloaded labels, lineage,
 digests, old release bytes, missing evidence and concurrent requests. These are
 mechanical correctness checks, not genuine human review, model-quality evidence,

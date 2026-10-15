@@ -195,3 +195,58 @@ test("concurrent release and adjudication never export stale or mixed decisions"
     assert.equal(row.provenance.adjudication_id, d.disputeId);
   }
 });
+
+// RF-R1: independent reviewer regressions. Optional audit evidence is still
+// mandatory when it supplies the correction in the final decision lineage.
+for (const mutation of ["revoked originating optional audit", "changed originating optional frame"] as const) {
+  test(`trusted corrected release must reject ${mutation}`, async () => {
+    const f = await fixture(), d = await disputed(f);
+    await db.update(auditsTable).set({ required: false }).where(eq(auditsTable.id, d.auditId));
+    assert.equal((await request(f.cookie, `/audits/${d.auditId}/disputes/${d.disputeId}/adjudicate`, { resolvedLabel: "contradicted" })).status, 200);
+    await db.update(projectsTable).set({ releaseAuditPolicyVersion: "independent-sample-v1" }).where(eq(projectsTable.id, f.projectId));
+    await completeAudit(f);
+    const control = await request(f.cookie, "/releases", { name: "valid-optional-origin" });
+    assert.equal(control.status, 201);
+    const old = await control.json() as { id: string; digest: string };
+    const bytes = await (await request(f.cookie, `/releases/${old.id}/download`)).text();
+    await db.update(auditsTable).set(mutation.startsWith("revoked") ? { status: "revoked" } : { samplingFrameHash: "changed-commitment" }).where(eq(auditsTable.id, d.auditId));
+    const result = await request(f.cookie, "/releases", { name: "damaged-optional-origin" });
+    assert.equal(result.status, 409, await result.clone().text());
+    assert.equal((await db.select().from(releasesTable).where(eq(releasesTable.projectId, f.projectId))).length, 1);
+    assert.equal(await (await request(f.cookie, `/releases/${old.id}/download`)).text(), bytes);
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), old.digest);
+  });
+}
+
+for (const mutation of ["revoked", "changed commitment", "changed selection", "changed snapshot"] as const) {
+  test(`adjudication rejects ${mutation} optional originating evidence before changing the task`, async () => {
+    const f = await fixture(), d = await disputed(f);
+    await db.update(auditsTable).set({ required: false }).where(eq(auditsTable.id, d.auditId));
+    const [audit] = await db.select().from(auditsTable).where(eq(auditsTable.id, d.auditId));
+    if (mutation === "revoked") await db.update(auditsTable).set({ status: "revoked" }).where(eq(auditsTable.id, d.auditId));
+    if (mutation === "changed commitment") await db.update(auditsTable).set({ samplingFrameHash: "changed-commitment" }).where(eq(auditsTable.id, d.auditId));
+    if (mutation === "changed selection") {
+      const { selectDeterministicSample } = await import("../lib/audits");
+      const frame = audit.samplingFrame as { eligible: Array<{ taskId: string }> };
+      let seed = "";
+      for (let n = 0; !seed; n++) if (selectDeterministicSample(`changed-${n}`, frame.eligible, 1)[0].taskId !== d.task.id) seed = `changed-${n}`;
+      await db.update(auditsTable).set({ seed }).where(eq(auditsTable.id, d.auditId));
+    }
+    if (mutation === "changed snapshot") {
+      const { samplingFrameHash } = await import("../lib/audits");
+      const frame = audit.samplingFrame as import("../lib/releases").ReleaseFrame;
+      frame.eligible.find(row => row.taskId === d.task.id)!.label = "insufficient_evidence";
+      // Even a self-consistent replacement commitment cannot override the
+      // original selected item's bound decision snapshot.
+      await db.update(auditsTable).set({ samplingFrame: frame, samplingFrameHash: samplingFrameHash(frame) }).where(eq(auditsTable.id, d.auditId));
+    }
+    const result = await request(f.cookie, `/audits/${d.auditId}/disputes/${d.disputeId}/adjudicate`, { resolvedLabel: "contradicted" });
+    assert.equal(result.status, 409, await result.clone().text());
+    const [task] = await db.select().from(tasksTable).where(eq(tasksTable.id, d.task.id));
+    const [dispute] = await db.select().from(auditDisputesTable).where(eq(auditDisputesTable.id, d.disputeId));
+    assert.equal(task.version, 2);
+    assert.equal(task.finalLabel, "supported");
+    assert.equal(task.finalAdjudicationId, null);
+    assert.equal(dispute.status, "pending");
+  });
+}
