@@ -82,7 +82,7 @@ export default function Home() {
   const cells: {
     title: string;
     value: string | number;
-    icon: React.ReactNode;
+    icon: ReactNode;
   }[] = [
     {
       title: "Total Tasks",
