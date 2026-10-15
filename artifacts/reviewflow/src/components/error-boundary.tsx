@@ -46,7 +46,7 @@ function DefaultFallback({ error, resetError }: ErrorFallbackProps) {
           eyebrow="Error"
           heading="Something went wrong"
           description="This part of the app hit an error. Reload to try again."
-          actionLabel="Reload"
+          actionLabel="Try again"
           onAction={resetError}
         >
           {import.meta.env.DEV ? (

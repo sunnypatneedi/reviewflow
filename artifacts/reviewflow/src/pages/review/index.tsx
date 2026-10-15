@@ -430,7 +430,7 @@ export default function Review() {
       <AnimatePresence mode="wait">
         <motion.div
           key={item.task.id}
-          className="flex-1 min-h-0 grid grid-cols-1 min-[861px]:grid-cols-[1fr_400px]"
+          className="rf-enter flex-1 min-h-0 grid grid-cols-1 min-[861px]:grid-cols-[1fr_400px]"
           initial={
             reduced
               ? { opacity: 1 }

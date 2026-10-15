@@ -1,7 +1,8 @@
 import { Kbd } from "@/components/ui/kbd";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { Eyebrow } from "@/components/eyebrow";
 import { cn } from "@/lib/utils";
 
+/** In-page review chrome — not a second sticky app header. */
 export function ReviewPageHeader({
   awaiting,
   decided,
@@ -21,16 +22,21 @@ export function ReviewPageHeader({
       : 0;
 
   return (
-    <header className="sticky top-0 z-sticky flex items-center gap-4 h-14 px-4 min-[861px]:px-8 border-b border-line-hairline shrink-0 bg-surface-glass backdrop-blur">
-      <h1 className="text-base font-semibold tracking-tight">Review</h1>
+    <div className="flex flex-wrap items-center gap-3 px-4 min-[861px]:px-8 py-3 border-b border-line-hairline shrink-0">
+      <div className="space-y-0.5">
+        <Eyebrow>Queue</Eyebrow>
+        <h1 className="type-small font-semibold tracking-tight text-text-primary">
+          Review
+        </h1>
+      </div>
 
-      <div className="ml-auto flex items-center gap-3 type-small text-text-secondary">
+      <div className="ml-auto flex flex-wrap items-center gap-3 type-small text-text-secondary">
         <span aria-live="polite" className="inline-flex items-center gap-1.5">
           {awaiting == null ? (
             "…"
           ) : (
             <>
-              <b className="text-text-primary font-semibold tabular-nums">
+              <b className="text-text-primary font-semibold tabular-nums font-mono">
                 {awaiting}
               </b>
               <span>awaiting</span>
@@ -40,7 +46,7 @@ export function ReviewPageHeader({
 
         {decided != null && total != null ? (
           <span className="hidden min-[861px]:inline-flex items-center gap-1.5">
-            <b className="text-text-primary font-semibold tabular-nums">
+            <b className="text-text-primary font-semibold tabular-nums font-mono">
               {decided}
             </b>
             <span>of {total} decided</span>
@@ -63,15 +69,11 @@ export function ReviewPageHeader({
           />
         </div>
 
-        <div className="hidden min-[861px]:block">
-          <ThemeToggle />
-        </div>
-
         {onOpenCommands ? (
           <button
             type="button"
             onClick={onOpenCommands}
-            className="hidden min-[861px]:inline-flex items-center gap-1.5 rounded-md px-2 py-1 type-small text-text-secondary hover:bg-fill-subtle hover:text-text-primary"
+            className="hidden min-[861px]:inline-flex items-center gap-1.5 rounded-[length:var(--radius-control)] px-2 py-1 type-small text-text-secondary hover:bg-fill-subtle hover:text-text-primary"
             aria-label="Open command menu"
           >
             <span>Commands</span>
@@ -82,13 +84,13 @@ export function ReviewPageHeader({
         <button
           type="button"
           onClick={onOpenShortcuts}
-          className="hidden min-[861px]:inline-flex items-center gap-1.5 rounded-md px-2 py-1 type-small text-text-secondary hover:bg-fill-subtle hover:text-text-primary"
+          className="hidden min-[861px]:inline-flex items-center gap-1.5 rounded-[length:var(--radius-control)] px-2 py-1 type-small text-text-secondary hover:bg-fill-subtle hover:text-text-primary"
           aria-label="Keyboard shortcuts"
         >
           <Kbd data-key="?">?</Kbd>
           <span>Shortcuts</span>
         </button>
       </div>
-    </header>
+    </div>
   );
 }

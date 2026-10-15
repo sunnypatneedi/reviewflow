@@ -1,9 +1,10 @@
 import { Link } from "wouter";
-import { Check } from "lucide-react";
 import { SkeletonSwap } from "@/components/interior/skeleton-swap";
 import { PropertyList } from "@/components/property-list";
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/empty-state";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import type { SessionSummary } from "@/lib/review-decision";
 import { ReviewPageHeader } from "./review-header";
 
@@ -103,46 +104,49 @@ export function QueueClear({
         onOpenCommands={onOpenCommands}
       />
       <div className="flex-1 flex items-center justify-center px-6 py-16">
-        <div className="max-w-md w-full text-center">
-          <span className="inline-flex size-12 items-center justify-center rounded-full bg-fill-subtle text-text-primary mb-6">
-            <Check className="size-6" strokeWidth={2} aria-hidden="true" />
-          </span>
-          <h2 className="font-serif type-display mb-3">Queue clear.</h2>
-          <p className="type-small text-text-secondary mb-8">
-            All {total} tasks have a decision. Nothing is waiting for review.
-          </p>
-          <PropertyList
-            className="mb-8 text-left max-w-sm mx-auto !grid-cols-1"
-            aria-label="Session summary"
-            rows={[
-              {
-                id: "decided",
-                label: "Decided this session",
-                value: String(session.decided),
-              },
-              {
-                id: "corrected",
-                label: "Corrected",
-                value: String(session.corrected),
-              },
-              {
-                id: "escalated",
-                label: "Escalated",
-                value: String(session.escalated),
-              },
-            ]}
-          />
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2">
-            <Button type="button" size="lg" onClick={onCheck}>
-              Check for new tasks
-            </Button>
-            <Link
-              href="/tasks"
-              className="inline-flex items-center justify-center min-h-[52px] h-[52px] px-5 rounded-md bg-fill-subtle text-text-primary type-body font-medium hover:bg-fill-emphasis"
-            >
-              Open Tasks
-            </Link>
-          </div>
+        <div className="max-w-md w-full">
+          <EmptyState
+            eyebrow="Clear"
+            heading="Queue clear."
+            description={`All ${total} tasks have a decision. Nothing is waiting for review.`}
+            hatchHalf={false}
+          >
+            <PropertyList
+              className="text-left max-w-sm !grid-cols-1"
+              aria-label="Session summary"
+              rows={[
+                {
+                  id: "decided",
+                  label: "Decided this session",
+                  value: String(session.decided),
+                },
+                {
+                  id: "corrected",
+                  label: "Corrected",
+                  value: String(session.corrected),
+                },
+                {
+                  id: "escalated",
+                  label: "Escalated",
+                  value: String(session.escalated),
+                },
+              ]}
+            />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+              <Button type="button" variant="default" onClick={onCheck}>
+                Check for new tasks
+              </Button>
+              <Link
+                href="/tasks"
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "inline-flex",
+                )}
+              >
+                Open Tasks
+              </Link>
+            </div>
+          </EmptyState>
         </div>
       </div>
     </div>
@@ -166,16 +170,22 @@ export function LoadError({
         onOpenCommands={onOpenCommands}
       />
       <div className="flex-1 flex items-center justify-center px-6 py-16">
-        <div className="max-w-md w-full text-center" role="alert">
-          <h2 className="font-serif type-display mb-3">
-            Couldn&apos;t load the next task
-          </h2>
-          <p className="type-small text-text-secondary mb-8">
-            Check your connection and try again.
-          </p>
-          <Button type="button" size="lg" onClick={onRetry}>
-            Try again
-          </Button>
+        <div className="max-w-md w-full">
+          <EmptyState
+            eyebrow="Error"
+            heading="Couldn’t load the next task"
+            description="Check your connection and try again."
+            actionLabel="Try again"
+            onAction={onRetry}
+            hatchHalf={false}
+          >
+            <Link
+              href="/tasks"
+              className={cn(buttonVariants({ variant: "outline" }), "inline-flex")}
+            >
+              Open Tasks
+            </Link>
+          </EmptyState>
         </div>
       </div>
     </div>

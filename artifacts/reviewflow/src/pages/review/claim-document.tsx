@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { AlertTriangle, Info } from "lucide-react";
-import { useCopyToClipboard } from "@/components/interior/copy-button";
+import { CopyControl } from "@/components/copy-control";
 import { PropertyList } from "@/components/property-list";
 import { SimulatedBadge } from "@/components/simulated-badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,6 @@ export function ClaimDocument({
   onClearCite: () => void;
 }) {
   const evidenceRef = useRef<HTMLQuoteElement>(null);
-  const { copy, status } = useCopyToClipboard({ timeout: 2000 });
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const [citePos, setCitePos] = useState<{ top: number; left: number } | null>(
     null,
@@ -125,16 +124,12 @@ export function ClaimDocument({
         <span className="font-mono type-mono text-text-primary">
           {item.task.externalId}
         </span>
-        <button
-          type="button"
-          className="reveal type-small text-text-secondary hover:text-text-primary underline-offset-2 hover:underline"
-          onClick={() => copy(item.task.externalId)}
-        >
-          {status === "copied" ? "Copied" : "Copy ID"}
-        </button>
-        <span className="sr-only" aria-live="polite">
-          {status === "copied" ? "Task ID copied" : ""}
-        </span>
+        <CopyControl
+          value={item.task.externalId}
+          label="Copy ID"
+          copiedLabel="Copied"
+          className="reveal"
+        />
       </div>
 
       <PropertyList
@@ -166,14 +161,11 @@ export function ClaimDocument({
             mono: true,
             value: proposal?.model ?? "—",
             action: proposal ? (
-              <button
-                type="button"
-                className="type-small text-text-secondary hover:text-text-primary"
-                aria-label="Copy model name"
-                onClick={() => copy(proposal.model)}
-              >
-                Copy
-              </button>
+              <CopyControl
+                value={proposal.model}
+                label="Copy"
+                copiedLabel="Copied"
+              />
             ) : undefined,
           },
           {
@@ -250,14 +242,11 @@ export function ClaimDocument({
             >
               Cite selection <Kbd data-key="c">C</Kbd>
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => copy(item.task.evidence)}
-            >
-              {status === "copied" ? "Copied" : "Copy evidence"}
-            </Button>
+            <CopyControl
+              value={item.task.evidence}
+              label="Copy evidence"
+              copiedLabel="Copied"
+            />
           </div>
         </div>
 

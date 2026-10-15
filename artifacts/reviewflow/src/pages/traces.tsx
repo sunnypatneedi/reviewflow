@@ -10,6 +10,21 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { EmptyState } from "@/components/empty-state";
+import { Eyebrow } from "@/components/eyebrow";
+import { Notice } from "@/components/notice";
+import { Field, FieldInput } from "@/components/field";
 import { traceRequest, downloadTrace, saveTraceFile } from "@/lib/trace-api";
 import { traceSample } from "@/lib/trace-sample";
 
@@ -64,9 +79,9 @@ const decisions: [Decision, string][] = [
   ["insufficient_evidence", "Insufficient evidence"],
   ["escalate", "Escalate"],
 ];
-const panel = "rounded-lg border border-border bg-card";
+const panel = "border border-line-hairline bg-surface-base";
 const code =
-  "whitespace-pre-wrap break-words text-xs leading-relaxed font-mono bg-muted/40 rounded-md p-4 max-h-72 overflow-auto";
+  "whitespace-pre-wrap break-words type-caption leading-relaxed font-mono bg-fill-subtle rounded-[length:var(--radius-sm)] p-4 max-h-72 overflow-auto";
 const pretty = (value: unknown) =>
   typeof value === "string" ? value : JSON.stringify(value, null, 2);
 
@@ -125,6 +140,8 @@ export default function Traces() {
     "human_only" | "model_assisted"
   >("human_only");
   const [annotationIssues, setAnnotationIssues] = useState<unknown>(null);
+  const [confirmRelease, setConfirmRelease] = useState(false);
+  const [confirmReconcile, setConfirmReconcile] = useState(false);
   const list = useQuery({
     queryKey: ["traces", "comparisons"],
     queryFn: () => traceRequest<Comparison[]>("/comparisons"),
@@ -159,49 +176,60 @@ export default function Traces() {
       setPending(false);
     }
   };
+  const loadError =
+    error ||
+    (list.error || detail.error || releases.error)?.message ||
+    "";
+
   return (
-    <div className="p-6 lg:p-8 max-w-screen-2xl mx-auto space-y-6">
+    <div className="p-6 min-[861px]:p-8 space-y-6">
       <header className="flex flex-wrap gap-4 justify-between items-start">
-        <div>
-          <div className="flex items-center gap-2 text-primary text-xs font-semibold uppercase tracking-wider mb-2">
-            <GitCompareArrows size={16} /> Observable runs → human preferences
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Trace2Preference
-          </h1>
-          <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
+        <div className="space-y-2 max-w-2xl">
+          <Eyebrow className="inline-flex items-center gap-2">
+            <GitCompareArrows className="size-3.5" aria-hidden="true" />
+            Observable runs → human preferences
+          </Eyebrow>
+          <h1 className="type-headline text-text-primary">Trace2Preference</h1>
+          <p className="type-small text-text-secondary">
             Compare actual responses at a shared, fully known decision point.
             Partial traces stay visible; only eligible, human-finalized
             comparisons enter training exports.
           </p>
         </div>
-        <span className="text-xs rounded-full border px-3 py-1.5 flex gap-2 items-center">
-          <ShieldCheck size={14} /> External evaluation off by default
+        <span className="type-caption border border-line-hairline px-3 py-1.5 flex gap-2 items-center text-text-secondary">
+          <ShieldCheck className="size-3.5" aria-hidden="true" /> External
+          evaluation off by default
         </span>
       </header>
-      {(error || list.error || detail.error || releases.error) && (
-        <div
-          role="alert"
-          data-testid="trace-error"
-          className="border border-destructive/30 bg-destructive/5 text-destructive rounded-md p-4 text-sm"
-        >
-          {error || (list.error || detail.error || releases.error)?.message}
+      {loadError ? (
+        <div data-testid="trace-error">
+          <Notice tone="danger">{loadError}</Notice>
         </div>
-      )}
-      {notice && (
-        <div
-          role="status"
-          data-testid="trace-notice"
-          className="border rounded-md p-3 text-sm bg-primary/5"
-        >
-          {notice}
+      ) : null}
+      {list.isError && !list.data ? (
+        <EmptyState
+          eyebrow="Error"
+          heading="Couldn’t load comparisons"
+          description="The comparison queue failed to load. Retry to continue."
+          actionLabel="Retry"
+          onAction={() => {
+            void list.refetch();
+          }}
+        />
+      ) : null}
+      {notice ? (
+        <div data-testid="trace-notice">
+          <Notice tone="info">{notice}</Notice>
         </div>
-      )}
+      ) : null}
       <section className={`${panel} p-5`}>
-        <h2 className="font-semibold flex items-center gap-2">
-          <Upload size={17} /> Import observable runs
+        <Eyebrow className="inline-flex items-center gap-2 mb-1">
+          <Upload className="size-3.5" aria-hidden="true" /> Import
+        </Eyebrow>
+        <h2 className="type-small font-semibold text-text-primary">
+          Import observable runs
         </h2>
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="type-caption text-text-muted mt-2">
           JSON is data only: imported links, tool calls, and scripts are never
           executed. Import only traces you are authorized to review.
         </p>
@@ -281,42 +309,55 @@ export default function Traces() {
           {pending ? "Working…" : "Validate & import"}
         </Button>
       </section>
-      <div className="grid xl:grid-cols-[260px_minmax(0,1fr)] gap-5">
+      <div className="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)] gap-5">
         <section className={`${panel} self-start overflow-hidden`}>
-          <h2 className="p-4 font-semibold border-b text-sm">
-            Comparison queue{" "}
-            <span className="text-muted-foreground font-normal">
-              ({list.data?.length ?? 0})
+          <div className="p-4 border-b border-line-hairline flex items-baseline justify-between gap-2">
+            <h2 className="type-small font-semibold text-text-primary">
+              Comparison queue
+            </h2>
+            <span className="type-meta text-text-muted">
+              {list.data?.length ?? 0}
             </span>
-          </h2>
-          {list.isLoading && (
-            <p className="p-4 text-sm" role="status">
-              Loading comparisons…
-            </p>
-          )}
-          {list.data?.length === 0 && (
-            <p className="p-4 text-sm text-muted-foreground">
-              Import traces to begin. No reviews or model runs are manufactured.
-            </p>
-          )}
-          <div className="max-h-[650px] overflow-auto">
+          </div>
+          {list.isLoading ? (
+            <div className="p-4 space-y-3" role="status" aria-label="Loading comparisons">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {list.data?.length === 0 ? (
+            <div className="p-4">
+              <EmptyState
+                hatchHalf={false}
+                className="min-h-0 border-0 p-0"
+                eyebrow="Empty"
+                heading="No comparisons yet"
+                description="Import traces to begin. No reviews or model runs are manufactured."
+              />
+            </div>
+          ) : null}
+          <div className="max-h-[min(650px,70vh)] overflow-auto">
             {list.data?.map((item) => (
               <button
                 type="button"
                 key={item.id}
                 data-testid={`select-comparison-${item.id}`}
                 aria-pressed={selected === item.id}
-                className={`w-full text-left p-4 border-b last:border-0 hover:bg-secondary ${selected === item.id ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
+                className={`w-full text-left p-4 border-b border-line-hairline last:border-0 hover:bg-fill-subtle ${selected === item.id ? "bg-fill-emphasis border-l-2 border-l-fill-inverse" : ""}`}
                 onClick={() => {
                   setSelected(item.id);
                   setError("");
                   setNotice("");
                 }}
               >
-                <p className="text-sm font-medium truncate">
+                <p className="type-small font-medium truncate text-text-primary">
                   {item.task || item.scenarioId || "Imported comparison"}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="type-caption text-text-muted mt-1">
                   {item.pendingAnnotation
                     ? "Confirm returned annotation"
                     : item.review
@@ -329,73 +370,117 @@ export default function Traces() {
           </div>
         </section>
         {!selected ? (
-          <div
-            className={`${panel} p-10 flex flex-col justify-center items-center text-center min-h-80`}
-          >
-            <GitCompareArrows
-              className="text-muted-foreground mb-4"
-              size={32}
-            />
-            <h2 className="font-semibold">
-              Evidence first. Preference second.
-            </h2>
-            <p className="text-sm text-muted-foreground mt-2 max-w-md">
-              Select a comparison to inspect its context and actual responses.
-              Candidate identities and model proposals begin hidden.
-            </p>
-          </div>
+          <EmptyState
+            className="min-h-80"
+            eyebrow="Inspect"
+            heading="Evidence first. Preference second."
+            description="Select a comparison to inspect its context and actual responses. Candidate identities and model proposals begin hidden."
+          />
         ) : detail.isLoading ? (
-          <p role="status">Loading evidence…</p>
+          <div
+            className={`${panel} p-5 space-y-4`}
+            role="status"
+            aria-label="Loading evidence"
+          >
+            <Skeleton className="h-6 w-1/2" />
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-40 w-full" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          </div>
+        ) : detail.isError ? (
+          <EmptyState
+            eyebrow="Error"
+            heading="Couldn’t load comparison"
+            description={detail.error.message}
+            actionLabel="Retry"
+            onAction={() => {
+              void detail.refetch();
+            }}
+          />
         ) : (
           detail.data && (
-            <TraceReview
-              key={selected}
-              comparison={detail.data}
-              run={run}
-              pending={pending}
-            />
+            <div className="rf-enter" key={selected}>
+              <TraceReview
+                comparison={detail.data}
+                run={run}
+                pending={pending}
+              />
+            </div>
           )
         )}
       </div>
       <section className={`${panel} p-5 space-y-4`}>
         <div>
-          <h2 className="font-semibold">Reproducible dataset releases</h2>
-          <p className="text-xs text-muted-foreground mt-1">
+          <Eyebrow>Releases</Eyebrow>
+          <h2 className="type-small font-semibold text-text-primary mt-1">
+            Reproducible dataset releases
+          </h2>
+          <p className="type-caption text-text-muted mt-1">
             Immutable snapshots. Complete records preserve nonbinary outcomes
             and exclusion reasons; preference exports include only eligible
             finalized A/B preferences. Related scenario variants stay in one
             split. Review trace text for private content before sharing.
           </p>
         </div>
-        <div className="flex gap-3 flex-wrap">
-          <Input
-            aria-label="Trace release name"
-            data-testid="input-trace-release-name"
-            placeholder="Release name"
-            className="max-w-sm"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
+        <div className="flex gap-3 flex-wrap items-end">
+          <Field label="Release name" className="max-w-sm flex-1 min-w-[12rem]">
+            <FieldInput
+              aria-label="Trace release name"
+              data-testid="input-trace-release-name"
+              placeholder="Release name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </Field>
           <Button
             variant="outline"
             disabled={!name.trim() || pending}
             data-testid="create-trace-release"
-            onClick={() =>
-              run(async () => {
-                await traceRequest("/releases", { name: name.trim() });
-                setName("");
-              }, "Immutable release created.")
-            }
+            onClick={() => setConfirmRelease(true)}
           >
             Create release
           </Button>
         </div>
-        {releases.isLoading && <p className="text-sm">Loading releases…</p>}
-        {releases.data?.length === 0 && (
-          <p className="text-sm text-muted-foreground">
+        <AlertDialog open={confirmRelease} onOpenChange={setConfirmRelease}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Create immutable release?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Release “{name.trim()}” is a permanent snapshot. Earlier
+                exports stay unchanged; this cut cannot be edited.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  void run(async () => {
+                    await traceRequest("/releases", { name: name.trim() });
+                    setName("");
+                    setConfirmRelease(false);
+                  }, "Immutable release created.");
+                }}
+              >
+                Create release
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        {releases.isLoading ? (
+          <div className="space-y-2" role="status" aria-label="Loading releases">
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        ) : null}
+        {releases.data?.length === 0 ? (
+          <p className="type-small text-text-muted">
             No trace dataset releases yet.
           </p>
-        )}
+        ) : null}
         {releases.data?.map((release) => (
           <div
             key={release.id}
@@ -404,10 +489,10 @@ export default function Traces() {
           >
             <div className="min-w-0">
               <p className="font-medium text-sm">{release.name}</p>
-              <p className="text-xs text-muted-foreground break-all">
+              <p className="type-caption text-text-muted break-all">
                 Snapshot {release.id}
               </p>
-              <p className="text-xs text-muted-foreground break-all max-w-lg">
+              <p className="type-caption text-text-muted break-all max-w-lg">
                 SHA-256: {release.digest}
               </p>
               <p className="text-xs">
@@ -447,7 +532,7 @@ export default function Traces() {
       </section>
       <section className={`${panel} p-5 space-y-3`}>
         <h2 className="font-semibold">Label Studio & study kit</h2>
-        <p className="text-xs text-muted-foreground max-w-3xl">
+        <p className="type-caption text-text-muted max-w-3xl">
           Download equivalent tasks, a preference-review configuration, and the
           stable candidate-order manifest. Human-only tasks omit model
           proposals. Assisted kits contain proposals behind a recorded reveal
@@ -511,7 +596,7 @@ export default function Traces() {
           <h3 className="text-sm font-semibold">
             Return Label Studio annotations
           </h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="type-caption text-text-muted">
             Upload the exported Label Studio JSON tasks with their unchanged
             task data. Server-side reconciliation preserves canonical candidate
             order and all six outcomes. Imported decisions are staged, not
@@ -562,7 +647,7 @@ export default function Traces() {
               <option value="model_assisted">Model-assisted kit</option>
             </select>
           </label>
-          <p className="text-xs text-muted-foreground">
+          <p className="type-caption text-text-muted">
             Select the kit used to create these annotations. Actual assistance
             mode is derived from its returned reveal record, not this selection.
             Imported review duration is unavailable unless separately
@@ -573,35 +658,57 @@ export default function Traces() {
             variant="outline"
             disabled={!annotations || pending}
             data-testid="reconcile-labelstudio-annotations"
-            onClick={() =>
-              run(async () => {
-                let parsed: unknown;
-                try {
-                  parsed = JSON.parse(annotations);
-                } catch {
-                  throw new Error(
-                    "Invalid Label Studio JSON. No annotations were staged.",
-                  );
-                }
-                if (!Array.isArray(parsed))
-                  throw new Error(
-                    "Expected a Label Studio JSON array of exported tasks.",
-                  );
-                const result = await traceRequest<{
-                  pending: unknown;
-                  issues: unknown[];
-                }>("/labelstudio/reconcile", {
-                  annotations: parsed,
-                  expectedVersions: annotationVersions,
-                  reviewMode: annotationMode,
-                });
-                setAnnotationIssues(result.issues);
-                setAnnotations("");
-              }, "Annotation reconciliation finished. Inspect staged decisions in the queue and explicitly confirm them.")
-            }
+            onClick={() => setConfirmReconcile(true)}
           >
             Reconcile & stage annotations
           </Button>
+          <AlertDialog open={confirmReconcile} onOpenChange={setConfirmReconcile}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Reconcile annotations?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Staging returned Label Studio decisions will attach pending
+                  annotations to matching comparisons. Inspect and explicitly
+                  confirm each before they become finalized judgments.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(event) => {
+                    event.preventDefault();
+                    void run(async () => {
+                      let parsed: unknown;
+                      try {
+                        parsed = JSON.parse(annotations);
+                      } catch {
+                        throw new Error(
+                          "Invalid Label Studio JSON. No annotations were staged.",
+                        );
+                      }
+                      if (!Array.isArray(parsed))
+                        throw new Error(
+                          "Expected a Label Studio JSON array of exported tasks.",
+                        );
+                      const result = await traceRequest<{
+                        pending: unknown;
+                        issues: unknown[];
+                      }>("/labelstudio/reconcile", {
+                        annotations: parsed,
+                        expectedVersions: annotationVersions,
+                        reviewMode: annotationMode,
+                      });
+                      setAnnotationIssues(result.issues);
+                      setAnnotations("");
+                      setConfirmReconcile(false);
+                    }, "Annotation reconciliation finished. Inspect staged decisions in the queue and explicitly confirm them.");
+                  }}
+                >
+                  Reconcile & stage
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           {annotationIssues != null && (
             <pre
               className={code}
@@ -678,7 +785,7 @@ function TraceReview({
       <div className="flex flex-wrap gap-3 justify-between">
         <div>
           <h2 className="font-semibold">{c.task || "Inspect comparison"}</h2>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="type-caption text-text-muted mt-1">
             Version {c.version} ·{" "}
             {c.revealed ? "Assisted reveal recorded" : "Blind review"}
           </p>
@@ -692,7 +799,7 @@ function TraceReview({
             : "Not eligible for training"}
         </span>
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="type-caption text-text-muted">
         Blind mode hides structured candidate identities and model proposals.
         Original prompts, responses, or events may self-identify their source;
         these actual texts are not rewritten to fabricate blinding. Context
@@ -712,7 +819,7 @@ function TraceReview({
         </div>
       ) : null}
       <div
-        className="text-xs rounded-md bg-muted/40 p-3"
+        className="text-xs rounded-md bg-fill-subtle p-3"
         data-testid="trace-training-readiness"
       >
         <strong>
@@ -741,7 +848,7 @@ function TraceReview({
         >
           Task & model-visible context
         </summary>
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="type-caption text-text-muted mt-2">
           Equality is checked across the captured context. Completeness is the
           importer's assertion, not proof that capture was complete.
         </p>
@@ -768,9 +875,9 @@ function TraceReview({
             key={key}
             className="border rounded-md min-w-0 overflow-hidden"
           >
-            <h3 className="border-b bg-muted/40 p-3 text-sm font-semibold">
+            <h3 className="border-b bg-fill-subtle p-3 text-sm font-semibold">
               Candidate {key.toUpperCase()}{" "}
-              <span className="font-normal text-xs text-muted-foreground">
+              <span className="font-normal type-caption text-text-muted">
                 {c[key]?.kind === "scripted"
                   ? "· Scripted fixture"
                   : c[key]?.kind === "telemetry"
@@ -839,7 +946,7 @@ function TraceReview({
               ? "Human-only"
               : "Model-assisted"}
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="type-caption text-text-muted">
             The outcome refers to stable candidate A/B, not current screen
             position. This import is not yet a finalized human judgment. Its
             Label Studio review duration is unavailable; confirmation effort is
@@ -892,7 +999,7 @@ function TraceReview({
       <div className="border-t pt-4 space-y-3">
         <div>
           <h3 className="font-semibold text-sm">Human preference</h3>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="type-caption text-text-muted mt-1">
             Judge the displayed evidence, not confidence. Escalation and
             insufficient evidence remain unresolved for training.
           </p>
@@ -900,7 +1007,7 @@ function TraceReview({
         {c.review && (
           <p
             data-testid="trace-saved-decision"
-            className="text-sm bg-primary/5 p-3 rounded-md"
+            className="text-sm bg-fill-emphasis p-3 rounded-md"
           >
             Saved decision:{" "}
             <strong>
@@ -919,7 +1026,7 @@ function TraceReview({
           {decisions.map(([value, label]) => (
             <label
               key={value}
-              className={`cursor-pointer text-sm border rounded-md p-3 flex gap-2 items-center ${decision === value ? "border-primary bg-primary/5" : ""}`}
+              className={`cursor-pointer text-sm border rounded-md p-3 flex gap-2 items-center ${decision === value ? "border-primary bg-fill-emphasis" : ""}`}
             >
               <input
                 data-testid={`decision-${value}`}
@@ -959,7 +1066,7 @@ function TraceReview({
             rows={2}
           />
         </label>
-        <p className="text-xs text-muted-foreground">
+        <p className="type-caption text-text-muted">
           Active effort measures focused interaction with a 30-second idle
           cutoff and excludes requests in flight. Opening the quality check
           switches timing to audit effort. Waiting records completed assistance
@@ -1017,7 +1124,7 @@ function TraceReview({
         >
           Required quality check · {c.quality.status}
         </summary>
-        <p className="text-xs text-muted-foreground mt-3">
+        <p className="type-caption text-text-muted mt-3">
           An authorized owner or adjudicator must verify evidence, privacy,
           context eligibility, and the decision before this example can enter
           training. While this section is open, active timing is attributed to
@@ -1093,7 +1200,7 @@ function TraceReview({
         >
           Optional model assistance
         </summary>
-        <p className="text-xs text-muted-foreground mt-3">
+        <p className="type-caption text-text-muted mt-3">
           Revealing candidate identities or proposals is recorded separately as
           assisted review. Simulator judgments are scripted, not real model
           judgments. Jev returns typed judgments only; it does not rewrite

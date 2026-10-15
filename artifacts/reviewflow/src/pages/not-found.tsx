@@ -18,7 +18,7 @@ export default function NotFound() {
           eyebrow="404"
           heading="Page not found"
           description="The requested path could not be found."
-          actionLabel="Go home"
+          actionLabel="Go to Overview"
           onAction={() => setLocation("/")}
         />
       </div>
