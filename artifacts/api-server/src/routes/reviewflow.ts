@@ -3,9 +3,7 @@ import { Router, type IRouter, type Request, type Response as ExpressResponse } 
 import { getAuth } from "@clerk/express";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import {
-  buildSamplingFrame,
   blindAuditTask,
-  eligibleAuditCandidates,
   nextAuditStatus,
   samplingFrameHash,
   selectDeterministicSample,
@@ -27,6 +25,7 @@ import {
 } from "@workspace/db";
 import { enqueueEvaluationJobs, MAX_ACTIVE_LIVE_JOBS_PER_PROJECT } from "../evaluation-worker";
 import { MODEL } from "../evaluation";
+import { createRelease, ReleaseBlocked, releaseSamplingFrame } from "../lib/releases";
 import type { RuntimeConfig } from "../config/runtime";
 import { registerTraceRoutes } from "./traces";
 import {
@@ -192,6 +191,7 @@ export async function ensureDemoProject(demoId: string, config: DemoAdmissionCon
       ownerId: null,
       demoSessionId: demoId,
       mode: "demo",
+      releaseAuditPolicyVersion: "demo-unverified-v1",
     }).returning();
     await tx.insert(tasksTable).values(samples.map(([externalId, question, evidence, candidateAnswer, risk, referenceLabel]) => {
       const content = canonicalTaskContent({ externalId, question, evidence, candidateAnswer, risk });
@@ -720,32 +720,13 @@ router.post("/reviewflow/releases", async (req,res):Promise<void> => {
   const context = await ensureProject(req);
   if (!await requireProjectAccess(req, res, context, RELEASE_ROLES)) return;
   const {project}=context; const {name,includeSourceText}=req.body??{};
-  const tasks=await db.select().from(tasksTable).where(eq(tasksTable.projectId,project.id));
-  if (!name?.trim() || tasks.some((t)=>t.status!=="finalized")) { res.status(409).json({error:"Release blocked: all tasks must have a resolved human decision"}); return; }
-  const requiredAudits = await db.select().from(auditsTable).where(and(eq(auditsTable.projectId, project.id), eq(auditsTable.required, true)));
-  if (requiredAudits.some((audit) => audit.status !== "completed")) {
-    res.status(409).json({ error: "Release blocked: required audits must be completed and all disagreements adjudicated" });
-    return;
+  let release;
+  try {
+    release = await createRelease(project.id, name, Boolean(includeSourceText), identity(req));
+  } catch (error) {
+    if (error instanceof ReleaseBlocked) { res.status(409).json({ error: error.message }); return; }
+    throw error;
   }
-  if (requiredAudits.length) {
-    const pendingDisputes = await db.select({ id: auditDisputesTable.id })
-      .from(auditDisputesTable)
-      .where(and(inArray(auditDisputesTable.auditId, requiredAudits.map((audit) => audit.id)), eq(auditDisputesTable.status, "pending")));
-    if (pendingDisputes.length) {
-      res.status(409).json({ error: "Release blocked: required audit disagreements need adjudication" });
-      return;
-    }
-  }
-  const proposals=await db.select().from(proposalsTable).where(eq(proposalsTable.projectId,project.id));
-  const reviews=await db.select().from(reviewsTable).where(eq(reviewsTable.projectId,project.id));
-  const lines=tasks.map((t)=>JSON.stringify({external_id:t.externalId,label:t.finalLabel,risk:t.risk,mode:t.mode,
-    ...(includeSourceText?{question:t.question,evidence:t.evidence,candidate_answer:t.candidateAnswer}:{}),
-    provenance:{task_hash:t.contentHash,proposal_id:proposals.find((p)=>p.taskId===t.id)?.id,review_id:reviews.find((r)=>r.taskId===t.id)?.id,
-      rubric_version:project.rubricVersion,policy_version:project.shadowPolicyVersion,model:proposals.find((p)=>p.taskId===t.id)?.returnedModel}}));
-  const jsonl=lines.join("\n")+"\n"; const digest=sha(jsonl); const id=randomUUID();
-  const [release]=await db.insert(releasesTable).values({id,projectId:project.id,name:name.trim(),mode:project.mode,itemCount:tasks.length,
-    includeSourceText:Boolean(includeSourceText),digest,jsonl,createdBy:identity(req),manifest:{source_hashes:tasks.map((t)=>t.contentHash),rubric_version:project.rubricVersion,
-      policy_version:project.shadowPolicyVersion,content_digest:digest,model_versions:[...new Set(proposals.map((p)=>p.returnedModel))]}}).returning();
   res.status(201).json({id:release.id,name:release.name,itemCount:release.itemCount,mode:release.mode,digest:release.digest,includeSourceText:release.includeSourceText,createdAt:release.createdAt.toISOString()});
 });
 router.get("/reviewflow/releases/:id/download", async (req,res):Promise<void> => {
@@ -771,30 +752,18 @@ router.post("/reviewflow/audits", async (req, res): Promise<void> => {
     return;
   }
 
-  const [tasks, reviews] = await Promise.all([
+  const [tasks, reviews, allDisputes] = await Promise.all([
     db.select().from(tasksTable).where(and(eq(tasksTable.projectId, project.id), eq(tasksTable.status, "finalized"))),
     db.select().from(reviewsTable).where(eq(reviewsTable.projectId, project.id)),
+    db.select().from(auditDisputesTable).innerJoin(auditsTable, eq(auditDisputesTable.auditId, auditsTable.id)).where(eq(auditsTable.projectId, project.id)),
   ]);
-  const reviewByTask = new Map<string, typeof reviewsTable.$inferSelect>();
-  for (const review of reviews) {
-    if (!reviewByTask.has(review.taskId)) reviewByTask.set(review.taskId, review);
-  }
-  const candidates = eligibleAuditCandidates(tasks
-    .map((task) => ({ task, review: reviewByTask.get(task.id) }))
-    .filter((entry): entry is { task: typeof tasksTable.$inferSelect; review: typeof reviewsTable.$inferSelect } =>
-      Boolean(entry.review?.label && LABELS.includes(entry.review.label as Label)) &&
-      true,
-    )
-    .map(({ task, review }) => ({ taskId: task.id, contentHash: task.contentHash, originalReviewerId: review.reviewerId })), actorId, independent)
-    .map((candidate) => ({
-      task: tasks.find((entry) => entry.id === candidate.taskId)!,
-      review: reviewByTask.get(candidate.taskId)!,
-    }));
-  const frame = buildSamplingFrame(candidates.map(({ task, review }) => ({
-    taskId: task.id,
-    contentHash: task.contentHash,
-    originalReviewerId: review.reviewerId,
-  })));
+  const disputes = allDisputes.map(row => row.rf_audit_disputes);
+  const frame = releaseSamplingFrame(tasks, reviews, actorId, independent, disputes);
+  const candidates = frame.eligible.map(row => ({
+    task: tasks.find(task => task.id === row.taskId)!,
+    review: reviews.find(review => review.id === row.reviewId)!,
+    snapshot: row,
+  }));
   if (requestedSize > candidates.length) {
     res.status(409).json({
       error: independent
@@ -804,9 +773,10 @@ router.post("/reviewflow/audits", async (req, res): Promise<void> => {
     });
     return;
   }
-  const selected = selectDeterministicSample(seed, candidates.map(({ task, review }) => ({
+  const selected = selectDeterministicSample(seed, candidates.map(({ task, review, snapshot }) => ({
     task,
     review,
+    snapshot,
     taskId: task.id,
   })), requestedSize);
   const frameHash = samplingFrameHash(frame);
@@ -824,15 +794,17 @@ router.post("/reviewflow/audits", async (req, res): Promise<void> => {
       required,
       auditorId: actorId,
     }).returning();
-    await tx.insert(auditItemsTable).values(selected.map(({ task, review }, index) => ({
+    await tx.insert(auditItemsTable).values(selected.map(({ task, review, snapshot }, index) => ({
       id: randomUUID(),
       auditId,
       taskId: task.id,
       ordinal: index + 1,
       originalReviewId: review.id,
-      originalReviewerId: review.reviewerId,
-      originalLabel: review.label!,
+      originalReviewerId: snapshot.reviewerId,
+      originalLabel: snapshot.label,
       taskContentHash: task.contentHash,
+      taskVersion: task.version,
+      originalAdjudicationId: task.finalAdjudicationId,
     })));
     await tx.insert(eventsTable).values({
       id: randomUUID(),
@@ -914,7 +886,9 @@ router.post("/reviewflow/audits/:id/decisions", async (req, res): Promise<void> 
   if (audit.auditorId !== actorId) { res.status(403).json({ error: "This audit is assigned to another auditor" }); return; }
   const [item] = await db.select().from(auditItemsTable).where(and(eq(auditItemsTable.id, auditItemId), eq(auditItemsTable.auditId, audit.id)));
   if (!item) { res.status(404).json({ error: "Audit item not found" }); return; }
-  const selfCheck = item.originalReviewerId === actorId;
+  const [originalReview] = await db.select().from(reviewsTable).where(and(eq(reviewsTable.id, item.originalReviewId), eq(reviewsTable.projectId, project.id)));
+  if (!originalReview || originalReview.taskId !== item.taskId) { res.status(409).json({ error: "The original review evidence is missing. Create a current audit." }); return; }
+  const selfCheck = item.originalReviewerId === actorId || originalReview?.reviewerId === actorId;
   if (audit.independent && selfCheck) {
     res.status(403).json({ error: "Independent audits cannot be completed by the original reviewer" });
     return;
@@ -925,6 +899,11 @@ router.post("/reviewflow/audits/:id/decisions", async (req, res): Promise<void> 
   let disputeId: string | null = null;
   let status = audit.status;
   const decisionCommitted = await db.transaction(async (tx) => {
+    await tx.select({ id: auditsTable.id }).from(auditsTable).where(eq(auditsTable.id, audit.id)).for("update");
+    const [currentTask] = await tx.select().from(tasksTable).where(and(eq(tasksTable.id, item.taskId), eq(tasksTable.projectId, project.id))).for("update");
+    if (!currentTask || currentTask.status !== "finalized" || item.taskVersion !== currentTask.version
+      || item.taskContentHash !== currentTask.contentHash || item.originalLabel !== currentTask.finalLabel
+      || item.originalAdjudicationId !== currentTask.finalAdjudicationId) return false;
     const claimed = await tx.insert(auditDecisionsTable).values({
       id: decisionId,
       auditId: audit.id,
@@ -1033,33 +1012,41 @@ router.post("/reviewflow/audits/:id/disputes/:disputeId/adjudicate", async (req,
   if (!audit || !dispute) { res.status(404).json({ error: "Dispute not found" }); return; }
   if (audit.auditorId === actorId) { res.status(403).json({ error: "The auditor cannot adjudicate their own disagreement" }); return; }
   const [item] = await db.select().from(auditItemsTable).where(eq(auditItemsTable.id, dispute.auditItemId));
-  if (item?.originalReviewerId === actorId) { res.status(403).json({ error: "The original reviewer cannot adjudicate this disagreement" }); return; }
+  const [originalReview] = item ? await db.select().from(reviewsTable).where(and(eq(reviewsTable.id, item.originalReviewId), eq(reviewsTable.projectId, project.id))) : [];
+  if (item?.originalReviewerId === actorId || originalReview?.reviewerId === actorId) { res.status(403).json({ error: "The original reviewer cannot adjudicate this disagreement" }); return; }
   if (dispute.status !== "pending") { res.status(409).json({ error: "This disagreement has already been adjudicated" }); return; }
-  const adjudicated = await db.transaction(async (tx) => {
-    const claimed = await tx.update(auditDisputesTable).set({
-      status: "resolved", adjudicatorId: actorId, resolvedLabel, reason: reason?.trim() || null,
-    }).where(and(
-      eq(auditDisputesTable.id, dispute.id),
-      eq(auditDisputesTable.status, "pending"),
-    )).returning({ id: auditDisputesTable.id });
-    if (!claimed.length) return false;
-    const [pending] = await tx.select({ id: auditDisputesTable.id }).from(auditDisputesTable)
-      .where(and(eq(auditDisputesTable.auditId, audit.id), eq(auditDisputesTable.status, "pending")));
-    const items = await tx.select({ id: auditItemsTable.id }).from(auditItemsTable).where(eq(auditItemsTable.auditId, audit.id));
-    const decisions = await tx.select().from(auditDecisionsTable).where(eq(auditDecisionsTable.auditId, audit.id));
-    const nextStatus = nextAuditStatus(
-      items.length,
-      decisions.length,
-      decisions.filter((entry) => entry.included).length,
-      pending ? 1 : 0,
-    );
-    await tx.update(auditsTable).set({ status: nextStatus }).where(eq(auditsTable.id, audit.id));
-    await tx.insert(eventsTable).values({
-      id: randomUUID(), projectId: project.id, actorId, type: "audit.dispute.adjudicated", entityId: dispute.id,
-      payload: { auditId, resolvedLabel },
+  let adjudicated;
+  try {
+    adjudicated = await db.transaction(async (tx) => {
+      // Serialize sibling decisions/status updates and bind the correction to
+      // the exact task decision audited, even across competing audit sessions.
+      const [currentAudit] = await tx.select().from(auditsTable).where(eq(auditsTable.id, audit.id)).for("update");
+      const [currentDispute] = await tx.select().from(auditDisputesTable).where(eq(auditDisputesTable.id, dispute.id)).for("update");
+      if (!currentDispute || currentDispute.status !== "pending") return false;
+      const [currentItem] = await tx.select().from(auditItemsTable).where(and(eq(auditItemsTable.id, currentDispute.auditItemId), eq(auditItemsTable.auditId, audit.id)));
+      const [task] = await tx.select().from(tasksTable).where(and(eq(tasksTable.id, currentDispute.taskId), eq(tasksTable.projectId, project.id))).for("update");
+      const decisions = await tx.select().from(auditDecisionsTable).where(and(eq(auditDecisionsTable.auditId, audit.id), eq(auditDecisionsTable.auditItemId, currentDispute.auditItemId)));
+      const decision = decisions.length === 1 ? decisions[0] : undefined;
+      if (!currentAudit || !currentItem || !task || !originalReview || originalReview.taskId !== task.id || currentAudit.auditorId === actorId || currentItem.originalReviewerId === actorId
+        || task.status !== "finalized" || currentItem.taskVersion !== task.version || currentItem.taskContentHash !== task.contentHash
+        || currentItem.originalLabel !== task.finalLabel || currentItem.originalAdjudicationId !== task.finalAdjudicationId
+        || !decision || !decision.included || decision.selfCheck || decision.auditorId !== currentAudit.auditorId
+        || decision.taskId !== task.id || decision.label !== currentDispute.auditLabel || currentDispute.originalLabel !== currentItem.originalLabel
+        || decision.auditorId === currentItem.originalReviewerId) throw new ReleaseBlocked("Adjudication evidence changed or is not independent. Create a current audit before resolving.");
+      await tx.update(auditDisputesTable).set({ status: "resolved", adjudicatorId: actorId, resolvedLabel, reason: reason?.trim() || null }).where(eq(auditDisputesTable.id, dispute.id));
+      await tx.update(tasksTable).set({ finalLabel: resolvedLabel, finalAdjudicationId: dispute.id, version: task.version + 1 }).where(eq(tasksTable.id, task.id));
+      const pending = await tx.select({ id: auditDisputesTable.id }).from(auditDisputesTable).where(and(eq(auditDisputesTable.auditId, audit.id), eq(auditDisputesTable.status, "pending")));
+      const items = await tx.select({ id: auditItemsTable.id }).from(auditItemsTable).where(eq(auditItemsTable.auditId, audit.id));
+      const allDecisions = await tx.select().from(auditDecisionsTable).where(eq(auditDecisionsTable.auditId, audit.id));
+      await tx.update(auditsTable).set({ status: nextAuditStatus(items.length, allDecisions.length, allDecisions.filter(d => d.included).length, pending.length) }).where(eq(auditsTable.id, audit.id));
+      await tx.insert(eventsTable).values({ id: randomUUID(), projectId: project.id, actorId, type: "audit.dispute.adjudicated", entityId: dispute.id,
+        payload: { auditId, resolvedLabel, taskId: task.id, fromTaskVersion: task.version, toTaskVersion: task.version + 1, originalReviewId: currentItem.originalReviewId, previousAdjudicationId: task.finalAdjudicationId } });
+      return true;
     });
-    return true;
-  });
+  } catch (error) {
+    if (error instanceof ReleaseBlocked) { res.status(409).json({ error: error.message }); return; }
+    throw error;
+  }
   if (!adjudicated) { res.status(409).json({ error: "This disagreement has already been adjudicated" }); return; }
   res.json({ id: dispute.id, auditId, auditItemId: dispute.auditItemId, taskId: dispute.taskId, originalLabel: dispute.originalLabel, auditLabel: dispute.auditLabel, status: "resolved", resolvedLabel, adjudicatorId: actorId });
 });

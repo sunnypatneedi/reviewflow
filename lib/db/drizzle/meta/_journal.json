@@ -15,6 +15,13 @@
       "when": 1789879712177,
       "tag": "0001_trace_workload",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789879712178,
+      "tag": "0002_release_integrity",
+      "breakpoints": true
     }
   ]
 }

@@ -22,6 +22,7 @@ export const projectsTable = pgTable("rf_projects", {
   mode: text("mode").notNull().default("demo"),
   rubricVersion: text("rubric_version").notNull().default("evidence-v1"),
   shadowPolicyVersion: text("shadow_policy_version").notNull().default("shadow-v1"),
+  releaseAuditPolicyVersion: text("release_audit_policy_version").notNull().default("independent-sample-v1"),
   ...timestamps,
 });
 
@@ -56,6 +57,7 @@ export const tasksTable = pgTable("rf_tasks", {
   version: integer("version").notNull().default(1),
   mode: text("mode").notNull().default("demo"),
   finalLabel: text("final_label"),
+  finalAdjudicationId: text("final_adjudication_id"),
   referenceLabel: text("reference_label"),
   contentHash: text("content_hash").notNull(),
   ...timestamps,
@@ -140,6 +142,8 @@ export const auditItemsTable = pgTable("rf_audit_items", {
   originalReviewerId: text("original_reviewer_id").notNull(),
   originalLabel: text("original_label").notNull(),
   taskContentHash: text("task_content_hash").notNull(),
+  taskVersion: integer("task_version"),
+  originalAdjudicationId: text("original_adjudication_id"),
   ...timestamps,
 }, (table) => [
   uniqueIndex("rf_audit_items_audit_task_unique").on(table.auditId, table.taskId),

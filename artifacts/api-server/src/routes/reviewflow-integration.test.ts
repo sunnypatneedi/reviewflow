@@ -56,6 +56,7 @@ async function createSession(): Promise<Session> {
 before(async () => {
   assert.equal(process.env.REVIEWFLOW_ISOLATED_READY, "1");
   process.env.APP_MODE = "demo";
+  process.env.DEMO_PROJECT_CREATION_WINDOW_MAX = "100";
   process.env.SESSION_SECRET = "isolated-reviewflow-test-secret";
   process.env.NODE_ENV = "test";
   ({ default: app } = await import("../app"));
@@ -282,6 +283,10 @@ test("concurrent audit decisions and adjudications each produce one committed ev
   const [task] = await db.select().from(tasksTable).where(eq(tasksTable.projectId, project.id));
   assert.ok(task);
 
+  const proposalId = randomUUID(), reviewId = randomUUID();
+  await db.update(tasksTable).set({ status: "finalized", version: 2, finalLabel: "supported" }).where(eq(tasksTable.id, task.id));
+  await db.insert(proposalsTable).values({ id: proposalId, projectId: project.id, taskId: task.id, mode: "demo", requestedModel: "demo-simulator-v1", returnedModel: "demo-simulator-v1", label: "supported", labelProbability: "0.9", probabilities: {}, injectionProbability: "0", complexity: 1, confidence: "0.9", latencyMs: 1, rawResponse: {} });
+  await db.insert(reviewsTable).values({ id: reviewId, projectId: project.id, taskId: task.id, proposalId, reviewerId: "different-reviewer", action: "accept", label: "supported", taskVersion: 1, activeMs: 1 });
   const auditId = randomUUID();
   const itemId = randomUUID();
   await db.insert(auditsTable).values({
@@ -301,10 +306,11 @@ test("concurrent audit decisions and adjudications each produce one committed ev
     auditId,
     taskId: task.id,
     ordinal: 1,
-    originalReviewId: randomUUID(),
+    originalReviewId: reviewId,
     originalReviewerId: "different-reviewer",
     originalLabel: "supported",
     taskContentHash: task.contentHash,
+    taskVersion: 2,
   });
   const decisionBody = { auditItemId: itemId, label: "supported", reason: "same" };
   const decisionRace = await Promise.all([
@@ -338,10 +344,11 @@ test("concurrent audit decisions and adjudications each produce one committed ev
     auditId: adjudicationAuditId,
     taskId: task.id,
     ordinal: 1,
-    originalReviewId: randomUUID(),
+    originalReviewId: reviewId,
     originalReviewerId: "different-reviewer",
     originalLabel: "supported",
     taskContentHash: task.contentHash,
+    taskVersion: 2,
   });
   await db.insert(auditDisputesTable).values({
     id: disputeId,
@@ -352,6 +359,7 @@ test("concurrent audit decisions and adjudications each produce one committed ev
     auditLabel: "contradicted",
     status: "pending",
   });
+  await db.insert(auditDecisionsTable).values({ id: randomUUID(), auditId: adjudicationAuditId, auditItemId: adjudicationItemId, taskId: task.id, auditorId: "different-auditor", label: "contradicted" });
   const adjudicationBody = { resolvedLabel: "supported", reason: "resolved" };
   const adjudicationRace = await Promise.all([
     request(`/reviewflow/audits/${adjudicationAuditId}/disputes/${disputeId}/adjudicate`, {

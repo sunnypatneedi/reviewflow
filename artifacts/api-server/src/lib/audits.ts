@@ -32,8 +32,12 @@ export function buildSamplingFrame(candidates: SamplingCandidate[]): AuditSampli
   };
 }
 
-export function samplingFrameHash(frame: AuditSamplingFrame) {
-  return sha(JSON.stringify(frame));
+export function samplingFrameHash(frame: AuditSamplingFrame | { version: "rf-audit-v2"; eligible: unknown[] }) {
+  // PostgreSQL JSONB reorders object keys. Canonicalize recursively so a frame
+  // has the same commitment before insertion and after it is read back.
+  const canonical = (value: unknown): unknown => Array.isArray(value) ? value.map(canonical)
+    : value !== null && typeof value === "object" ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => [key, canonical(entry)])) : value;
+  return sha(JSON.stringify(canonical(frame)));
 }
 
 export function selectDeterministicSample<T extends { taskId: string }>(
