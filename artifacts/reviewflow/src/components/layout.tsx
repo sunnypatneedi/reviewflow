@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AppCommands } from "@/components/app-commands";
 
 const NAV_ITEMS = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
@@ -30,15 +31,15 @@ function ClerkAccount() {
   const { signOut } = useClerk();
   const { user } = useUser();
   return (
-    <div className="p-4 border-t border-border">
+    <div className="p-4 border-t border-line-hairline">
       <div className="flex items-center justify-between mb-4 px-2">
         <div className="flex items-center gap-2 overflow-hidden">
-          <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center text-xs font-semibold text-secondary-foreground shrink-0">
+          <div className="w-8 h-8 rounded-full bg-fill-subtle border border-line-hairline flex items-center justify-center text-xs font-semibold text-text-secondary shrink-0">
             {user?.firstName?.charAt(0) ||
               user?.emailAddresses[0]?.emailAddress?.charAt(0) ||
               "U"}
           </div>
-          <div className="text-xs truncate text-muted-foreground">
+          <div className="text-xs truncate text-text-secondary">
             <div className="font-medium text-foreground truncate">
               {user?.fullName || "User"}
             </div>
@@ -50,7 +51,7 @@ function ClerkAccount() {
       </div>
       <button
         onClick={() => signOut()}
-        className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-text-secondary hover:text-foreground hover:bg-accent rounded-md transition-colors"
+        className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-text-secondary hover:text-foreground hover:bg-fill-emphasis rounded-md transition-colors"
       >
         <LogOut className="w-4 h-4" />
         Sign out
@@ -61,7 +62,7 @@ function ClerkAccount() {
 
 function DemoAccount() {
   return (
-    <div className="p-4 border-t border-border">
+    <div className="p-4 border-t border-line-hairline">
       <p className="flex items-center gap-2 text-xs text-text-secondary px-1">
         <span
           className="inline-block size-1.5 rounded-full bg-warn shrink-0"
@@ -93,8 +94,8 @@ function NavLinks({
             className={cn(
               "flex items-center gap-3 px-3 py-[7px] rounded-md text-sm font-medium transition-colors",
               isActive
-                ? "bg-sidebar-accent text-foreground font-semibold"
-                : "text-text-secondary hover:text-foreground hover:bg-accent",
+                ? "bg-fill-emphasis text-foreground font-semibold"
+                : "text-text-secondary hover:text-foreground hover:bg-fill-emphasis",
             )}
             aria-current={isActive ? "page" : undefined}
           >
@@ -118,10 +119,10 @@ export function AppLayout({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
-      <aside className="hidden min-[861px]:flex w-52 border-r border-border bg-sidebar flex-col justify-between flex-shrink-0">
+    <div className="flex w-full bg-background text-foreground min-[861px]:h-screen min-[861px]:overflow-hidden">
+      <aside className="hidden min-[861px]:flex w-52 border-r border-line-hairline bg-fill-subtle flex-col justify-between flex-shrink-0">
         <div>
-          <div className="h-14 flex items-center px-5 border-b border-border">
+          <div className="h-14 flex items-center px-5 border-b border-line-hairline">
             <h1 className="font-semibold text-base tracking-tight text-foreground flex items-center gap-2.5">
               <div className="w-4 h-4 bg-primary rounded" aria-hidden="true" />
               ReviewFlow
@@ -129,17 +130,19 @@ export function AppLayout({
           </div>
           <NavLinks location={location} />
         </div>
-        <div className="px-3 pb-3">
-          <ThemeToggle />
-        </div>
         {authMode === "clerk" ? <ClerkAccount /> : <DemoAccount />}
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <div className="min-[861px]:hidden flex items-center gap-3 h-14 px-4 border-b border-border shrink-0 bg-background">
+        <header className="hidden min-[861px]:flex h-[var(--topbar)] items-center justify-end gap-3 px-4 border-b border-line-hairline shrink-0 bg-surface-base">
+          <AppCommands />
+          <ThemeToggle />
+        </header>
+
+        <div className="min-[861px]:hidden flex items-center gap-3 h-14 px-4 border-b border-line-hairline shrink-0 bg-surface-base">
           <button
             type="button"
-            className="inline-flex items-center justify-center size-9 rounded-md text-text-secondary hover:bg-accent hover:text-foreground"
+            className="inline-flex items-center justify-center size-9 rounded-md text-text-secondary hover:bg-fill-emphasis hover:text-foreground"
             aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"}
             aria-expanded={mobileNavOpen}
             onClick={() => setMobileNavOpen((open) => !open)}
@@ -157,20 +160,21 @@ export function AppLayout({
             />
             ReviewFlow
           </span>
+          <AppCommands />
           <ThemeToggle />
         </div>
 
         {mobileNavOpen ? (
-          <div className="min-[861px]:hidden fixed inset-0 z-40">
+          <div className="min-[861px]:hidden fixed inset-0 z-scrim">
             <button
               type="button"
-              className="absolute inset-0 bg-foreground/20"
+              className="absolute inset-0 bg-surface-scrim"
               aria-label="Dismiss navigation"
               onClick={() => setMobileNavOpen(false)}
             />
-            <aside className="absolute left-0 top-0 bottom-0 w-64 bg-sidebar border-r border-border flex flex-col justify-between shadow-lg">
+            <aside className="absolute left-0 top-0 bottom-0 w-64 bg-fill-subtle border-r border-line-hairline flex flex-col justify-between shadow-surface z-dialog">
               <div>
-                <div className="h-14 flex items-center justify-between px-5 border-b border-border">
+                <div className="h-14 flex items-center justify-between px-5 border-b border-line-hairline">
                   <span className="font-semibold text-base tracking-tight flex items-center gap-2.5">
                     <span
                       className="w-4 h-4 bg-primary rounded"
@@ -180,7 +184,7 @@ export function AppLayout({
                   </span>
                   <button
                     type="button"
-                    className="size-8 inline-flex items-center justify-center rounded-md text-text-secondary hover:bg-accent"
+                    className="size-8 inline-flex items-center justify-center rounded-md text-text-secondary hover:bg-fill-emphasis"
                     aria-label="Close navigation"
                     onClick={() => setMobileNavOpen(false)}
                   >
@@ -197,8 +201,8 @@ export function AppLayout({
           </div>
         ) : null}
 
-        <main className="flex-1 flex flex-col min-h-0 overflow-hidden bg-background">
-          <div className="flex-1 overflow-auto">{children}</div>
+        <main className="flex-1 flex flex-col min-h-0 min-[861px]:overflow-hidden bg-surface-base">
+          <div className="flex-1 min-[861px]:overflow-auto">{children}</div>
         </main>
       </div>
     </div>

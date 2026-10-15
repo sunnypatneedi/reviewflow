@@ -135,7 +135,11 @@ export default function Audits() {
               Required for release
             </label>
           </div>
-          <Button onClick={handleCreate} disabled={createAudit.isPending}>
+          <Button
+            variant={selectedAuditId ? "outline" : "default"}
+            onClick={handleCreate}
+            disabled={createAudit.isPending}
+          >
             {createAudit.isPending ? "Creating…" : "Create audit"}
           </Button>
         </div>

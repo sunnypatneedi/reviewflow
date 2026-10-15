@@ -112,7 +112,7 @@ export default function Releases() {
               </label>
             </div>
             <Button className="w-full" onClick={handleCreate} disabled={!name || createRelease.isPending}>
-              {createRelease.isPending ? "Cutting Release..." : "Cut Release"}
+              {createRelease.isPending ? "Cutting release…" : "Cut release"}
             </Button>
           </div>
         </div>

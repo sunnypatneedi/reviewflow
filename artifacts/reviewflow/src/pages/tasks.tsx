@@ -236,7 +236,12 @@ export default function Tasks() {
               value={importJson}
               onChange={e => setImportJson(e.target.value)}
             />
-            <Button className="w-full" onClick={handleImport} disabled={!importJson || importTasks.isPending}>
+            <Button
+              className="w-full"
+              variant={tasks?.length === 0 ? "default" : "outline"}
+              onClick={handleImport}
+              disabled={!importJson || importTasks.isPending}
+            >
               {importTasks.isPending ? "Importing..." : "Import JSONL"}
             </Button>
             {importTasks.isError && (
@@ -271,12 +276,13 @@ export default function Tasks() {
               </div>
             )}
 
-            <Button 
-              className="w-full" 
-              onClick={handleEvaluate} 
+            <Button
+              className="w-full"
+              variant={tasks?.length === 0 ? "outline" : "default"}
+              onClick={handleEvaluate}
               disabled={selectedTasks.size === 0 || (evalMode === 'live' && !consent) || evaluateTasks.isPending}
             >
-              {evaluateTasks.isPending ? "Evaluating..." : "Run Evaluation"}
+              {evaluateTasks.isPending ? "Evaluating..." : "Run evaluation"}
             </Button>
             {evaluateTasks.isError && (
               <p className="text-sm text-destructive">Evaluation failed: {evaluateTasks.error.message}</p>
