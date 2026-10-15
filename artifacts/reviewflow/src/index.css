@@ -197,6 +197,102 @@ html.theming * {
     border-color var(--dur-theme) var(--ease-standard) !important;
 }
 
+@keyframes rf-nudge {
+  20% {
+    transform: translateX(-5px);
+  }
+  45% {
+    transform: translateX(4px);
+  }
+  70% {
+    transform: translateX(-2px);
+  }
+}
+
+@keyframes rf-sweep {
+  from {
+    background-size: 0 100%;
+  }
+}
+
+@keyframes rf-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes rf-fadeup {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes rf-life {
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.animate-rf-nudge {
+  animation: rf-nudge var(--dur-base) var(--ease-standard);
+}
+
+.rf-mark {
+  color: var(--text-primary);
+  background: linear-gradient(var(--fill-emphasis), var(--fill-emphasis))
+    no-repeat 0 0 / 100% 100%;
+  text-decoration: underline;
+  text-decoration-color: var(--text-primary);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  border-radius: 2px;
+  animation: rf-sweep var(--dur-base) var(--ease-standard);
+}
+
+.rf-skel {
+  display: block;
+  height: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--fill-subtle);
+  position: relative;
+  overflow: hidden;
+}
+
+.rf-skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--surface-base),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: rf-shimmer 1.25s var(--ease-standard) infinite;
+}
+
+.rf-toast-life {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--text-inverse);
+  transform-origin: left center;
+  animation: rf-life 5s linear forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-mark,
+  .animate-rf-nudge,
+  .rf-skel::after,
+  .rf-toast-life {
+    animation: none;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

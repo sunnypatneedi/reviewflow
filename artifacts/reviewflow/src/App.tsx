@@ -7,6 +7,7 @@ import { queryClient } from "@/lib/queryClient";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
+import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { AppLayout } from '@/components/layout';
@@ -152,6 +153,7 @@ function AppRoutes() {
         </ErrorBoundary>
       </WouterRouter>
       <Toaster />
+      <SonnerToaster position="bottom-left" offset={{ left: 248 }} />
     </TooltipProvider>
   );
 }

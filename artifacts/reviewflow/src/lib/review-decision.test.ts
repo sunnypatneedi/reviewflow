@@ -9,9 +9,11 @@ import {
   labelTitle,
   primaryActionForSelection,
   primaryButtonLabel,
+  progressFromMetrics,
+  reasonFieldCopy,
   reasonHelpText,
-  reasonRequirementHint,
   riskTitle,
+  SUBMIT_SHORTCUT,
 } from "./review-decision.ts";
 
 describe("primaryActionForSelection", () => {
@@ -43,6 +45,26 @@ describe("primaryButtonLabel", () => {
   });
 });
 
+describe("reasonFieldCopy", () => {
+  it("returns copy for each action", () => {
+    assert.deepEqual(reasonFieldCopy("accept"), {
+      label: "Reason",
+      hint: "Optional to accept",
+      help: "Not saved when you accept.",
+    });
+    assert.deepEqual(reasonFieldCopy("correct"), {
+      label: "Reason for correction",
+      hint: "Required",
+      help: "Saved with the correction.",
+    });
+    assert.deepEqual(reasonFieldCopy("escalate"), {
+      label: "Reason for escalation",
+      hint: "Required",
+      help: "",
+    });
+  });
+});
+
 describe("reason validation", () => {
   it("blocks correct without a reason and allows escalate only with a reason", () => {
     assert.equal(isPrimaryBlocked("correct", ""), true);
@@ -53,24 +75,62 @@ describe("reason validation", () => {
     assert.equal(canEscalate("needs specialist"), true);
   });
 
-  it("shows accept helper copy until a failed attempt needs a reason", () => {
+  it("never reports invalid for accept", () => {
     assert.deepEqual(
       reasonHelpText({ action: "accept", attempt: null, reason: "" }),
       { invalid: false, message: "Not saved when you accept." },
     );
     assert.deepEqual(
+      reasonHelpText({ action: "accept", attempt: "primary", reason: "" }),
+      { invalid: false, message: "Not saved when you accept." },
+    );
+    assert.deepEqual(
+      reasonHelpText({ action: "accept", attempt: "escalate", reason: "" }),
+      { invalid: false, message: "Not saved when you accept." },
+    );
+  });
+
+  it("reports correct errors only from the primary attempt on the correct field", () => {
+    assert.deepEqual(
       reasonHelpText({ action: "correct", attempt: "primary", reason: "" }),
       { invalid: true, message: "Add a reason to correct." },
     );
     assert.deepEqual(
-      reasonHelpText({ action: "accept", attempt: "escalate", reason: "" }),
+      reasonHelpText({ action: "correct", attempt: "escalate", reason: "" }),
+      { invalid: false, message: "Saved with the correction." },
+    );
+  });
+
+  it("reports escalate errors only from the escalate dialog field", () => {
+    assert.deepEqual(
+      reasonHelpText({ action: "escalate", attempt: "escalate", reason: "" }),
       { invalid: true, message: "Add a reason to escalate." },
     );
-    assert.equal(
-      reasonRequirementHint("accept"),
-      "Needed to correct or escalate",
+    assert.deepEqual(
+      reasonHelpText({ action: "escalate", attempt: "primary", reason: "" }),
+      { invalid: false, message: "" },
     );
-    assert.equal(reasonRequirementHint("correct"), "Required to correct");
+  });
+});
+
+describe("progressFromMetrics", () => {
+  it("sums finalized and escalated as decided", () => {
+    assert.deepEqual(
+      progressFromMetrics({
+        finalized: 4,
+        escalated: 2,
+        total: 20,
+        proposed: 7,
+      }),
+      { decided: 6, total: 20, awaiting: 7 },
+    );
+  });
+});
+
+describe("SUBMIT_SHORTCUT", () => {
+  it("exposes mac and other labels", () => {
+    assert.equal(SUBMIT_SHORTCUT.mac, "⌘ ↵");
+    assert.equal(SUBMIT_SHORTCUT.other, "Ctrl ↵");
   });
 });
 

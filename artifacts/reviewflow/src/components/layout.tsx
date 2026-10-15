@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { AppCommands } from "@/components/app-commands";
 
 const NAV_ITEMS = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
@@ -39,8 +38,8 @@ function ClerkAccount() {
               user?.emailAddresses[0]?.emailAddress?.charAt(0) ||
               "U"}
           </div>
-          <div className="text-xs truncate text-text-secondary">
-            <div className="font-medium text-foreground truncate">
+          <div className="text-xs truncate text-text-muted">
+            <div className="font-medium text-text-primary truncate">
               {user?.fullName || "User"}
             </div>
             <div className="truncate">
@@ -51,7 +50,7 @@ function ClerkAccount() {
       </div>
       <button
         onClick={() => signOut()}
-        className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-text-secondary hover:text-foreground hover:bg-fill-emphasis rounded-md transition-colors"
+        className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-fill-subtle rounded-md transition-colors"
       >
         <LogOut className="w-4 h-4" />
         Sign out
@@ -94,8 +93,8 @@ function NavLinks({
             className={cn(
               "flex items-center gap-3 px-3 py-[7px] rounded-md text-sm font-medium transition-colors",
               isActive
-                ? "bg-fill-emphasis text-foreground font-semibold"
-                : "text-text-secondary hover:text-foreground hover:bg-fill-emphasis",
+                ? "bg-sidebar-accent text-text-primary font-semibold"
+                : "text-text-secondary hover:text-text-primary hover:bg-fill-subtle",
             )}
             aria-current={isActive ? "page" : undefined}
           >
@@ -119,30 +118,31 @@ export function AppLayout({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    <div className="flex w-full bg-background text-foreground min-[861px]:h-screen min-[861px]:overflow-hidden">
+    <div className="flex min-[861px]:h-screen w-full bg-surface-base text-text-primary min-[861px]:overflow-hidden">
       <aside className="hidden min-[861px]:flex w-52 border-r border-line-hairline bg-fill-subtle flex-col justify-between flex-shrink-0">
         <div>
           <div className="h-14 flex items-center px-5 border-b border-line-hairline">
-            <h1 className="font-semibold text-base tracking-tight text-foreground flex items-center gap-2.5">
-              <div className="w-4 h-4 bg-primary rounded" aria-hidden="true" />
+            <h1 className="font-semibold text-base tracking-tight text-text-primary flex items-center gap-2.5">
+              <div
+                className="w-4 h-4 bg-fill-inverse rounded"
+                aria-hidden="true"
+              />
               ReviewFlow
             </h1>
           </div>
           <NavLinks location={location} />
         </div>
+        <div className="px-3 pb-3">
+          <ThemeToggle />
+        </div>
         {authMode === "clerk" ? <ClerkAccount /> : <DemoAccount />}
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <header className="hidden min-[861px]:flex h-[var(--topbar)] items-center justify-end gap-3 px-4 border-b border-line-hairline shrink-0 bg-surface-base">
-          <AppCommands />
-          <ThemeToggle />
-        </header>
-
-        <div className="min-[861px]:hidden flex items-center gap-3 h-14 px-4 border-b border-line-hairline shrink-0 bg-surface-base">
+        <div className="min-[861px]:hidden sticky top-0 z-sticky flex items-center gap-3 h-14 px-4 border-b border-line-hairline shrink-0 bg-surface-glass backdrop-blur">
           <button
             type="button"
-            className="inline-flex items-center justify-center size-9 rounded-md text-text-secondary hover:bg-fill-emphasis hover:text-foreground"
+            className="inline-flex items-center justify-center size-11 rounded-md text-text-secondary hover:bg-fill-subtle hover:text-text-primary"
             aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"}
             aria-expanded={mobileNavOpen}
             onClick={() => setMobileNavOpen((open) => !open)}
@@ -155,12 +155,11 @@ export function AppLayout({
           </button>
           <span className="font-semibold text-sm tracking-tight flex items-center gap-2 flex-1">
             <span
-              className="w-3.5 h-3.5 bg-primary rounded-sm"
+              className="w-3.5 h-3.5 bg-fill-inverse rounded-sm"
               aria-hidden="true"
             />
             ReviewFlow
           </span>
-          <AppCommands />
           <ThemeToggle />
         </div>
 
@@ -177,14 +176,14 @@ export function AppLayout({
                 <div className="h-14 flex items-center justify-between px-5 border-b border-line-hairline">
                   <span className="font-semibold text-base tracking-tight flex items-center gap-2.5">
                     <span
-                      className="w-4 h-4 bg-primary rounded"
+                      className="w-4 h-4 bg-fill-inverse rounded"
                       aria-hidden="true"
                     />
                     ReviewFlow
                   </span>
                   <button
                     type="button"
-                    className="size-8 inline-flex items-center justify-center rounded-md text-text-secondary hover:bg-fill-emphasis"
+                    className="size-11 inline-flex items-center justify-center rounded-md text-text-secondary hover:bg-fill-subtle"
                     aria-label="Close navigation"
                     onClick={() => setMobileNavOpen(false)}
                   >
