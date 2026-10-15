@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { ClerkProvider, SignIn, SignUp, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { Switch, Route, useLocation, Router as WouterRouter } from 'wouter';
+import { ThemeProvider, useTheme } from "next-themes";
 import { queryClient } from "@/lib/queryClient";
 import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -17,6 +18,24 @@ import Audits from '@/pages/audits';
 import Releases from '@/pages/releases';
 import Settings from '@/pages/settings';
 import Traces from '@/pages/traces';
+
+const THEME_VALUES = ["light", "dark", "plum"] as const;
+
+function ThemeQueryBootstrap() {
+  const { setTheme } = useTheme();
+  const applied = useRef(false);
+
+  useEffect(() => {
+    if (applied.current) return;
+    const param = new URLSearchParams(window.location.search).get("theme");
+    if (param && (THEME_VALUES as readonly string[]).includes(param)) {
+      setTheme(param);
+      applied.current = true;
+    }
+  }, [setTheme]);
+
+  return null;
+}
 
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -158,7 +177,17 @@ function ClerkApp() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      {appMode === "clerk" ? <ClerkApp /> : <AppRoutes />}
+      <ThemeProvider
+        attribute="data-theme"
+        themes={[...THEME_VALUES]}
+        defaultTheme="system"
+        enableSystem
+        storageKey="rf.theme"
+        disableTransitionOnChange={false}
+      >
+        <ThemeQueryBootstrap />
+        {appMode === "clerk" ? <ClerkApp /> : <AppRoutes />}
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

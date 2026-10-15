@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV_ITEMS = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
@@ -49,7 +50,7 @@ function ClerkAccount() {
       </div>
       <button
         onClick={() => signOut()}
-        className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-ink-2 hover:text-foreground hover:bg-accent rounded-md transition-colors"
+        className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-text-secondary hover:text-foreground hover:bg-accent rounded-md transition-colors"
       >
         <LogOut className="w-4 h-4" />
         Sign out
@@ -61,7 +62,7 @@ function ClerkAccount() {
 function DemoAccount() {
   return (
     <div className="p-4 border-t border-border">
-      <p className="flex items-center gap-2 text-xs text-ink-2 px-1">
+      <p className="flex items-center gap-2 text-xs text-text-secondary px-1">
         <span
           className="inline-block size-1.5 rounded-full bg-warn shrink-0"
           aria-hidden="true"
@@ -93,7 +94,7 @@ function NavLinks({
               "flex items-center gap-3 px-3 py-[7px] rounded-md text-sm font-medium transition-colors",
               isActive
                 ? "bg-sidebar-accent text-foreground font-semibold"
-                : "text-ink-2 hover:text-foreground hover:bg-accent",
+                : "text-text-secondary hover:text-foreground hover:bg-accent",
             )}
             aria-current={isActive ? "page" : undefined}
           >
@@ -128,6 +129,9 @@ export function AppLayout({
           </div>
           <NavLinks location={location} />
         </div>
+        <div className="px-3 pb-3">
+          <ThemeToggle />
+        </div>
         {authMode === "clerk" ? <ClerkAccount /> : <DemoAccount />}
       </aside>
 
@@ -135,7 +139,7 @@ export function AppLayout({
         <div className="min-[861px]:hidden flex items-center gap-3 h-14 px-4 border-b border-border shrink-0 bg-background">
           <button
             type="button"
-            className="inline-flex items-center justify-center size-9 rounded-md text-ink-2 hover:bg-accent hover:text-foreground"
+            className="inline-flex items-center justify-center size-9 rounded-md text-text-secondary hover:bg-accent hover:text-foreground"
             aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"}
             aria-expanded={mobileNavOpen}
             onClick={() => setMobileNavOpen((open) => !open)}
@@ -146,13 +150,14 @@ export function AppLayout({
               <Menu className="w-5 h-5" />
             )}
           </button>
-          <span className="font-semibold text-sm tracking-tight flex items-center gap-2">
+          <span className="font-semibold text-sm tracking-tight flex items-center gap-2 flex-1">
             <span
               className="w-3.5 h-3.5 bg-primary rounded-sm"
               aria-hidden="true"
             />
             ReviewFlow
           </span>
+          <ThemeToggle />
         </div>
 
         {mobileNavOpen ? (
@@ -175,7 +180,7 @@ export function AppLayout({
                   </span>
                   <button
                     type="button"
-                    className="size-8 inline-flex items-center justify-center rounded-md text-ink-2 hover:bg-accent"
+                    className="size-8 inline-flex items-center justify-center rounded-md text-text-secondary hover:bg-accent"
                     aria-label="Close navigation"
                     onClick={() => setMobileNavOpen(false)}
                   >
