@@ -71,6 +71,8 @@ with scripted responders, not real models. No genuine human benchmark exists; se
 
 ## Documentation
 
+- [Local hardening and remaining production gates](docs/production-readiness.md)
+
 - [Launch candidate, live collaboration, routing API and release gates](docs/launch-candidate.md)
 
 - [Setup and verification commands](docs/setup.md)

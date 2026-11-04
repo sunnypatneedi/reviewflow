@@ -475,3 +475,21 @@ test("queued live evaluation rechecks quarantine after budget wait before invoki
   assert.equal(calls, 0);
   assert.equal((await db.select().from(jevCallsTable).where(eq(jevCallsTable.projectId, task.projectId))).length, 0);
 });
+
+test("worker reports polling failures, recovers with bounded retry, and wakes promptly on stop", async () => {
+  const worker = new EvaluationWorker({ pollMs: 5 });
+  let calls = 0;
+  worker.runOnce = async () => {
+    calls++;
+    if (calls === 1) throw new Error("synthetic-private-database-failure");
+    if (calls === 2) { assert.equal(worker.ready(), false); return false; }
+    assert.equal(worker.ready(), true); worker.stop(); return false;
+  };
+  assert.equal(worker.ready(), false);
+  await worker.start(); assert.equal(calls, 3); assert.equal(worker.ready(), false);
+  const stopped = new EvaluationWorker({ pollMs: 30_000 }); let polled = false;
+  stopped.runOnce = async () => { polled = true; return false; };
+  const running = stopped.start(); await waitFor(async () => polled);
+  const before = performance.now(); stopped.stop(); await running;
+  assert.ok(performance.now() - before < 500, "Stop interrupts the poll wait");
+});

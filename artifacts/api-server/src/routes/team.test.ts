@@ -649,3 +649,12 @@ test("overlapping audit assignments cannot reuse an auditor after learning an ou
     0,
   );
 });
+
+test("signed-out Clerk requests cannot provision a demo project or receive a demo cookie", async () => {
+  const before = await db.select({ id: projectsTable.id }).from(projectsTable);
+  const denied = await call("", "/bootstrap", undefined, "");
+  assert.equal(denied.status, 401); assert.equal(denied.headers.get("set-cookie"), null);
+  assert.equal((await db.select({ id: projectsTable.id }).from(projectsTable)).length, before.length);
+  const authenticated = await call(owner, "/context");
+  assert.equal(authenticated.status, 200); assert.equal(authenticated.headers.get("set-cookie"), null);
+});

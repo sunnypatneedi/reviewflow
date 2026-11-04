@@ -43,9 +43,12 @@ valuable data. Operators must create a fresh database and verify the target.
 - Demo cookies isolate browser sessions but do not establish human identity.
 - Shared Clerk mode has not received an independent penetration test, security
   audit, or production certification.
-- Deployment hardening, TLS termination, secret rotation, backups, disaster
-  recovery, rate limiting, abuse controls, retention policy, and monitoring are
-  operator responsibilities and are not demonstrated by this repository.
+- Local hardening includes loopback defaults, explicit production identity/origin
+  gates, bounded per-process request admission, generic errors and database readiness.
+  A synthetic crash/restart rehearsal is included; see [production gates](docs/production-readiness.md).
+- TLS termination, real-session behavior, secret rotation, backup restoration,
+  distributed abuse controls, retention/deletion and deployed monitoring remain
+  operator responsibilities and are not qualified by local tests.
 - Live Jev connectivity and provider behavior are not claimed as tested.
 - Imported text is treated as untrusted and imported links are not fetched,
   but exported source text can still contain sensitive input supplied by an

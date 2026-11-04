@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "node --check reviewflow-e2e.mjs && node --check same-origin-proxy.mjs && node --check package-source.mjs"
+    "typecheck": "node --check reviewflow-e2e.mjs && node --check same-origin-proxy.mjs && node --check package-source.mjs && node --check ops-smoke.mjs && node --check listen-host.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.11.0",

@@ -1,3 +1,4 @@
+import { resolveListenHost } from "./listen-host.mjs";
 import http from "node:http";
 
 const listenPort = Number(process.env.PORT ?? 8080);
@@ -49,6 +50,6 @@ server.on("upgrade", (request, socket, head) => {
   upstream.end();
 });
 
-server.listen(listenPort, "0.0.0.0", () => {
+server.listen(listenPort, resolveListenHost(process.env), () => {
   console.log(`ReviewFlow same-origin proxy listening on http://localhost:${listenPort}`);
 });

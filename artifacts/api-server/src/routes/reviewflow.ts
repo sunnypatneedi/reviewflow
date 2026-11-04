@@ -220,6 +220,7 @@ async function ensureProject(req: Request) {
   let demoId = req.signedCookies?.reviewflow_demo as string | undefined;
   if (!demoId) demoId = randomUUID();
   const userId = getAuth(req).userId;
+  if (req.app.locals.runtimeConfig?.appMode === "clerk" && !userId) throw new FactoryError("Sign in required", 401);
   const selectedId = req.path === "/reviewflow/projects" ? undefined : req.get("x-reviewflow-project");
   if (selectedId) {
     if (!userId) throw new FactoryError("Shared project selection requires authentication", 401);
@@ -470,9 +471,10 @@ async function live(task: typeof tasksTable.$inferSelect) {
 }
 
 router.use(async (req, res, next): Promise<void> => {
+  if (req.path !== "/reviewflow" && !req.path.startsWith("/reviewflow/")) { next(); return; }
   try {
-    const { demoId } = await ensureProject(req);
-    if (!req.signedCookies?.reviewflow_demo) {
+    const { demoId, userId } = await ensureProject(req);
+    if (!userId && !req.signedCookies?.reviewflow_demo) {
       // Keep the same project for the route handler in this request. The cookie
       // is sent in the response, so Express has not populated req.signedCookies
       // yet when the handler calls ensureProject again.

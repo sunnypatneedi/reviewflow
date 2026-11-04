@@ -1,3 +1,5 @@
+> Local hardening follow-up and external qualification gates: [production readiness](production-readiness.md). The separately running reviewed preview remains on `f9e39b5`.
+
 # Local launch candidate and release gates
 
 This candidate is a locally verified prototype for source sharing and a synthetic demonstration. It is not a qualified hosted service, a provider benchmark, or evidence of independent human accuracy. No deployment, publication, invitations or paid inference are part of verification.

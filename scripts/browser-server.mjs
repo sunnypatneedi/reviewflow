@@ -14,12 +14,19 @@ const express = require("express"),
   cookieParser = require("cookie-parser");
 const { attachCollaboration } =
   await import("../artifacts/api-server/src/lib/collaboration.ts");
-const { FactoryError } =
-  await import("../artifacts/api-server/src/lib/factory-engine.ts");
+const {
+  requestPrivacy,
+  requestBudget,
+  requestCapacity,
+  requireConfiguredIdentity,
+  privateErrors,
+} = await import("../artifacts/api-server/src/middlewares/launchSecurity.ts");
 const { protectCredentialedWrites } =
   await import("../artifacts/api-server/src/middlewares/requestSecurity.ts");
 const app = express();
-app.use(express.json());
+app.use(requestPrivacy);
+app.use(requestCapacity(32));
+app.use(requestBudget(600));
 app.use(cookieParser("synthetic-browser-only"));
 app.locals.runtimeConfig = {
   appMode: "clerk",
@@ -29,12 +36,7 @@ app.locals.runtimeConfig = {
   demoProjectCreationWindowMax: 1000,
   demoProjectCreationWindowSeconds: 60,
 };
-app.use(protectCredentialedWrites(app.locals.runtimeConfig));
-app.use((req, res, next) => {
-  if (req.body?.mode === "live" || req.body?.provider === "jev")
-    return res
-      .status(403)
-      .json({ error: "This synthetic harness prohibits live inference" });
+app.use((req, _res, next) => {
   const auth = () => ({
     userId: req.get("x-synthetic-user") ?? null,
     tokenType: "session_token",
@@ -43,20 +45,21 @@ app.use((req, res, next) => {
   req.auth = auth;
   next();
 });
+app.use("/api/reviewflow", requireConfiguredIdentity("clerk"));
+app.use(protectCredentialedWrites(app.locals.runtimeConfig));
+app.use(express.json());
+app.use((req, res, next) => {
+  if (req.body?.mode === "live" || req.body?.provider === "jev")
+    return res
+      .status(403)
+      .json({ error: "This synthetic harness prohibits live inference" });
+  next();
+});
 app.use(
   "/api",
   (await import("../artifacts/api-server/src/routes/reviewflow.ts")).default,
 );
-app.use((error, _req, res, _next) =>
-  res
-    .status(error instanceof FactoryError ? error.status : 500)
-    .json({
-      error:
-        error instanceof FactoryError
-          ? error.message
-          : "Synthetic server error",
-    }),
-);
+app.use(privateErrors);
 const server = createServer(app);
 attachCollaboration(server, app.locals.runtimeConfig);
 server.listen(5291, "127.0.0.1");

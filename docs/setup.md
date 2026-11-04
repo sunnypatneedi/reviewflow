@@ -165,3 +165,6 @@ In CI, the same script may use the explicitly acknowledged disposable
 `reviewflow_ci` service instead of creating another cluster. The end-to-end
 script refuses non-loopback targets. These are instructions and test scope, not
 a statement that any particular revision has passed.
+## Listener and operations boundaries
+
+Local services now default to `127.0.0.1`. See [local hardening and production gates](production-readiness.md) before changing listener, identity, proxy or rate settings. `pnpm run test:ops` owns a new disposable database and rehearses crash/restart; it does not back up or restore production data.

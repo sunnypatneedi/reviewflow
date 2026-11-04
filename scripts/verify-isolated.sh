@@ -66,3 +66,5 @@ REVIEWFLOW_E2E_ISOLATED=1 REVIEWFLOW_E2E_ORIGIN=http://localhost:8080 \
 REVIEWFLOW_E2E_ISOLATED=1 REVIEWFLOW_E2E_ORIGIN=http://localhost:8080 \
   REVIEWFLOW_BASE_URL="http://127.0.0.1:$api_port/api" \
   node scripts/trace-e2e.mjs
+# Recovery rehearsal always owns another fresh local cluster; never crash CI or user data.
+sh scripts/ops-isolated.sh

@@ -279,6 +279,9 @@ export class EvaluationWorker {
   private readonly pollMs: number;
   private readonly evaluate: typeof evaluateTask;
   private stopped = false;
+  private wake?: () => void;
+  private lastPollAt = 0;
+  private lastPollSucceeded = false;
 
   constructor(options: WorkerOptions = {}) {
     this.workerId = options.workerId ?? `worker-${randomUUID()}`;
@@ -324,15 +327,40 @@ export class EvaluationWorker {
     return true;
   }
 
+  /** Queue polling health, not provider quality or human-label qualification. */
+  ready(): boolean {
+    return !this.stopped && this.lastPollSucceeded && performance.now() - this.lastPollAt < this.leaseMs;
+  }
+
+  private wait(ms: number): Promise<void> {
+    return new Promise(resolve => {
+      const done = () => { clearTimeout(timer); this.wake = undefined; resolve(); };
+      const timer = setTimeout(done, ms);
+      this.wake = done;
+      if (this.stopped) done();
+    });
+  }
+
   async start(): Promise<void> {
     this.stopped = false;
+    this.lastPollSucceeded = false;
+    let failures = 0;
     while (!this.stopped) {
-      const claimed = await this.runOnce();
-      if (!claimed) await new Promise((resolve) => setTimeout(resolve, this.pollMs));
+      try {
+        const claimed = await this.runOnce();
+        this.lastPollSucceeded = true; this.lastPollAt = performance.now(); failures = 0;
+        if (!claimed && !this.stopped) await this.wait(this.pollMs);
+      } catch {
+        this.lastPollSucceeded = false;
+        const delayMs = Math.min(5_000, 500 * 2 ** Math.min(failures++, 4));
+        console.error(JSON.stringify({ level: "warn", event: "worker_poll_unavailable", retryDelayMs: delayMs }));
+        if (!this.stopped) await this.wait(delayMs);
+      }
     }
   }
 
   stop(): void {
     this.stopped = true;
+    this.wake?.();
   }
 }

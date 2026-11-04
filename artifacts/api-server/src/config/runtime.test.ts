@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loadRuntimeConfig, resolveAppMode, resolveTrustedOrigins } from "./runtime";
+import {
+  loadRuntimeConfig,
+  resolveAppMode,
+  resolveTrustedOrigins,
+} from "./runtime";
 
 test("mode defaults to demo without Clerk and preserves a complete Clerk configuration", () => {
   assert.equal(resolveAppMode({}), "demo");
-  assert.equal(resolveAppMode({ CLERK_PUBLISHABLE_KEY: "pk", CLERK_SECRET_KEY: "sk" }), "clerk");
+  assert.equal(
+    resolveAppMode({ CLERK_PUBLISHABLE_KEY: "pk", CLERK_SECRET_KEY: "sk" }),
+    "clerk",
+  );
 });
 
 test("explicit modes and incomplete Clerk configuration fail closed", () => {
@@ -27,9 +34,16 @@ test("trusted origins accept explicit origins and safely-derived Replit hosts", 
 });
 
 test("unsafe managed host values are ignored and malformed explicit origins are rejected", () => {
-  const origins = resolveTrustedOrigins({ NODE_ENV: "production", REPLIT_DOMAINS: "good.replit.app,evil.test/path" });
-  assert.deepEqual([...origins], ["https://good.replit.app"]);
-  assert.throws(() => resolveTrustedOrigins({ TRUSTED_ORIGINS: "https://example.test/path" }), /Invalid trusted origin/);
+  const origins = resolveTrustedOrigins({
+    NODE_ENV: "production",
+    REPLIT_DOMAINS: "good.replit.app,evil.test/path",
+  });
+  assert.deepEqual([...origins], []);
+  assert.throws(
+    () =>
+      resolveTrustedOrigins({ TRUSTED_ORIGINS: "https://example.test/path" }),
+    /Invalid trusted origin/,
+  );
 });
 
 test("live inference is off by default and production requires a session secret", () => {
@@ -38,22 +52,99 @@ test("live inference is off by default and production requires a session secret"
   assert.equal(defaults.demoProjectCap, 100);
   assert.equal(defaults.demoProjectCreationWindowMax, 10);
   assert.equal(defaults.demoProjectCreationWindowSeconds, 60);
-  assert.throws(() => loadRuntimeConfig({ NODE_ENV: "production", APP_MODE: "demo" }), /SESSION_SECRET/);
   assert.throws(
-    () => loadRuntimeConfig({ SESSION_SECRET: "secret", LIVE_INFERENCE_ENABLED: "yes" }),
+    () => loadRuntimeConfig({ NODE_ENV: "production", APP_MODE: "demo" }),
+    /SESSION_SECRET/,
+  );
+  assert.throws(
+    () =>
+      loadRuntimeConfig({
+        SESSION_SECRET: "secret",
+        LIVE_INFERENCE_ENABLED: "yes",
+      }),
     /LIVE_INFERENCE_ENABLED/,
   );
 });
 
 test("demo bootstrap limits accept only positive integer configuration", () => {
-  const config = loadRuntimeConfig({
-    DEMO_PROJECT_CAP: "25",
-    DEMO_PROJECT_CREATION_WINDOW_MAX: "4",
-    DEMO_PROJECT_CREATION_WINDOW_SECONDS: "30",
-  }, () => "ephemeral");
+  const config = loadRuntimeConfig(
+    {
+      DEMO_PROJECT_CAP: "25",
+      DEMO_PROJECT_CREATION_WINDOW_MAX: "4",
+      DEMO_PROJECT_CREATION_WINDOW_SECONDS: "30",
+    },
+    () => "ephemeral",
+  );
   assert.equal(config.demoProjectCap, 25);
   assert.equal(config.demoProjectCreationWindowMax, 4);
   assert.equal(config.demoProjectCreationWindowSeconds, 30);
-  assert.throws(() => loadRuntimeConfig({ DEMO_PROJECT_CAP: "0" }), /DEMO_PROJECT_CAP/);
-  assert.throws(() => loadRuntimeConfig({ DEMO_PROJECT_CREATION_WINDOW_MAX: "1.5" }), /WINDOW_MAX/);
+  assert.throws(
+    () => loadRuntimeConfig({ DEMO_PROJECT_CAP: "0" }),
+    /DEMO_PROJECT_CAP/,
+  );
+  assert.throws(
+    () => loadRuntimeConfig({ DEMO_PROJECT_CREATION_WINDOW_MAX: "1.5" }),
+    /WINDOW_MAX/,
+  );
+});
+
+test("production rejects demo, weak secrets and implicit or non-HTTPS origins", () => {
+  const production = {
+    NODE_ENV: "production",
+    APP_MODE: "clerk",
+    CLERK_PUBLISHABLE_KEY: "pk_synthetic",
+    CLERK_SECRET_KEY: "sk_synthetic",
+    SESSION_SECRET: "synthetic-config-fixture-only-32-characters",
+    TRUSTED_ORIGINS: "https://example.test",
+  };
+  assert.equal(loadRuntimeConfig(production).appMode, "clerk");
+  assert.throws(
+    () => loadRuntimeConfig({ ...production, APP_MODE: "demo" }),
+    /requires APP_MODE=clerk/,
+  );
+  assert.throws(
+    () => loadRuntimeConfig({ ...production, SESSION_SECRET: "short" }),
+    /at least 32/,
+  );
+  assert.throws(
+    () =>
+      loadRuntimeConfig({
+        ...production,
+        SESSION_SECRET: "replace-with-a-long-random-local-value",
+      }),
+    /placeholder/,
+  );
+  assert.throws(
+    () =>
+      loadRuntimeConfig({
+        ...production,
+        TRUSTED_ORIGINS: "",
+        REPLIT_DOMAINS: "example.test",
+      }),
+    /explicit HTTPS/,
+  );
+  assert.throws(
+    () =>
+      loadRuntimeConfig({
+        ...production,
+        TRUSTED_ORIGINS: "http://example.test",
+      }),
+    /HTTPS/,
+  );
+  assert.equal(loadRuntimeConfig(production).clerkProxyOrigin, undefined);
+  assert.throws(
+    () =>
+      loadRuntimeConfig({
+        ...production,
+        CLERK_PROXY_ORIGIN: "https://other.test",
+      }),
+    /explicit trusted/,
+  );
+  assert.equal(
+    loadRuntimeConfig({
+      ...production,
+      CLERK_PROXY_ORIGIN: "https://example.test",
+    }).clerkProxyOrigin,
+    "https://example.test",
+  );
 });

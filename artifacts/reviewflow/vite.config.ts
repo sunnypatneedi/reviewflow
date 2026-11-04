@@ -1,3 +1,4 @@
+import { resolveListenHost } from "../../scripts/listen-host.mjs";
 import path from 'path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -61,15 +62,15 @@ export default defineConfig({
   server: {
     port,
     strictPort: true,
-    host: '0.0.0.0',
-    allowedHosts: true,
+    host: resolveListenHost(process.env),
+    allowedHosts: ["localhost", "127.0.0.1"],
     fs: {
       strict: true,
     },
   },
   preview: {
     port,
-    host: '0.0.0.0',
-    allowedHosts: true,
+    host: resolveListenHost(process.env),
+    allowedHosts: ["localhost", "127.0.0.1"],
   },
 });

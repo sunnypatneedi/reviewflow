@@ -32,6 +32,9 @@ export REVIEWFLOW_MIGRATION_DATABASE_URL="$isolated_url"
 export REVIEWFLOW_MIGRATION_CONFIRM=reviewflow_test_isolated
 export REVIEWFLOW_DISPOSABLE_DB=1
 export REVIEWFLOW_ISOLATED_READY=1
+export REVIEWFLOW_ISOLATED_PGDATA="$data_dir"
+export REVIEWFLOW_ISOLATED_PGPORT="$port"
+export REVIEWFLOW_ISOLATED_PGSOCKET="$socket_dir"
 
 echo "Started disposable PostgreSQL cluster (database reviewflow_test_isolated)"
 "$@"

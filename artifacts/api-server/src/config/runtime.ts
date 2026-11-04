@@ -6,6 +6,8 @@ export type RuntimeConfig = {
   appMode: AppMode;
   liveInferenceEnabled: boolean;
   sessionSecret: string;
+  clerkProxyOrigin?: string;
+  apiRequestsPerMinute: number;
   trustedOrigins: ReadonlySet<string>;
   demoProjectCap: number;
   demoProjectCreationWindowMax: number;
@@ -19,11 +21,17 @@ function parseBoolean(name: string, value: string | undefined): boolean {
   throw new Error(`${name} must be "true" or "false"`);
 }
 
-function parsePositiveInteger(name: string, value: string | undefined, fallback: number): number {
+function parsePositiveInteger(
+  name: string,
+  value: string | undefined,
+  fallback: number,
+): number {
   if (value === undefined || value === "") return fallback;
-  if (!/^[1-9]\d*$/.test(value)) throw new Error(`${name} must be a positive integer`);
+  if (!/^[1-9]\d*$/.test(value))
+    throw new Error(`${name} must be a positive integer`);
   const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed)) throw new Error(`${name} must be a positive integer`);
+  if (!Number.isSafeInteger(parsed))
+    throw new Error(`${name} must be a positive integer`);
   return parsed;
 }
 
@@ -36,17 +44,28 @@ export function resolveAppMode(env: NodeJS.ProcessEnv): AppMode {
   const hasPublishableKey = Boolean(env.CLERK_PUBLISHABLE_KEY);
   const hasSecretKey = Boolean(env.CLERK_SECRET_KEY);
   if (hasPublishableKey !== hasSecretKey) {
-    throw new Error("Clerk configuration is incomplete: both Clerk keys are required");
+    throw new Error(
+      "Clerk configuration is incomplete: both Clerk keys are required",
+    );
   }
   if (explicit === "clerk" && !hasPublishableKey) {
-    throw new Error("APP_MODE=clerk requires Clerk publishable and secret keys");
+    throw new Error(
+      "APP_MODE=clerk requires Clerk publishable and secret keys",
+    );
   }
   return explicit ?? (hasPublishableKey ? "clerk" : "demo");
 }
 
 function normalizeOrigin(value: string): string {
   const url = new URL(value);
-  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+  if (
+    !["http:", "https:"].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash
+  ) {
     throw new Error(`Invalid trusted origin: ${value}`);
   }
   return url.origin;
@@ -54,15 +73,26 @@ function normalizeOrigin(value: string): string {
 
 function safeManagedHost(value: string): string | null {
   const host = value.trim().toLowerCase();
-  if (!host || host.includes(":") || !/^[a-z0-9.-]+$/.test(host) || host.startsWith(".") || host.endsWith(".")) {
+  if (
+    !host ||
+    host.includes(":") ||
+    !/^[a-z0-9.-]+$/.test(host) ||
+    host.startsWith(".") ||
+    host.endsWith(".")
+  ) {
     return null;
   }
   return host;
 }
 
-export function resolveTrustedOrigins(env: NodeJS.ProcessEnv): ReadonlySet<string> {
+export function resolveTrustedOrigins(
+  env: NodeJS.ProcessEnv,
+): ReadonlySet<string> {
   const origins = new Set<string>();
-  for (const entry of (env.TRUSTED_ORIGINS ?? "").split(",").map((value) => value.trim()).filter(Boolean)) {
+  for (const entry of (env.TRUSTED_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)) {
     origins.add(normalizeOrigin(entry));
   }
 
@@ -72,6 +102,8 @@ export function resolveTrustedOrigins(env: NodeJS.ProcessEnv): ReadonlySet<strin
     const devHost = safeManagedHost(env.REPLIT_DEV_DOMAIN ?? "");
     if (devHost?.endsWith(".replit.dev")) origins.add(`https://${devHost}`);
   }
+
+  if (env.NODE_ENV === "production") return origins;
 
   for (const entry of (env.REPLIT_DOMAINS ?? "").split(",")) {
     const host = safeManagedHost(entry);
@@ -89,12 +121,56 @@ export function loadRuntimeConfig(
   if (env.NODE_ENV === "production" && !configuredSecret) {
     throw new Error("SESSION_SECRET is required in production");
   }
+  const trustedOrigins = resolveTrustedOrigins(env);
+  if (env.NODE_ENV === "production") {
+    if (
+      !configuredSecret ||
+      configuredSecret.length < 32 ||
+      /^(replace|changeme|example)/i.test(configuredSecret)
+    )
+      throw new Error(
+        "Production SESSION_SECRET must be a non-placeholder value of at least 32 characters",
+      );
+    if (appMode !== "clerk")
+      throw new Error(
+        "Production requires APP_MODE=clerk; demo is local/synthetic only",
+      );
+    if (
+      !trustedOrigins.size ||
+      [...trustedOrigins].some((origin) => !origin.startsWith("https://"))
+    )
+      throw new Error("Production requires explicit HTTPS TRUSTED_ORIGINS");
+  }
+  let clerkProxyOrigin: string | undefined;
+  if (env.CLERK_PROXY_ORIGIN) {
+    clerkProxyOrigin = normalizeOrigin(env.CLERK_PROXY_ORIGIN);
+    if (
+      !clerkProxyOrigin.startsWith("https://") ||
+      !trustedOrigins.has(clerkProxyOrigin)
+    )
+      throw new Error(
+        "CLERK_PROXY_ORIGIN must be an explicit trusted HTTPS origin",
+      );
+  }
   return {
     appMode,
-    liveInferenceEnabled: parseBoolean("LIVE_INFERENCE_ENABLED", env.LIVE_INFERENCE_ENABLED),
+    clerkProxyOrigin,
+    apiRequestsPerMinute: parsePositiveInteger(
+      "API_REQUESTS_PER_MINUTE",
+      env.API_REQUESTS_PER_MINUTE,
+      600,
+    ),
+    liveInferenceEnabled: parseBoolean(
+      "LIVE_INFERENCE_ENABLED",
+      env.LIVE_INFERENCE_ENABLED,
+    ),
     sessionSecret: configuredSecret ?? ephemeralSecret(),
-    trustedOrigins: resolveTrustedOrigins(env),
-    demoProjectCap: parsePositiveInteger("DEMO_PROJECT_CAP", env.DEMO_PROJECT_CAP, 100),
+    trustedOrigins,
+    demoProjectCap: parsePositiveInteger(
+      "DEMO_PROJECT_CAP",
+      env.DEMO_PROJECT_CAP,
+      100,
+    ),
     demoProjectCreationWindowMax: parsePositiveInteger(
       "DEMO_PROJECT_CREATION_WINDOW_MAX",
       env.DEMO_PROJECT_CREATION_WINDOW_MAX,
