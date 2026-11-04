@@ -15,6 +15,7 @@ import {
   auditsTable,
   db,
   eventsTable,
+  exposuresTable,
   jobsTable,
   membershipsTable,
   projectsTable,
@@ -29,10 +30,14 @@ import { assertAuditEvidence, createRelease, readDecisionEvidence, ReleaseBlocke
 import type { RuntimeConfig } from "../config/runtime";
 import { registerTraceRoutes } from "./traces";
 import { registerFactoryRoutes } from "./factories";
+import { registerTeamRoutes } from "./team";
+import { assertCurrentRole, assertUnexposed, blindTaskIds, recordExposure, lockExposure } from "../lib/team";
 import { assertFactoryWork, assertFactoryAssistance, assertFactoryNotQuarantined } from "../lib/factories";
 import { FactoryError, routeFactoryItem } from "../lib/factory-engine";
 import {
   RELEASE_ROLES,
+  EXPORT_ROLES,
+  AUDIT_ROLES,
   REVIEW_ROLES,
   isEscalationResolution,
   isProjectRole,
@@ -87,8 +92,9 @@ type ProjectContext = {
   role: ProjectRole | null;
 };
 
-export async function enqueueLiveJobsWithProjectLock(projectId: string, taskIds: string[]) {
+export async function enqueueLiveJobsWithProjectLock(projectId: string, taskIds: string[], actorId?: string) {
   return db.transaction(async (tx) => {
+    if (actorId) await assertCurrentRole(tx, projectId, actorId, ["owner"]);
     // Serialize admission, retry, and project-mode transition for this project.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${projectId}, 0))`);
     for (const taskId of [...taskIds].sort()) await assertFactoryAssistance(tx, projectId, "evidence", taskId);
@@ -212,6 +218,14 @@ async function ensureProject(req: Request) {
   let demoId = req.signedCookies?.reviewflow_demo as string | undefined;
   if (!demoId) demoId = randomUUID();
   const userId = getAuth(req).userId;
+  const selectedId = req.path === "/reviewflow/projects" ? undefined : req.get("x-reviewflow-project");
+  if (selectedId) {
+    if (!userId) throw new FactoryError("Shared project selection requires authentication", 401);
+    const [selected] = await db.select().from(projectsTable).where(eq(projectsTable.id, selectedId));
+    const [member] = await db.select().from(membershipsTable).where(and(eq(membershipsTable.projectId, selectedId), eq(membershipsTable.userId, userId)));
+    if (!selected || !member || !isProjectRole(member.role)) throw new FactoryError("Project membership is missing or revoked", 403);
+    return { project: selected, demoId, userId, role: member.role } satisfies ProjectContext;
+  }
   const key = userId ? `user:${userId}` : `demo:${demoId}`;
   if (!userId) {
     const config = req.app.locals.runtimeConfig as RuntimeConfig;
@@ -220,26 +234,32 @@ async function ensureProject(req: Request) {
   }
   let [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, key));
   if (!project) {
-    [project] = await db.insert(projectsTable).values({
+    project = await db.transaction(async tx => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`personal:${key}`}, 0))`);
+    const [existing] = await tx.select().from(projectsTable).where(eq(projectsTable.id, key));
+    if (existing) return existing;
+    const [created] = await tx.insert(projectsTable).values({
       id: key,
       name: "Evidence Grounding Lab",
       ownerId: userId ?? null,
       demoSessionId: null,
       mode: "demo",
     }).returning();
-    await db.insert(membershipsTable).values({
+    await tx.insert(membershipsTable).values({
       id: randomUUID(),
       projectId: key,
       userId,
       role: "owner",
     });
-    await db.insert(tasksTable).values(samples.map(([externalId, question, evidence, candidateAnswer, risk, referenceLabel]) => {
+    await tx.insert(tasksTable).values(samples.map(([externalId, question, evidence, candidateAnswer, risk, referenceLabel]) => {
       const content = canonicalTaskContent({ externalId, question, evidence, candidateAnswer, risk });
       return {
         id: randomUUID(), projectId: key, externalId, question, evidence, candidateAnswer,
         risk, referenceLabel, contentHash: sha(content), mode: "demo",
       };
     }));
+    return created;
+    });
   }
   let role: ProjectRole | null = null;
   if (userId) {
@@ -284,6 +304,9 @@ async function requireProjectAccess(
     res.status(403).json({ error: "You are not a member of this project" });
     return false;
   }
+  const [currentMember] = await db.select().from(membershipsTable).where(and(eq(membershipsTable.projectId, context.project.id), eq(membershipsTable.userId, context.userId)));
+  if (!currentMember || !isProjectRole(currentMember.role)) { res.status(403).json({ error: "Project membership was revoked" }); return false; }
+  context.role = currentMember.role;
   if (!roleAllows(context.role, roles)) {
     res.status(403).json({ error: "Your project role is not allowed for this action" });
     return false;
@@ -302,16 +325,18 @@ function proposalView(row: typeof proposalsTable.$inferSelect) {
   };
 }
 
-async function taskViews(projectId: string) {
+async function taskViews(projectId: string, actorId?: string) {
   const tasks = await db.select().from(tasksTable).where(eq(tasksTable.projectId, projectId)).orderBy(asc(tasksTable.createdAt));
   const proposals = await db.select().from(proposalsTable).where(eq(proposalsTable.projectId, projectId));
   const modes = new Map(tasks.map(task => [task.id, task.mode]));
   const byTask = new Map(proposals.filter(p => p.mode === modes.get(p.taskId)).map((p) => [p.taskId, p]));
+  const blind = actorId ? await blindTaskIds(projectId, actorId) : new Set<string>();
+  if (actorId) await recordExposure(projectId, actorId, tasks.filter(task => !blind.has(task.id) && (task.finalLabel || byTask.has(task.id))));
   return tasks.map((task) => ({
     id: task.id, externalId: task.externalId, question: task.question, evidence: task.evidence,
     candidateAnswer: task.candidateAnswer, scenarioFamilyId: task.scenarioFamilyId, risk: task.risk,
-    status: task.status, version: task.version, mode: task.mode, finalLabel: task.finalLabel,
-    proposal: byTask.get(task.id) ? proposalView(byTask.get(task.id)!) : null,
+    status: task.status, version: task.version, mode: task.mode, finalLabel: blind.has(task.id) ? null : task.finalLabel,
+    proposal: !blind.has(task.id) && byTask.get(task.id) ? proposalView(byTask.get(task.id)!) : null,
     createdAt: task.createdAt.toISOString(),
   }));
 }
@@ -468,19 +493,19 @@ router.get("/reviewflow/bootstrap", async (req, res): Promise<void> => {
   if (!await requireProjectAccess(req, res, context)) return;
   const { project } = context;
   const [tasks, releases, data] = await Promise.all([
-    taskViews(project.id),
+    context.role === "auditor" || context.role === "exporter" ? Promise.resolve([]) : taskViews(project.id, identity(req)),
     db.select().from(releasesTable).where(eq(releasesTable.projectId, project.id)).orderBy(asc(releasesTable.createdAt)),
     metrics(project.id),
   ]);
-  res.json({ projectName: project.name, mode: project.mode, liveCredentialConfigured: Boolean(process.env.TYPESAFE_API_KEY),
+  res.json({ projectId: project.id, role: context.role ?? "demo", projectName: project.name, mode: project.mode, liveCredentialConfigured: Boolean(process.env.TYPESAFE_API_KEY),
     providerModel: MODEL, shadowPolicyVersion: project.shadowPolicyVersion, metrics: data, tasks,
     releases: releases.map((r) => ({ id:r.id,name:r.name,itemCount:r.itemCount,mode:r.mode,digest:r.digest,includeSourceText:r.includeSourceText,createdAt:r.createdAt.toISOString() })) });
 });
 
 router.get("/reviewflow/tasks", async (req, res): Promise<void> => {
   const context = await ensureProject(req);
-  if (!await requireProjectAccess(req, res, context)) return;
-  res.json(await taskViews(context.project.id));
+  if (!await requireProjectAccess(req, res, context, REVIEW_ROLES)) return;
+  res.json(await taskViews(context.project.id, identity(req)));
 });
 
 router.get("/reviewflow/evaluation-jobs", async (req, res): Promise<void> => {
@@ -547,8 +572,9 @@ router.post("/reviewflow/evaluation-jobs/retry", async (req, res): Promise<void>
   }
 
   const queued = mode === "live"
-    ? await enqueueLiveJobsWithProjectLock(project.id, [taskId])
+    ? await enqueueLiveJobsWithProjectLock(project.id, [taskId], identity(req))
     : await db.transaction(async tx => {
+      await assertCurrentRole(tx, project.id, identity(req), ["owner"]);
       await assertFactoryAssistance(tx, project.id, "evidence", taskId);
       return enqueueEvaluationJobs({ projectId: project.id, taskIds: [taskId], mode, executor: tx });
     });
@@ -582,6 +608,7 @@ router.post("/reviewflow/tasks/import", async (req, res): Promise<void> => {
   }
   try {
     const imported = await db.transaction(async (tx) => {
+      await assertCurrentRole(tx, project.id, identity(req), ["owner"]);
       const inserted = await tx.insert(tasksTable).values(inputs.map((item: ImportTask) => ({
         id: randomUUID(),
         projectId: project.id,
@@ -639,8 +666,9 @@ router.post("/reviewflow/evaluate", async (req, res): Promise<void> => {
   const tasks = await db.select().from(tasksTable).where(and(eq(tasksTable.projectId, project.id), inArray(tasksTable.id, taskIds)));
   const scopedTaskIds = tasks.map((task) => task.id);
   const queued = mode === "live"
-    ? await enqueueLiveJobsWithProjectLock(project.id, scopedTaskIds)
+    ? await enqueueLiveJobsWithProjectLock(project.id, scopedTaskIds, identity(req))
     : await db.transaction(async tx => {
+      await assertCurrentRole(tx, project.id, identity(req), ["owner"]);
       for (const taskId of [...scopedTaskIds].sort()) await assertFactoryAssistance(tx, project.id, "evidence", taskId);
       return enqueueEvaluationJobs({ projectId: project.id, taskIds: scopedTaskIds, mode, executor: tx });
     });
@@ -653,9 +681,9 @@ router.post("/reviewflow/evaluate", async (req, res): Promise<void> => {
 
 router.get("/reviewflow/review/next", async (req, res): Promise<void> => {
   const context = await ensureProject(req);
-  if (!await requireProjectAccess(req, res, context)) return;
+  if (!await requireProjectAccess(req, res, context, REVIEW_ROLES)) return;
   const { project } = context;
-  const tasks = await taskViews(project.id);
+  const tasks = await taskViews(project.id, identity(req));
   const task = tasks.find((t) => ["proposed","in_review"].includes(t.status));
   if (!task) { res.json(null); return; }
   const reasons = [];
@@ -703,7 +731,7 @@ router.post("/reviewflow/reviews", async (req, res): Promise<void> => {
     const { policy } = await assertFactoryWork(tx, { projectId: project.id, factory: "evidence", itemId: task.id, actorId: identity(req), claimToken: req.body?.claimToken });
     const routing = routeFactoryItem({ highRisk: task.risk === "high", escalated: task.status === "escalated",
       redirection: proposal ? Number(proposal.injectionProbability) : null }, policy.definition);
-    if (routing.lane === "escalation" && action !== "escalate" && context.userId && !RELEASE_ROLES.includes(context.role!)) throw new FactoryError("An owner or adjudicator must resolve this lane", 403);
+    if (routing.lane === "escalation" && action !== "escalate" && context.userId) await assertCurrentRole(tx, project.id, identity(req), RELEASE_ROLES);
     if (action === "accept" && !policy.definition.assistanceAllowed) throw new FactoryError("Assistance is disabled. Record an independent human label.", 403);
     const claimed = await tx.update(tasksTable).set({
       status: action === "escalate" ? "escalated" : "finalized",
@@ -724,7 +752,7 @@ router.post("/reviewflow/reviews", async (req, res): Promise<void> => {
     return true;
   });
   if (!committed) { res.status(409).json({ error:"This task changed in another session. Reload before submitting." }); return; }
-  const updated = (await taskViews(project.id)).find((t) => t.id === taskId); res.json(updated);
+  const updated = (await taskViews(project.id, identity(req))).find((t) => t.id === taskId); res.json(updated);
 });
 
 router.get("/reviewflow/metrics", async (req, res): Promise<void> => {
@@ -740,7 +768,7 @@ router.get("/reviewflow/releases", async (req,res):Promise<void> => {
 });
 router.post("/reviewflow/releases", async (req,res):Promise<void> => {
   const context = await ensureProject(req);
-  if (!await requireProjectAccess(req, res, context, RELEASE_ROLES)) return;
+  if (!await requireProjectAccess(req, res, context, EXPORT_ROLES)) return;
   const {project}=context; const {name,includeSourceText}=req.body??{};
   let release;
   try {
@@ -755,16 +783,19 @@ router.get("/reviewflow/releases/:id/download", async (req,res):Promise<void> =>
   const context = await ensureProject(req); const {project}=context; const id=String(req.params.id);
   const [release]=await db.select().from(releasesTable).where(and(eq(releasesTable.id,id),eq(releasesTable.projectId,project.id)));
   if(!release){res.status(404).json({error:"Release not found"});return;}
-  if (!await requireProjectAccess(req, res, context, release.mode === "live" ? RELEASE_ROLES : undefined)) return;
+  if (!await requireProjectAccess(req, res, context, EXPORT_ROLES)) return;
+  if ((await blindTaskIds(project.id, identity(req))).size) { res.status(403).json({ error: "Finish assigned blind audits before accessing exports" }); return; }
+  await recordExposure(project.id, identity(req), await db.select().from(tasksTable).where(eq(tasksTable.projectId, project.id)));
   res.setHeader("content-type","application/x-ndjson");res.setHeader("content-disposition",`attachment; filename=\"${release.name.replace(/[^a-z0-9_-]/gi,"_")}.jsonl\"`);res.send(release.jsonl);
 });
 router.post("/reviewflow/audits", async (req, res): Promise<void> => {
   const context = await ensureProject(req);
-  if (!await requireProjectAccess(req, res, context, REVIEW_ROLES)) return;
+  if (!await requireProjectAccess(req, res, context, AUDIT_ROLES)) return;
   const { project } = context;
   const actorId = identity(req);
   const requestedSize = Number(req.body?.sampleSize);
   const independent = req.body?.independent !== false;
+  if (independent && !project.exposureTrackingEnabled) { res.status(409).json({ error: "Prior exposure history predates tracking. Use a new tracked project for independent audit qualification." }); return; }
   const required = req.body?.required !== false;
   const seed = typeof req.body?.seed === "string" && req.body.seed.trim()
     ? req.body.seed.trim()
@@ -781,6 +812,7 @@ router.post("/reviewflow/audits", async (req, res): Promise<void> => {
   ]);
   const disputes = allDisputes.map(row => row.rf_audit_disputes);
   const frame = releaseSamplingFrame(tasks, reviews, actorId, independent, disputes);
+  if (independent) await assertUnexposed(db, project.id, actorId, frame.eligible.map(row => row.taskId));
   const candidates = frame.eligible.map(row => ({
     task: tasks.find(task => task.id === row.taskId)!,
     review: reviews.find(review => review.id === row.reviewId)!,
@@ -804,6 +836,11 @@ router.post("/reviewflow/audits", async (req, res): Promise<void> => {
   const frameHash = samplingFrameHash(frame);
   const auditId = randomUUID();
   const [audit] = await db.transaction(async (tx) => {
+    await assertCurrentRole(tx, project.id, actorId, AUDIT_ROLES);
+    if (independent) {
+      await lockExposure(tx, project.id, actorId);
+      await assertUnexposed(tx, project.id, actorId, frame.eligible.map(row => row.taskId));
+    }
     const [created] = await tx.insert(auditsTable).values({
       id: auditId,
       projectId: project.id,
@@ -862,7 +899,7 @@ router.get("/reviewflow/audits", async (req, res): Promise<void> => {
 
 router.get("/reviewflow/audits/:id", async (req, res): Promise<void> => {
   const context = await ensureProject(req);
-  if (!await requireProjectAccess(req, res, context, REVIEW_ROLES)) return;
+  if (!await requireProjectAccess(req, res, context, AUDIT_ROLES)) return;
   const { project } = context;
   const id = String(req.params.id);
   const actorId = identity(req);
@@ -897,7 +934,7 @@ router.get("/reviewflow/audits/:id", async (req, res): Promise<void> => {
 
 router.post("/reviewflow/audits/:id/decisions", async (req, res): Promise<void> => {
   const context = await ensureProject(req);
-  if (!await requireProjectAccess(req, res, context, REVIEW_ROLES)) return;
+  if (!await requireProjectAccess(req, res, context, AUDIT_ROLES)) return;
   const { project } = context;
   const id = String(req.params.id);
   const actorId = identity(req);
@@ -921,6 +958,8 @@ router.post("/reviewflow/audits/:id/decisions", async (req, res): Promise<void> 
   let disputeId: string | null = null;
   let status = audit.status;
   const decisionCommitted = await db.transaction(async (tx) => {
+    await assertCurrentRole(tx, project.id, actorId, AUDIT_ROLES);
+    await lockExposure(tx, project.id, actorId);
     await tx.select({ id: auditsTable.id }).from(auditsTable).where(eq(auditsTable.id, audit.id)).for("update");
     await assertFactoryNotQuarantined(tx, project.id, "evidence", item.taskId);
     const [currentTask] = await tx.select().from(tasksTable).where(and(eq(tasksTable.id, item.taskId), eq(tasksTable.projectId, project.id))).for("update");
@@ -964,6 +1003,7 @@ router.post("/reviewflow/audits/:id/decisions", async (req, res): Promise<void> 
       pendingDisputes.length,
     );
     await tx.update(auditsTable).set({ status }).where(eq(auditsTable.id, audit.id));
+    await tx.insert(exposuresTable).values({ id: randomUUID(), projectId: project.id, actorId, taskId: item.taskId, contentHash: item.taskContentHash }).onConflictDoNothing();
     await tx.insert(eventsTable).values({
       id: randomUUID(), projectId: project.id, actorId, type: "audit.decision.submitted", entityId: audit.id,
       payload: { auditItemId: item.id, selfCheck, included: !selfCheck, disputeId },
@@ -994,6 +1034,7 @@ router.get("/reviewflow/audits/:id/adjudication", async (req, res): Promise<void
     return;
   }
   const taskById = new Map(tasks.map((task) => [task.id, task]));
+  await recordExposure(project.id, actorId, tasks.filter(task => disputes.some(dispute => dispute.taskId === task.id)));
   res.json({
     id: audit.id,
     status: audit.status,
@@ -1038,9 +1079,11 @@ router.post("/reviewflow/audits/:id/disputes/:disputeId/adjudicate", async (req,
   const [originalReview] = item ? await db.select().from(reviewsTable).where(and(eq(reviewsTable.id, item.originalReviewId), eq(reviewsTable.projectId, project.id))) : [];
   if (item?.originalReviewerId === actorId || originalReview?.reviewerId === actorId) { res.status(403).json({ error: "The original reviewer cannot adjudicate this disagreement" }); return; }
   if (dispute.status !== "pending") { res.status(409).json({ error: "This disagreement has already been adjudicated" }); return; }
+  await recordExposure(project.id, actorId, await db.select().from(tasksTable).where(and(eq(tasksTable.projectId, project.id), eq(tasksTable.id, dispute.taskId))));
   let adjudicated;
   try {
     adjudicated = await db.transaction(async (tx) => {
+      await assertCurrentRole(tx, project.id, actorId, RELEASE_ROLES);
       // Serialize sibling decisions/status updates and bind the correction to
       // the exact task decision audited, even across competing audit sessions.
       const [currentAudit] = await tx.select().from(auditsTable).where(eq(auditsTable.id, audit.id)).for("update");
@@ -1082,5 +1125,6 @@ router.post("/reviewflow/audits/:id/disputes/:disputeId/adjudicate", async (req,
 
 registerTraceRoutes(router, { ensureProject, requireProjectAccess, identity });
 registerFactoryRoutes(router, { ensureProject, requireProjectAccess, identity });
+registerTeamRoutes(router, { ensureProject, requireProjectAccess, identity });
 
 export default router;

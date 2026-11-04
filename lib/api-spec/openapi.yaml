@@ -374,6 +374,100 @@ paths:
         "200": { description: "Hold updated, claims revoked, audit event committed" }
         "403": { description: Owner required }
         "409": { description: Controls changed; reload }
+  /reviewflow/context:
+    get:
+      operationId: getProjectContext
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Current project role and name without task or decision exposure
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectContext" }
+  /reviewflow/projects:
+    description: Project selection uses the x-reviewflow-project header on subsequent requests. Membership is checked by the server on every request.
+    get:
+      operationId: listProjects
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Projects for the authenticated member or the private demo
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/ProjectRef" } }
+    post:
+      operationId: createProject
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectInput" }
+      responses:
+        "201":
+          description: Empty shared project with independent release policy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectRef" }
+  /reviewflow/members:
+    get:
+      operationId: listMembers
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Current project membership revisions
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/MemberRecord" } }
+    post:
+      operationId: changeMembership
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MembershipInput" }
+      responses:
+        "200":
+          description: Owner-authorized membership change and claim invalidation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberRecord" }
+        "409": { description: Stale membership revision or last-owner protection }
+  /reviewflow/jev:
+    get:
+      operationId: getJevBudget
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Project-wide lifetime call reservations
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JevBudget" }
+    post:
+      operationId: changeJevBudget
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JevBudgetInput" }
+      responses:
+        "200":
+          description: Owner-authorized provider control revision
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JevBudget" }
+  /reviewflow/jev/evaluation-plan:
+    get:
+      operationId: getJevEvaluationPlan
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Preparation only; no provider requests or quality claim
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
 components:
   schemas:
     HealthStatus:
@@ -750,8 +844,10 @@ components:
         adjudicatorId: { type: string }
     Bootstrap:
       type: object
-      required: [projectName, mode, liveCredentialConfigured, providerModel, shadowPolicyVersion, metrics, tasks, releases]
+      required: [projectId, role, projectName, mode, liveCredentialConfigured, providerModel, shadowPolicyVersion, metrics, tasks, releases]
       properties:
+        projectId: { type: string }
+        role: { type: string, enum: [owner, reviewer, adjudicator, auditor, exporter, demo] }
         projectName: { type: string }
         mode: { type: string, enum: [demo, live] }
         liveCredentialConfigured: { type: boolean }
@@ -764,3 +860,53 @@ components:
         releases:
           type: array
           items: { $ref: "#/components/schemas/Release" }
+    ProjectInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+    ProjectContext:
+      type: object
+      required: [projectId, projectName, role]
+      properties:
+        projectId: { type: string }
+        projectName: { type: string }
+        role: { type: string, enum: [owner, reviewer, adjudicator, auditor, exporter, demo] }
+    ProjectRef:
+      type: object
+      required: [id, name, role]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        role: { type: string }
+    MemberRecord:
+      type: object
+      required: [userId, role, revision]
+      properties:
+        userId: { type: string }
+        role: { type: string }
+        revision: { type: integer }
+    MembershipInput:
+      type: object
+      required: [userId, role, expectedRevision]
+      properties:
+        userId: { type: string, minLength: 1, maxLength: 200 }
+        role: { type: string, enum: [owner, reviewer, adjudicator, auditor, exporter, revoked] }
+        expectedRevision: { type: integer, minimum: -1 }
+    JevBudget:
+      type: object
+      required: [revision, enabled, maxCalls, used, remaining]
+      properties:
+        revision: { type: integer }
+        enabled: { type: boolean }
+        maxCalls: { type: integer }
+        used: { type: integer }
+        remaining: { type: integer }
+    JevBudgetInput:
+      type: object
+      required: [expectedRevision, enabled, maxCalls]
+      properties:
+        expectedRevision: { type: integer, minimum: 0 }
+        enabled: { type: boolean }
+        maxCalls: { type: integer, minimum: 0, maximum: 100 }
+        ownerConsent: { type: boolean }

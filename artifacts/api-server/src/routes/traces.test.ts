@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Server } from "node:http";
 import express, { Router } from "express";
 import { and, eq, inArray } from "drizzle-orm";
-import { db, pool, projectsTable, traceRecordsTable } from "@workspace/db";
+import { db, pool, projectsTable, traceRecordsTable, jevControlsTable } from "@workspace/db";
 import { registerTraceRoutes } from "./traces";
 import { roleAllows, type ProjectRole } from "./authorization";
 
@@ -26,6 +26,7 @@ before(async () => {
   });
   app.use(router);
   await db.insert(projectsTable).values(ids.map(id => ({ id, name: "Disposable trace verification" })));
+  await db.insert(jevControlsTable).values(ids.map(projectId => ({ projectId, enabled: true, maxCalls: 10 })));
   await new Promise<void>((resolve, reject) => { server = app.listen(0, "127.0.0.1", error => error ? reject(error) : resolve()); });
   const address = server.address();
   assert.ok(address && typeof address !== "string");
@@ -146,6 +147,10 @@ test("trace API: import, blind reveal, concurrent human reviews, scoped immutabl
   const release = await releaseResponse.json() as any;
   assert.equal(release.trainingCount, 1);
   const completeBefore = await (await call(`/releases/${release.id}/download`)).text();
+  const observer = { "x-actor": "synthetic-export-observer" };
+  assert.equal((await (await call(path, undefined, observer)).json() as any).revealed, false);
+  assert.equal((await call(`/releases/${release.id}/download`, undefined, observer)).status, 200);
+  assert.equal((await (await call(path, undefined, observer)).json() as any).revealed, true, "Export access prevents future claims of blind human-only review");
   const exported = JSON.parse(completeBefore);
   assert.equal(exported.complete[0].reviewHistory[0].assisted, false);
   assert.equal(completeBefore.includes("private@example.test"), false);

@@ -7,6 +7,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { SimulatedBadge } from "@/components/simulated-badge";
 import { formatDate } from "@/lib/utils";
 import { Download } from "lucide-react";
+import { projectHeaders } from "@workspace/api-client-react";
 
 export default function Releases() {
   const { data: releases, isLoading } = useListReleases();
@@ -32,7 +33,7 @@ export default function Releases() {
   const handleDownload = async (id: string, releaseName: string) => {
     try {
       const res = await fetch(`/api/reviewflow/releases/${id}/download`, {
-        headers: { 'Accept': 'application/x-ndjson' }
+        headers: { 'Accept': 'application/x-ndjson', ...projectHeaders() }
       });
       if (res.ok) {
         const blob = await res.blob();

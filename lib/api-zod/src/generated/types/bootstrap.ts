@@ -6,11 +6,14 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { BootstrapMode } from './bootstrapMode';
+import type { BootstrapRole } from './bootstrapRole';
 import type { Metrics } from './metrics';
 import type { Release } from './release';
 import type { Task } from './task';
 
 export interface Bootstrap {
+  projectId: string;
+  role: BootstrapRole;
   projectName: string;
   mode: BootstrapMode;
   liveCredentialConfigured: boolean;

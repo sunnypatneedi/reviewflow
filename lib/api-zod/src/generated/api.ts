@@ -21,6 +21,15 @@ export const getBootstrapResponseTasksItemProposalOneConfidenceMin = 0;
 export const getBootstrapResponseTasksItemProposalOneConfidenceMax = 1;
 
 export const GetBootstrapResponse = zod.object({
+  projectId: zod.string(),
+  role: zod.enum([
+    "owner",
+    "reviewer",
+    "adjudicator",
+    "auditor",
+    "exporter",
+    "demo",
+  ]),
   projectName: zod.string(),
   mode: zod.enum(["demo", "live"]),
   liveCredentialConfigured: zod.boolean(),
@@ -879,3 +888,108 @@ export const SetFactoryQuarantineBody = zod.object({
 });
 
 export const SetFactoryQuarantineResponse = zod.unknown();
+
+export const GetProjectContextResponse = zod.object({
+  projectId: zod.string(),
+  projectName: zod.string(),
+  role: zod.enum([
+    "owner",
+    "reviewer",
+    "adjudicator",
+    "auditor",
+    "exporter",
+    "demo",
+  ]),
+});
+
+export const ListProjectsResponseItem = zod.object({
+  id: zod.string(),
+  name: zod.string(),
+  role: zod.string(),
+});
+export const ListProjectsResponse = zod.array(ListProjectsResponseItem);
+
+export const createProjectBodyNameMax = 120;
+
+export const CreateProjectBody = zod.object({
+  name: zod.string().min(1).max(createProjectBodyNameMax),
+});
+
+export const CreateProjectResponse = zod.object({
+  id: zod.string(),
+  name: zod.string(),
+  role: zod.string(),
+});
+
+export const ListMembersResponseItem = zod.object({
+  userId: zod.string(),
+  role: zod.string(),
+  revision: zod.number().int(),
+});
+export const ListMembersResponse = zod.array(ListMembersResponseItem);
+
+export const changeMembershipBodyUserIdMax = 200;
+
+export const changeMembershipBodyExpectedRevisionMin = -1;
+
+export const ChangeMembershipBody = zod.object({
+  userId: zod.string().min(1).max(changeMembershipBodyUserIdMax),
+  role: zod.enum([
+    "owner",
+    "reviewer",
+    "adjudicator",
+    "auditor",
+    "exporter",
+    "revoked",
+  ]),
+  expectedRevision: zod
+    .number()
+    .int()
+    .min(changeMembershipBodyExpectedRevisionMin),
+});
+
+export const ChangeMembershipResponse = zod.object({
+  userId: zod.string(),
+  role: zod.string(),
+  revision: zod.number().int(),
+});
+
+export const GetJevBudgetResponse = zod.object({
+  revision: zod.number().int(),
+  enabled: zod.boolean(),
+  maxCalls: zod.number().int(),
+  used: zod.number().int(),
+  remaining: zod.number().int(),
+});
+
+export const changeJevBudgetBodyExpectedRevisionMin = 0;
+
+export const changeJevBudgetBodyMaxCallsMin = 0;
+export const changeJevBudgetBodyMaxCallsMax = 100;
+
+export const ChangeJevBudgetBody = zod.object({
+  expectedRevision: zod
+    .number()
+    .int()
+    .min(changeJevBudgetBodyExpectedRevisionMin),
+  enabled: zod.boolean(),
+  maxCalls: zod
+    .number()
+    .int()
+    .min(changeJevBudgetBodyMaxCallsMin)
+    .max(changeJevBudgetBodyMaxCallsMax),
+  ownerConsent: zod.boolean().optional(),
+});
+
+export const ChangeJevBudgetResponse = zod.object({
+  revision: zod.number().int(),
+  enabled: zod.boolean(),
+  maxCalls: zod.number().int(),
+  used: zod.number().int(),
+  remaining: zod.number().int(),
+});
+
+export const GetJevEvaluationPlanResponse = zod.record(
+  zod.string(),
+  zod.unknown(),
+);

@@ -17,6 +17,9 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _projectId: string | null = null;
+export function setProjectId(id: string | null): void { _projectId = id; }
+export function projectHeaders(): Record<string, string> { return _projectId ? { "x-reviewflow-project": _projectId } : {}; }
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -336,6 +339,7 @@ export async function customFetch<T = unknown>(
   }
 
   const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
+  if (_projectId && !headers.has("x-reviewflow-project")) headers.set("x-reviewflow-project", _projectId);
   if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS" && !headers.has("x-reviewflow-csrf")) {
     headers.set("x-reviewflow-csrf", "1");
   }

@@ -1,8 +1,10 @@
-export const PROJECT_ROLES = ["owner", "reviewer", "adjudicator"] as const;
+export const PROJECT_ROLES = ["owner", "reviewer", "adjudicator", "auditor", "exporter"] as const;
 export type ProjectRole = (typeof PROJECT_ROLES)[number];
 
 export const REVIEW_ROLES: readonly ProjectRole[] = ["owner", "reviewer", "adjudicator"];
 export const RELEASE_ROLES: readonly ProjectRole[] = ["owner", "adjudicator"];
+export const EXPORT_ROLES: readonly ProjectRole[] = ["owner", "adjudicator", "exporter"];
+export const AUDIT_ROLES: readonly ProjectRole[] = ["owner", "reviewer", "adjudicator", "auditor"];
 
 export function isProjectRole(value: string): value is ProjectRole {
   return PROJECT_ROLES.includes(value as ProjectRole);

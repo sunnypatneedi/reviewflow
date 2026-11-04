@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   RELEASE_ROLES,
   REVIEW_ROLES,
+  EXPORT_ROLES,
+  AUDIT_ROLES,
   isEscalationResolution,
   membershipBelongsToProject,
   roleAllows,
@@ -46,6 +48,8 @@ test("the complete role matrix grants only intended capabilities", () => {
     owner: { review: true, release: true },
     reviewer: { review: true, release: false },
     adjudicator: { review: true, release: true },
+    auditor: { review: false, release: false },
+    exporter: { review: false, release: false },
   } as const;
   for (const [role, access] of Object.entries(expected)) {
     assert.equal(roleAllows(role as keyof typeof expected, REVIEW_ROLES), access.review);
@@ -64,4 +68,12 @@ test("membership validation rejects wrong users and invalid persisted roles", ()
     projectId: "project-a",
     role: "administrator",
   }), false);
+});
+test("auditor and exporter duties remain separate from review and adjudication", () => {
+  assert.equal(roleAllows("auditor", AUDIT_ROLES), true);
+  assert.equal(roleAllows("auditor", REVIEW_ROLES), false);
+  assert.equal(roleAllows("auditor", EXPORT_ROLES), false);
+  assert.equal(roleAllows("exporter", EXPORT_ROLES), true);
+  assert.equal(roleAllows("exporter", AUDIT_ROLES), false);
+  assert.equal(roleAllows("exporter", RELEASE_ROLES), false);
 });

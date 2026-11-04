@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ActiveTimeTracker } from "@/lib/active-time";
 import { queryClient } from "@/lib/queryClient";
+import { projectHeaders } from "@workspace/api-client-react";
 
 type Policy = {
   schemaVersion: 1;
@@ -50,6 +51,7 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
     credentials: "same-origin",
     headers: {
       Accept: "application/json",
+      ...projectHeaders(),
       ...(body === undefined
         ? {}
         : { "Content-Type": "application/json", "x-reviewflow-csrf": "1" }),
@@ -89,6 +91,14 @@ export default function Factories() {
       (await api<Evidence[]>("/tasks")).find((item) => item.id === selected),
   });
   const current = query.data?.items.find((item) => item.id === selected);
+  const [assignee, setAssignee] = useState("");
+  const members = useQuery({
+    queryKey: ["assignable-members"],
+    enabled: Boolean(
+      query.data?.canConfigure && !query.data.actor.startsWith("demo:"),
+    ),
+    queryFn: () => api<Array<{ userId: string; role: string }>>("/members"),
+  });
   useEffect(() => {
     setDraft(query.data?.policy.definition ?? null);
   }, [factory, query.data?.policy.revision]);
@@ -409,6 +419,62 @@ export default function Factories() {
                             ? "Renew claim"
                             : "Claim for 10 minutes"}
                         </Button>
+                      )}
+                    {members.data &&
+                      current.workKind !== "audit" &&
+                      !current.quarantined && (
+                        <div className="flex gap-2 flex-wrap">
+                          <label>
+                            Assign to
+                            <select
+                              aria-label="Assign to member"
+                              className="border rounded p-2 block"
+                              value={assignee}
+                              onChange={(event) =>
+                                setAssignee(event.target.value)
+                              }
+                            >
+                              <option value="">Choose a reviewer</option>
+                              {members.data
+                                .filter((member) =>
+                                  ["owner", "reviewer", "adjudicator"].includes(
+                                    member.role,
+                                  ),
+                                )
+                                .map((member) => (
+                                  <option
+                                    key={member.userId}
+                                    value={member.userId}
+                                  >
+                                    {member.userId} · {member.role}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                          <Button
+                            className="self-end"
+                            variant="outline"
+                            disabled={busy || !assignee}
+                            onClick={() =>
+                              run(
+                                () =>
+                                  api(
+                                    `${base}/items/${encodeURIComponent(current.id)}/claim`,
+                                    {
+                                      expectedVersion: current.version,
+                                      expectedRevision: current.controlRevision,
+                                      assignedTo: assignee,
+                                      reassign: true,
+                                      claimToken: current.claimToken,
+                                    },
+                                  ),
+                                "Assignment saved; previous claim token revoked.",
+                              )
+                            }
+                          >
+                            Assign / reassign
+                          </Button>
+                        </div>
                       )}
                     {factory === "evidence" && evidence.data && (
                       <div className="space-y-3">

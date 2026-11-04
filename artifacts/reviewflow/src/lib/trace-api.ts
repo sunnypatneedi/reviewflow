@@ -1,18 +1,19 @@
 export const traceBase = "/api/reviewflow/traces";
+import { projectHeaders } from "@workspace/api-client-react";
 
 export async function traceRequest<T>(path: string, body?: unknown): Promise<T> {
   // Claims are scoped to the authenticated actor by the server. Fetch the current
   // fencing token so the preference workbench can use a claim from Factories.
   const comparisonId = /^\/comparisons\/([^/]+)\//.exec(path)?.[1];
   if (body && typeof body === "object" && comparisonId) {
-    const claims = await fetch("/api/reviewflow/factories/preference", { credentials: "same-origin" });
+    const claims = await fetch("/api/reviewflow/factories/preference", { credentials: "same-origin", headers: projectHeaders() });
     if (!claims.ok) throw new Error("Could not verify work claim. Reload the factory queue.");
     const queue = await claims.json() as { items: Array<{ id: string; claimToken: string | null }> };
     body = { ...body, claimToken: queue.items.find(item => item.id === decodeURIComponent(comparisonId))?.claimToken ?? null };
   }
   const response = await fetch(`${traceBase}${path}`, {
     credentials: "same-origin",
-    headers: { Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json", "x-reviewflow-csrf": "1" }) },
+    headers: { Accept: "application/json", ...projectHeaders(), ...(body === undefined ? {} : { "Content-Type": "application/json", "x-reviewflow-csrf": "1" }) },
     ...(body === undefined ? {} : { method: "POST", body: JSON.stringify(body) }),
   });
   const text = await response.text();
@@ -32,7 +33,7 @@ export function saveTraceFile(content: BlobPart, name: string, type = "applicati
 }
 
 export async function downloadTrace(path: string, name: string) {
-  const response = await fetch(`${traceBase}${path}`, { credentials: "same-origin" });
+  const response = await fetch(`${traceBase}${path}`, { credentials: "same-origin", headers: projectHeaders() });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     throw new Error(payload.error ?? `Download failed (${response.status}).`);

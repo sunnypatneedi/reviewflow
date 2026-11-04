@@ -37,6 +37,8 @@ test("blind views hide identity/proposal and a later reveal does not mutate huma
   assert.equal(revealed.proposal.decision, "b");
   assert.equal(revealed.review.assisted, false);
   assert.equal(comparisonView({ ...payload, reveals: [{ actor: "other" }] }, "person").revealed, false);
+  assert.equal(comparisonView(payload, "another-reviewer").review, null);
+  assert.equal(comparisonView({ ...payload, reveals: [{ actor: "another-reviewer" }] }, "another-reviewer").review.decision, "a");
 });
 
 test("canonical decision keys survive display order and all nonbinary outcomes validate", () => {

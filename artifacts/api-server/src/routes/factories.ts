@@ -27,6 +27,7 @@ import {
   type FactoryTransaction,
 } from "../lib/factories";
 import type { ProjectRole } from "./authorization";
+import { assertCurrentRole, blindTaskIds } from "../lib/team";
 
 type Context = {
   project: { id: string; mode: string };
@@ -241,6 +242,8 @@ export function registerFactoryRoutes(router: IRouter, helpers: Helpers) {
           };
         });
       }
+      const blind = await blindTaskIds(project.id, actor);
+      items = items.filter(item => role === "auditor" ? item.workKind === "audit" : role === "exporter" ? false : !blind.has(item.id));
       const counts = Object.fromEntries(
         [
           "human_review",
@@ -273,6 +276,7 @@ export function registerFactoryRoutes(router: IRouter, helpers: Helpers) {
     async (req, res, { project }, actor, factory) => {
       const definition = validateFactoryPolicy(req.body?.definition);
       const policy = await db.transaction(async (tx) => {
+        await assertCurrentRole(tx, project.id, actor, ["owner"]);
         await lockFactory(tx, project.id, factory);
         const current = await factoryPolicy(tx, project.id, factory);
         if (req.body?.expectedRevision !== current.revision)
@@ -338,6 +342,9 @@ export function registerFactoryRoutes(router: IRouter, helpers: Helpers) {
           );
       }
       const result = await db.transaction(async (tx) => {
+        await assertCurrentRole(tx, context.project.id, actor, ["owner", "reviewer", "adjudicator"]);
+        await assertCurrentRole(tx, context.project.id, target, ["owner", "reviewer", "adjudicator"]);
+        if (target !== actor) await assertCurrentRole(tx, context.project.id, actor, ["owner"]);
         const control = await lockFactoryItem(
           tx,
           context.project.id,
@@ -351,6 +358,7 @@ export function registerFactoryRoutes(router: IRouter, helpers: Helpers) {
           throw new FactoryError("Quarantined items cannot be claimed");
         const active =
           control.expiresAt && control.expiresAt.getTime() > Date.now();
+        if (active && control.assignedTo !== actor) await assertCurrentRole(tx, context.project.id, actor, ["owner"]);
         if (
           active &&
           control.assignedTo !== actor &&
@@ -427,6 +435,7 @@ export function registerFactoryRoutes(router: IRouter, helpers: Helpers) {
         );
       const id = String(req.params.id);
       await db.transaction(async (tx) => {
+        await assertCurrentRole(tx, project.id, actor, ["owner"]);
         const control = await lockFactoryItem(tx, project.id, factory, id);
         await source(tx, project.id, factory, id);
         if (control.revision !== req.body?.expectedRevision)

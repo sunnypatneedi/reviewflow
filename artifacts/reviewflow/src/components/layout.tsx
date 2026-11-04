@@ -14,6 +14,8 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { projectHeaders } from "@workspace/api-client-react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
@@ -24,6 +26,7 @@ const NAV_ITEMS = [
   { href: "/audits", label: "Audits", icon: ShieldCheck },
   { href: "/releases", label: "Releases", icon: Tag },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/team", label: "Team & provider", icon: Settings },
 ];
 
 function ClerkAccount() {
@@ -76,13 +79,23 @@ function DemoAccount() {
 function NavLinks({
   location,
   onNavigate,
+  role,
 }: {
   location: string;
   onNavigate?: () => void;
+  role?: string;
 }) {
   return (
     <nav className="p-3 space-y-0.5" aria-label="Primary">
-      {NAV_ITEMS.map((item) => {
+      {NAV_ITEMS.filter((item) =>
+        role === "auditor"
+          ? ["/", "/factories", "/audits", "/team"].includes(item.href)
+          : role === "exporter"
+            ? ["/", "/releases", "/traces", "/team"].includes(item.href)
+            : role === "reviewer"
+              ? item.href !== "/releases"
+              : true,
+      ).map((item) => {
         const isActive = location === item.href;
         const Icon = item.icon;
         return (
@@ -116,6 +129,17 @@ export function AppLayout({
 }) {
   const [location] = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const context = useQuery({
+    queryKey: ["layout-context"],
+    queryFn: async () => {
+      const response = await fetch("/api/reviewflow/context", {
+        credentials: "same-origin",
+        headers: projectHeaders(),
+      });
+      if (!response.ok) throw new Error("Project access is unavailable");
+      return response.json() as Promise<{ role: string; projectName: string }>;
+    },
+  });
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
@@ -127,7 +151,7 @@ export function AppLayout({
               ReviewFlow
             </h1>
           </div>
-          <NavLinks location={location} />
+          <NavLinks location={location} role={context.data?.role} />
         </div>
         {authMode === "clerk" ? <ClerkAccount /> : <DemoAccount />}
       </aside>
@@ -185,6 +209,7 @@ export function AppLayout({
                 </div>
                 <NavLinks
                   location={location}
+                  role={context.data?.role}
                   onNavigate={() => setMobileNavOpen(false)}
                 />
               </div>

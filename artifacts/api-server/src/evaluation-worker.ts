@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { assertFactoryAssistance } from "./lib/factories";
+import { reserveJevCall, finishJevCall } from "./lib/jev-budget";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   db,
@@ -300,7 +301,10 @@ export class EvaluationWorker {
       if (!task) throw new ProviderError("Evaluation task no longer exists");
       await db.transaction(tx => assertFactoryAssistance(tx, job.projectId, "evidence", job.taskId));
       if (!["pending", "proposed", "in_review"].includes(task.status)) throw new ProviderError("Task no longer needs evaluation");
-      const result = await this.evaluate(task, job.mode as EvaluationMode);
+      const reservation = job.mode === "live" ? await reserveJevCall(job.projectId, "evidence", job.taskId) : null;
+      let result;
+      try { result = await this.evaluate(task, job.mode as EvaluationMode); if (reservation) await finishJevCall(reservation, "succeeded"); }
+      catch (error) { if (reservation) await finishJevCall(reservation, "failed"); throw error; }
       await saveSuccess(job, result, this.workerId, this.maxAttempts);
     } catch (error) {
       await saveFailure(job, this.workerId, error, this.maxAttempts);

@@ -34,10 +34,18 @@ import type {
   FactoryPolicyInput,
   FactoryQuarantineInput,
   FactoryQueue,
+  GetJevEvaluationPlan200,
   HealthStatus,
   ImportResult,
+  JevBudget,
+  JevBudgetInput,
   ListEvaluationJobsParams,
+  MemberRecord,
+  MembershipInput,
   Metrics,
+  ProjectContext,
+  ProjectInput,
+  ProjectRef,
   Release,
   ReleaseInput,
   ReviewInput,
@@ -2203,3 +2211,669 @@ export const useSetFactoryQuarantine = <
 > => {
   return useMutation(getSetFactoryQuarantineMutationOptions(options));
 };
+
+export const getGetProjectContextUrl = () => {
+  return `/api/reviewflow/context`;
+};
+
+export const getProjectContext = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<ProjectContext> => {
+  return customFetch<ProjectContext>(getGetProjectContextUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetProjectContextQueryKey = () => {
+  return [`/api/reviewflow/context`] as const;
+};
+
+export const getGetProjectContextQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProjectContext>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getProjectContext>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetProjectContextQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getProjectContext>>
+  > = ({ signal }) => getProjectContext({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProjectContext>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetProjectContextQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProjectContext>>
+>;
+export type GetProjectContextQueryError = ErrorType<unknown>;
+
+export function useGetProjectContext<
+  TData = Awaited<ReturnType<typeof getProjectContext>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getProjectContext>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetProjectContextQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getListProjectsUrl = () => {
+  return `/api/reviewflow/projects`;
+};
+
+export const listProjects = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<ProjectRef[]> => {
+  return customFetch<ProjectRef[]>(getListProjectsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProjectsQueryKey = () => {
+  return [`/api/reviewflow/projects`] as const;
+};
+
+export const getListProjectsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProjects>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listProjects>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListProjectsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listProjects>>> = ({
+    signal,
+  }) => listProjects({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProjects>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProjectsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProjects>>
+>;
+export type ListProjectsQueryError = ErrorType<unknown>;
+
+export function useListProjects<
+  TData = Awaited<ReturnType<typeof listProjects>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listProjects>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProjectsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getCreateProjectUrl = () => {
+  return `/api/reviewflow/projects`;
+};
+
+export const createProject = async (
+  projectInput: ProjectInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<ProjectRef> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<ProjectRef>(getCreateProjectUrl(), {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(projectInput),
+  });
+};
+
+export const getCreateProjectMutationKey = () => ["createProject"] as const;
+
+export const getCreateProjectMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createProject>>,
+    TError,
+    CreateProjectMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createProject>>,
+  TError,
+  CreateProjectMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateProjectMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createProject>>,
+    CreateProjectMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createProject(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateProjectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createProject>>
+>;
+export type CreateProjectMutationBody = BodyType<ProjectInput>;
+export type CreateProjectMutationError = ErrorType<unknown>;
+export type CreateProjectMutationVariables = { data: BodyType<ProjectInput> };
+
+export const useCreateProject = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createProject>>,
+    TError,
+    CreateProjectMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createProject>>,
+  TError,
+  CreateProjectMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateProjectMutationOptions(options));
+};
+
+export const getListMembersUrl = () => {
+  return `/api/reviewflow/members`;
+};
+
+export const listMembers = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<MemberRecord[]> => {
+  return customFetch<MemberRecord[]>(getListMembersUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListMembersQueryKey = () => {
+  return [`/api/reviewflow/members`] as const;
+};
+
+export const getListMembersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listMembers>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMembers>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListMembersQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listMembers>>> = ({
+    signal,
+  }) => listMembers({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listMembers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListMembersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listMembers>>
+>;
+export type ListMembersQueryError = ErrorType<unknown>;
+
+export function useListMembers<
+  TData = Awaited<ReturnType<typeof listMembers>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMembers>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListMembersQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getChangeMembershipUrl = () => {
+  return `/api/reviewflow/members`;
+};
+
+export const changeMembership = async (
+  membershipInput: MembershipInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<MemberRecord> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<MemberRecord>(getChangeMembershipUrl(), {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(membershipInput),
+  });
+};
+
+export const getChangeMembershipMutationKey = () =>
+  ["changeMembership"] as const;
+
+export const getChangeMembershipMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof changeMembership>>,
+    TError,
+    ChangeMembershipMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof changeMembership>>,
+  TError,
+  ChangeMembershipMutationVariables,
+  TContext
+> => {
+  const mutationKey = getChangeMembershipMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof changeMembership>>,
+    ChangeMembershipMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return changeMembership(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ChangeMembershipMutationResult = NonNullable<
+  Awaited<ReturnType<typeof changeMembership>>
+>;
+export type ChangeMembershipMutationBody = BodyType<MembershipInput>;
+export type ChangeMembershipMutationError = ErrorType<void>;
+export type ChangeMembershipMutationVariables = {
+  data: BodyType<MembershipInput>;
+};
+
+export const useChangeMembership = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof changeMembership>>,
+    TError,
+    ChangeMembershipMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof changeMembership>>,
+  TError,
+  ChangeMembershipMutationVariables,
+  TContext
+> => {
+  return useMutation(getChangeMembershipMutationOptions(options));
+};
+
+export const getGetJevBudgetUrl = () => {
+  return `/api/reviewflow/jev`;
+};
+
+export const getJevBudget = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<JevBudget> => {
+  return customFetch<JevBudget>(getGetJevBudgetUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetJevBudgetQueryKey = () => {
+  return [`/api/reviewflow/jev`] as const;
+};
+
+export const getGetJevBudgetQueryOptions = <
+  TData = Awaited<ReturnType<typeof getJevBudget>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getJevBudget>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetJevBudgetQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getJevBudget>>> = ({
+    signal,
+  }) => getJevBudget({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getJevBudget>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetJevBudgetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getJevBudget>>
+>;
+export type GetJevBudgetQueryError = ErrorType<unknown>;
+
+export function useGetJevBudget<
+  TData = Awaited<ReturnType<typeof getJevBudget>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getJevBudget>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetJevBudgetQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getChangeJevBudgetUrl = () => {
+  return `/api/reviewflow/jev`;
+};
+
+export const changeJevBudget = async (
+  jevBudgetInput: JevBudgetInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<JevBudget> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<JevBudget>(getChangeJevBudgetUrl(), {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(jevBudgetInput),
+  });
+};
+
+export const getChangeJevBudgetMutationKey = () => ["changeJevBudget"] as const;
+
+export const getChangeJevBudgetMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof changeJevBudget>>,
+    TError,
+    ChangeJevBudgetMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof changeJevBudget>>,
+  TError,
+  ChangeJevBudgetMutationVariables,
+  TContext
+> => {
+  const mutationKey = getChangeJevBudgetMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof changeJevBudget>>,
+    ChangeJevBudgetMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return changeJevBudget(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ChangeJevBudgetMutationResult = NonNullable<
+  Awaited<ReturnType<typeof changeJevBudget>>
+>;
+export type ChangeJevBudgetMutationBody = BodyType<JevBudgetInput>;
+export type ChangeJevBudgetMutationError = ErrorType<unknown>;
+export type ChangeJevBudgetMutationVariables = {
+  data: BodyType<JevBudgetInput>;
+};
+
+export const useChangeJevBudget = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof changeJevBudget>>,
+    TError,
+    ChangeJevBudgetMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof changeJevBudget>>,
+  TError,
+  ChangeJevBudgetMutationVariables,
+  TContext
+> => {
+  return useMutation(getChangeJevBudgetMutationOptions(options));
+};
+
+export const getGetJevEvaluationPlanUrl = () => {
+  return `/api/reviewflow/jev/evaluation-plan`;
+};
+
+export const getJevEvaluationPlan = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<GetJevEvaluationPlan200> => {
+  return customFetch<GetJevEvaluationPlan200>(getGetJevEvaluationPlanUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetJevEvaluationPlanQueryKey = () => {
+  return [`/api/reviewflow/jev/evaluation-plan`] as const;
+};
+
+export const getGetJevEvaluationPlanQueryOptions = <
+  TData = Awaited<ReturnType<typeof getJevEvaluationPlan>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getJevEvaluationPlan>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetJevEvaluationPlanQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getJevEvaluationPlan>>
+  > = ({ signal }) => getJevEvaluationPlan({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getJevEvaluationPlan>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetJevEvaluationPlanQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getJevEvaluationPlan>>
+>;
+export type GetJevEvaluationPlanQueryError = ErrorType<unknown>;
+
+export function useGetJevEvaluationPlan<
+  TData = Awaited<ReturnType<typeof getJevEvaluationPlan>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getJevEvaluationPlan>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetJevEvaluationPlanQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}

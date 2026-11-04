@@ -18,6 +18,9 @@ import Releases from '@/pages/releases';
 import Settings from '@/pages/settings';
 import Traces from '@/pages/traces';
 import Factories from '@/pages/factories';
+import Team from '@/pages/team';
+import { setProjectId } from '@workspace/api-client-react';
+setProjectId(sessionStorage.getItem("reviewflow.project"));
 
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -92,6 +95,8 @@ function ClerkQueryClientCacheInvalidator() {
     const unsubscribe = addListener(({ user }) => {
       const userId = user?.id ?? null;
       if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) {
+        setProjectId(null);
+        sessionStorage.removeItem("reviewflow.project");
         qc.clear();
       }
       prevUserIdRef.current = userId;
@@ -125,6 +130,7 @@ function AppRoutes() {
             <Route path="/"><HomeRedirect /></Route>
             <Route path="/tasks"><ProtectedRoute component={Tasks} /></Route>
             <Route path="/factories"><ProtectedRoute component={Factories} /></Route>
+            <Route path="/team"><ProtectedRoute component={Team} /></Route>
             <Route path="/traces"><ProtectedRoute component={Traces} /></Route>
             <Route path="/review"><ProtectedRoute component={Review} /></Route>
             <Route path="/audits"><ProtectedRoute component={Audits} /></Route>

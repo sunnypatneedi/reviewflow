@@ -6,6 +6,7 @@ import {
   db,
   eventsTable,
   jobsTable,
+  jevControlsTable,
   pool,
   projectsTable,
   proposalsTable,
@@ -272,6 +273,7 @@ test("a provider result arriving after human finalization cannot create proposal
 
 test("live jobs stay queued unless both live inference gates are enabled", async () => {
   const task = await createTask();
+  await db.insert(jevControlsTable).values({ projectId: task.projectId, enabled: true, maxCalls: 1 });
   await enqueueEvaluationJobs({ projectId: task.projectId, taskIds: [task.id], mode: "live" });
   const originalEnabled = process.env.LIVE_INFERENCE_ENABLED;
   const originalMode = process.env.APP_MODE;

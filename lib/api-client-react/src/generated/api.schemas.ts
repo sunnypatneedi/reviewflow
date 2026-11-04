@@ -598,6 +598,17 @@ export interface AuditDispute {
   adjudicatorId: string;
 }
 
+export type BootstrapRole = (typeof BootstrapRole)[keyof typeof BootstrapRole];
+
+export const BootstrapRole = {
+  owner: "owner",
+  reviewer: "reviewer",
+  adjudicator: "adjudicator",
+  auditor: "auditor",
+  exporter: "exporter",
+  demo: "demo",
+} as const;
+
 export type BootstrapMode = (typeof BootstrapMode)[keyof typeof BootstrapMode];
 
 export const BootstrapMode = {
@@ -606,6 +617,8 @@ export const BootstrapMode = {
 } as const;
 
 export interface Bootstrap {
+  projectId: string;
+  role: BootstrapRole;
   projectName: string;
   mode: BootstrapMode;
   liveCredentialConfigured: boolean;
@@ -614,6 +627,87 @@ export interface Bootstrap {
   metrics: Metrics;
   tasks: Task[];
   releases: Release[];
+}
+
+export interface ProjectInput {
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  name: string;
+}
+
+export type ProjectContextRole =
+  (typeof ProjectContextRole)[keyof typeof ProjectContextRole];
+
+export const ProjectContextRole = {
+  owner: "owner",
+  reviewer: "reviewer",
+  adjudicator: "adjudicator",
+  auditor: "auditor",
+  exporter: "exporter",
+  demo: "demo",
+} as const;
+
+export interface ProjectContext {
+  projectId: string;
+  projectName: string;
+  role: ProjectContextRole;
+}
+
+export interface ProjectRef {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export interface MemberRecord {
+  userId: string;
+  role: string;
+  revision: number;
+}
+
+export type MembershipInputRole =
+  (typeof MembershipInputRole)[keyof typeof MembershipInputRole];
+
+export const MembershipInputRole = {
+  owner: "owner",
+  reviewer: "reviewer",
+  adjudicator: "adjudicator",
+  auditor: "auditor",
+  exporter: "exporter",
+  revoked: "revoked",
+} as const;
+
+export interface MembershipInput {
+  /**
+   * @minLength 1
+   * @maxLength 200
+   */
+  userId: string;
+  role: MembershipInputRole;
+  /** @minimum -1 */
+  expectedRevision: number;
+}
+
+export interface JevBudget {
+  revision: number;
+  enabled: boolean;
+  maxCalls: number;
+  used: number;
+  remaining: number;
+}
+
+export interface JevBudgetInput {
+  /** @minimum 0 */
+  expectedRevision: number;
+  enabled: boolean;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  maxCalls: number;
+  ownerConsent?: boolean;
 }
 
 export type ListEvaluationJobsParams = {
@@ -633,3 +727,5 @@ export const ListEvaluationJobsMode = {
   demo: "demo",
   live: "live",
 } as const;
+
+export type GetJevEvaluationPlan200 = { [key: string]: unknown };

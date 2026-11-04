@@ -142,7 +142,20 @@ test("required audit fails closed on incomplete, missing, excluded or changed ev
   const [old] = await db.select().from(reviewsTable).where(eq(reviewsTable.taskId, unsampled.id));
   await db.insert(reviewsTable).values({ ...old, id: randomUUID(), taskVersion: 2 });
   assert.equal((await release()).status, 409);
-  await completeAudit(f);
+  assert.equal((await request(f.cookie, "/audits", { sampleSize: 1, independent: true })).status, 409, "The earlier audit outcome exposed this actor; requalification needs a fresh auditor");
+  // Seed a different synthetic auditor's frozen proof. Synthetic multi-actor
+  // HTTP assignment and completion are exercised in team.test.ts.
+  const actor = `synthetic-fresh-${randomUUID()}`;
+  const currentTasks = await db.select().from(tasksTable).where(eq(tasksTable.projectId, f.projectId));
+  const currentReviews = await db.select().from(reviewsTable).where(eq(reviewsTable.projectId, f.projectId));
+  const { releaseSamplingFrame } = await import("../lib/releases");
+  const { selectDeterministicSample, samplingFrameHash } = await import("../lib/audits");
+  const frame = releaseSamplingFrame(currentTasks, currentReviews, actor, true);
+  const selected = selectDeterministicSample("synthetic-fresh", frame.eligible, 1)[0];
+  const freshAuditId = randomUUID(), freshItemId = randomUUID();
+  await db.insert(auditsTable).values({ id: freshAuditId, projectId: f.projectId, status: "completed", sampleSize: 1, seed: "synthetic-fresh", samplingFrameHash: samplingFrameHash(frame), samplingFrame: frame, independent: true, required: true, auditorId: actor });
+  await db.insert(auditItemsTable).values({ id: freshItemId, auditId: freshAuditId, taskId: selected.taskId, ordinal: 1, originalReviewId: selected.reviewId, originalReviewerId: selected.reviewerId, originalLabel: selected.label, taskContentHash: selected.contentHash, taskVersion: selected.taskVersion, originalAdjudicationId: selected.adjudicationId });
+  await db.insert(auditDecisionsTable).values({ id: randomUUID(), auditId: freshAuditId, auditItemId: freshItemId, taskId: selected.taskId, auditorId: actor, label: selected.label });
   assert.equal((await release()).status, 201, "a new current-population audit restores coverage");
 });
 

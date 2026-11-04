@@ -3,6 +3,8 @@ import { eq, inArray } from "drizzle-orm";
 import { db, projectsTable, tasksTable, proposalsTable, reviewsTable, auditsTable, auditItemsTable, auditDecisionsTable, auditDisputesTable, releasesTable } from "@workspace/db";
 import { samplingFrameHash, selectDeterministicSample } from "./audits";
 import { assertFactoryRelease } from "./factories";
+import { assertCurrentRole, blindTaskIds } from "./team";
+import { EXPORT_ROLES } from "../routes/authorization";
 
 type Task = typeof tasksTable.$inferSelect;
 type Review = typeof reviewsTable.$inferSelect;
@@ -149,9 +151,12 @@ export async function createRelease(projectId: string, name: string, includeSour
   // Every read, gate, provenance field and byte is from one MVCC snapshot.
   // A concurrent correction can yield a valid before/after release, never a mix.
   return db.transaction(async tx => {
+    await assertCurrentRole(tx, projectId, actorId, EXPORT_ROLES);
+    if ((await blindTaskIds(projectId, actorId, tx)).size) return blocked("finish assigned blind audits before creating an export");
     const factory = await assertFactoryRelease(tx, projectId, "evidence");
     const [project] = await tx.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) return blocked("project missing");
+    if (project.releaseAuditPolicyVersion === "independent-sample-v1" && !project.exposureTrackingEnabled) return blocked("prior exposure history predates tracking; use a new tracked project for independent qualification");
     const tasks = await tx.select().from(tasksTable).where(eq(tasksTable.projectId, projectId)).orderBy(tasksTable.id);
     if (!name?.trim() || !tasks.length || tasks.some(t => t.status !== "finalized" || !labels.includes(t.finalLabel ?? ""))) return blocked("all tasks must have a resolved human decision");
     const evidence = await readDecisionEvidence(tx, projectId);

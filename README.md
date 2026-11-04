@@ -51,6 +51,9 @@ The original **Tasks → Review → Releases** evidence-labeling path remains.
 **Factories & lanes** adds human-only evidence review, versioned routing policies,
 expiring work claims and quarantine gates. See the [implementation and launch
 boundaries](docs/factory-lanes.md).
+**Team & provider** adds shared-project selection, member roles and revocation,
+owner assignment, blind-exposure tracking and an optional lifetime Jev call cap.
+See the [multiplayer implementation and qualification boundaries](docs/multiplayer-provider.md).
 This command uses a temporary database; stopping it discards that demo only.
 See [setup](docs/setup.md) and the reusable [Python CLI](docs/trace-python.md).
 

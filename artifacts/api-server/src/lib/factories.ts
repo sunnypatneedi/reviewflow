@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { assertCurrentRole } from "./team";
+import { REVIEW_ROLES } from "../routes/authorization";
 import { and, desc, eq, sql } from "drizzle-orm";
 import {
   db,
@@ -99,6 +101,7 @@ export async function assertFactoryWork(
     assistance?: boolean;
   },
 ) {
+  await assertCurrentRole(tx, input.projectId, input.actorId, REVIEW_ROLES);
   const item = await lockFactoryItem(
     tx,
     input.projectId,

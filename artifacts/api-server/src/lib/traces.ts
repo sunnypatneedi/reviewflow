@@ -143,12 +143,13 @@ export function comparisonView(payload: TraceObject, actor: string): TraceObject
   }
   if (view.review) {
     const { actor: _actor, ...review } = view.review;
-    view.review = review;
+    view.review = revealed || payload.review.actor === actor ? review : null;
   }
   if (view.quality) {
     const { actor: _actor, ...quality } = view.quality;
-    view.quality = quality;
+    view.quality = revealed || payload.quality.actor === actor ? quality : { status: "pending" };
   }
+  if (!revealed && payload.pendingAnnotation?.importedBy !== actor) view.pendingAnnotation = null;
   return { ...view, revealed, ...(revealed ? { proposal: proposal ?? null } : {}), proposalAvailable: Boolean(proposal) };
 }
 

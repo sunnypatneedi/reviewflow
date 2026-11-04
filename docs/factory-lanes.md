@@ -95,6 +95,12 @@ needed.
 
 ## Remaining launch gates
 
+The subsequent [multiplayer and provider milestone](multiplayer-provider.md)
+implements the shared-project, membership lifecycle, dedicated roles, exposure
+tracking and call-budget controls described below. The following paragraph records
+the boundary at this first milestone; consult the newer document for current
+implementation and qualification status.
+
 The next milestone is shared-project onboarding and a full multiplayer operation
 with real authenticated accounts: selection/invitations, membership lifecycle,
 dedicated auditor/exporter roles, session changes and revocation. The current

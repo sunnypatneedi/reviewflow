@@ -22,6 +22,7 @@ export const projectsTable = pgTable("rf_projects", {
   mode: text("mode").notNull().default("demo"),
   rubricVersion: text("rubric_version").notNull().default("evidence-v1"),
   shadowPolicyVersion: text("shadow_policy_version").notNull().default("shadow-v1"),
+  exposureTrackingEnabled: boolean("exposure_tracking_enabled").notNull().default(true),
   releaseAuditPolicyVersion: text("release_audit_policy_version").notNull().default("independent-sample-v1"),
   ...timestamps,
 });
@@ -31,6 +32,7 @@ export const membershipsTable = pgTable("rf_memberships", {
   projectId: text("project_id").notNull(),
   userId: text("user_id").notNull(),
   role: text("role").notNull(),
+  revision: integer("revision").notNull().default(0),
   ...timestamps,
 }, (table) => [
   uniqueIndex("rf_memberships_project_user_unique").on(table.projectId, table.userId),

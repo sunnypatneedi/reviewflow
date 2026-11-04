@@ -54,7 +54,7 @@ export default function Settings() {
                 <div className="text-sm font-medium text-muted-foreground mb-2">Live API Credentials</div>
                 <div className="flex items-center gap-3">
                   <div className={`w-3 h-3 rounded-full ${config?.liveCredentialConfigured ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-destructive'}`} />
-                  <span className="text-sm font-medium">{config?.liveCredentialConfigured ? 'Configured and ready' : 'Not configured. Live evaluations will fail.'}</span>
+                  <span className="text-sm font-medium">{config?.liveCredentialConfigured ? 'Credential present. Server and project approval are still required; provider quality is unverified.' : 'Not configured. Live evaluations are unavailable.'}</span>
                 </div>
               </div>
             </div>
