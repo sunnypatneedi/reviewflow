@@ -448,3 +448,30 @@ test("live provider transport classifies retryable failures without network acce
     ? request.headers.get("authorization") === "Bearer transport-test-key"
     : (request.headers as Record<string, string>).authorization === "Bearer transport-test-key"));
 });
+
+test("queued live evaluation rechecks quarantine after budget wait before invoking a provider", async () => {
+  const { factoryItemsTable, jevCallsTable } = await import("@workspace/db");
+  const task = await createTask();
+  await db.insert(factoryItemsTable).values({ id: randomUUID(), projectId: task.projectId, factory: "evidence", itemId: task.id });
+  await db.insert(jevControlsTable).values({ projectId: task.projectId, enabled: true, maxCalls: 1 });
+  await enqueueEvaluationJobs({ projectId: task.projectId, taskIds: [task.id], mode: "live" });
+  const enabled = process.env.LIVE_INFERENCE_ENABLED, mode = process.env.APP_MODE;
+  process.env.LIVE_INFERENCE_ENABLED = "true"; process.env.APP_MODE = "clerk";
+  const lock = await pool.connect();
+  let run: Promise<boolean> | undefined, calls = 0;
+  try {
+    await lock.query("BEGIN");
+    const pid = (await lock.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    await lock.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`jev:${task.projectId}`]);
+    run = new EvaluationWorker({ workerId: "synthetic-admission", evaluate: async () => { calls++; return simulated(task); } }).runOnce();
+    await waitFor(async () => (await pool.query("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1::int = ANY(pg_blocking_pids(pid))) AS blocked", [pid])).rows[0].blocked);
+    await db.update(factoryItemsTable).set({ quarantined: true }).where(eq(factoryItemsTable.itemId, task.id));
+  } finally {
+    await lock.query("COMMIT"); lock.release();
+    if (run) await run;
+    if (enabled === undefined) delete process.env.LIVE_INFERENCE_ENABLED; else process.env.LIVE_INFERENCE_ENABLED = enabled;
+    if (mode === undefined) delete process.env.APP_MODE; else process.env.APP_MODE = mode;
+  }
+  assert.equal(calls, 0);
+  assert.equal((await db.select().from(jevCallsTable).where(eq(jevCallsTable.projectId, task.projectId))).length, 0);
+});

@@ -28,7 +28,14 @@ The explicit allowlist is:
 - shared and operational source: `lib`, `scripts`, and the new `python`
   Trace2Preference package (not the user's separately developed Python kit).
 
-The copier rejects symlinks and special files. It excludes `.agents`, `.cache`,
+The packager pins a commit and selects allowlisted entries from its Git tree,
+then reads their immutable blob IDs. Working-tree recursion is never used;
+ignored private prose or generated files cannot enter the candidate. The verifier
+compares staged paths/content hashes to this committed inventory before comparing
+extracted content. Packaging requires a Git checkout, while the resulting source
+archive can build and run without Git metadata.
+
+The packager rejects committed symlinks, submodules and special files. It excludes `.agents`, `.cache`,
 `.config`, `.git`, `.local`, `.replit`, `.replit-artifact`, `.replitignore`,
 `attached_assets`, `artifacts/mockup-sandbox`, old screenshots, `node_modules`,
 `dist`, `releases`, TypeScript build metadata, Python bytecode and local virtual
@@ -41,7 +48,7 @@ excluded mockup package; pnpm tolerates an unmatched workspace glob.
 
 ## Final review procedure
 
-1. Generate the candidate from the exact working tree intended for release.
+1. Commit the intended source and generate the candidate from that exact revision.
    Record the archive checksum and candidate file count.
 2. Compare the complete staged file list with the allowlist. Confirm expected
    application, library, migration, generated API client, test, script, package,

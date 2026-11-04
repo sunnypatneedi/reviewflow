@@ -5,7 +5,7 @@ import { db, traceRecordsTable } from "@workspace/db";
 import { RELEASE_ROLES, REVIEW_ROLES, EXPORT_ROLES, type ProjectRole } from "./authorization";
 import { assertCurrentRole } from "../lib/team";
 import { reserveJevCall, finishJevCall } from "../lib/jev-budget";
-import { assertFactoryRelease, assertFactoryWork } from "../lib/factories";
+import { assertFactoryRelease, assertFactoryWork, lockFactory } from "../lib/factories";
 import { FactoryError } from "../lib/factory-engine";
 import {
   TraceError, assertVersion, assertNoReferenceLeakage, comparisonView, measuredEffort, publicProposal, shareableEvidence, stableJson, traceHash, traceProposal,
@@ -33,9 +33,12 @@ async function find(tx: Transaction | typeof db, projectId: string, kind: string
   if (!record) throw new TraceError("Trace record not found in this project", 404);
   return record.payload as TraceObject;
 }
+async function lockTraceProject(tx: Transaction, projectId: string) {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`traces:${projectId}`}, 0))`);
+}
 async function locked<T>(projectId: string, action: (tx: Transaction) => Promise<T>): Promise<T> {
   return db.transaction(async tx => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`traces:${projectId}`}, 0))`);
+    await lockTraceProject(tx, projectId);
     return action(tx);
   });
 }
@@ -200,7 +203,15 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
     });
     // Never hold the project lock during external I/O. Failure commits nothing.
     try {
-      const reservation = provider === "jev" ? await reserveJevCall(context.project.id, "preference", snapshot.id) : null;
+      const reservation = provider === "jev" ? await reserveJevCall(context.project.id, "preference", snapshot.id, async tx => {
+        await lockTraceProject(tx, context.project.id);
+        await assertCurrentRole(tx, context.project.id, actor, REVIEW_ROLES);
+        await lockFactory(tx, context.project.id, "preference");
+        await assertFactoryWork(tx, { projectId: context.project.id, factory: "preference", itemId: snapshot.id, actorId: actor, claimToken: req.body?.claimToken, assistance: true });
+        const current = await find(tx, context.project.id, "comparison", snapshot.id);
+        assertVersion(current, snapshot.version);
+        if (current.proposal || current.proposalRequest?.requestId !== requestId || current.proposalRequest?.expiresAt <= Date.now()) throw new TraceError("Proposal admission changed or expired", 409);
+      }) : null;
       let proposal;
       try { proposal = await traceProposal(snapshot, provider); if (reservation) await finishJevCall(reservation, "succeeded"); }
       catch (error) { if (reservation) await finishJevCall(reservation, "failed"); throw error; }

@@ -2,7 +2,13 @@ import type { IRouter, Request, Response } from "express";
 import { and, eq } from "drizzle-orm";
 import { db, projectsTable, proposalsTable, tasksTable } from "@workspace/db";
 import { evaluateTask } from "../evaluation";
-import { factoryPolicy, lockFactoryItem, factoryEvent } from "../lib/factories";
+import {
+  factoryPolicy,
+  lockFactoryItem,
+  lockFactory,
+  factoryEvent,
+  type FactoryTransaction,
+} from "../lib/factories";
 import { FactoryError } from "../lib/factory-engine";
 import { routingAdvice } from "../lib/routing-advice";
 import { assertCurrentRole, recordExposure } from "../lib/team";
@@ -47,43 +53,48 @@ export function registerRoutingRoutes(router: IRouter, helpers: Helpers) {
     if (req.body?.expectedVersion !== task.version)
       throw new FactoryError("Task changed. Reload before routing.");
     await recordExposure(context.project.id, actor, [task]);
-    const snapshot = async () =>
-      db.transaction(async (tx) => {
-        await assertCurrentRole(tx, context.project.id, actor, REVIEW_ROLES);
-        const control = await lockFactoryItem(
-          tx,
-          context.project.id,
-          "evidence",
-          task.id,
+    const readSnapshot = async (tx: FactoryTransaction, admission = false) => {
+      await assertCurrentRole(tx, context.project.id, actor, REVIEW_ROLES);
+      if (admission) await lockFactory(tx, context.project.id, "evidence");
+      const control = await lockFactoryItem(
+        tx,
+        context.project.id,
+        "evidence",
+        task.id,
+      );
+      const policy = await factoryPolicy(tx, context.project.id, "evidence");
+      const [latest] = await tx
+        .select()
+        .from(tasksTable)
+        .where(eq(tasksTable.id, task.id))
+        .for("share");
+      if (
+        !latest ||
+        latest.version !== task.version ||
+        latest.contentHash !== task.contentHash
+      )
+        throw new FactoryError("Task changed during routing. Reload.");
+      const [proposal] = await tx
+        .select()
+        .from(proposalsTable)
+        .where(
+          and(
+            eq(proposalsTable.taskId, task.id),
+            eq(proposalsTable.mode, latest.mode),
+          ),
         );
-        const policy = await factoryPolicy(tx, context.project.id, "evidence");
-        const [latest] = await tx
-          .select()
-          .from(tasksTable)
-          .where(eq(tasksTable.id, task.id))
-          .for("share");
-        if (!latest || latest.version !== task.version)
-          throw new FactoryError("Task changed during routing. Reload.");
-        const [proposal] = await tx
-          .select()
-          .from(proposalsTable)
-          .where(
-            and(
-              eq(proposalsTable.taskId, task.id),
-              eq(proposalsTable.mode, task.mode),
-            ),
-          );
-        const input = {
-          quarantined: control.quarantined,
-          finalized: task.status === "finalized",
-          escalated: task.status === "escalated",
-          highRisk: task.risk === "high",
-          hasProposal: Boolean(proposal),
-          confidence: proposal ? Number(proposal.confidence) : null,
-          redirection: proposal ? Number(proposal.injectionProbability) : null,
-        };
-        return { policy, input };
-      });
+      const input = {
+        quarantined: control.quarantined,
+        finalized: latest.status === "finalized",
+        escalated: latest.status === "escalated",
+        highRisk: latest.risk === "high",
+        hasProposal: Boolean(proposal),
+        confidence: proposal ? Number(proposal.confidence) : null,
+        redirection: proposal ? Number(proposal.injectionProbability) : null,
+      };
+      return { policy, input };
+    };
+    const snapshot = () => db.transaction((tx) => readSnapshot(tx));
     const before = await snapshot();
     const baseline = routingAdvice(before.input, before.policy.definition);
     let source = "rules";
@@ -128,6 +139,20 @@ export function registerRoutingRoutes(router: IRouter, helpers: Helpers) {
               context.project.id,
               "routing-advice",
               task.id,
+              async (tx) => {
+                // Budget admission may have waited while access, policy, source
+                // or quarantine changed. Validate them together with reservation.
+                const current = await readSnapshot(tx, true);
+                if (
+                  current.policy.revision !== before.policy.revision ||
+                  !current.policy.definition.assistanceAllowed ||
+                  routingAdvice(current.input, current.policy.definition)
+                    .protectedLane
+                )
+                  throw new FactoryError(
+                    "Outbound routing admission changed. Reload before retrying.",
+                  );
+              },
             );
           result = await evaluateTask(
             task,
@@ -169,19 +194,17 @@ export function registerRoutingRoutes(router: IRouter, helpers: Helpers) {
         },
       );
     });
-    res
-      .set("Cache-Control", "no-store")
-      .json({
-        ...advice,
-        source,
-        fallback,
-        taskVersion: task.version,
-        policyRevision: after.policy.revision,
-        latencyMs,
-        deadlineMs: provider === "jev" ? 2_000 : null,
-        qualification: "unqualified",
-        message:
-          "Advisory only. Policy routing and explicit human decisions remain authoritative.",
-      });
+    res.set("Cache-Control", "no-store").json({
+      ...advice,
+      source,
+      fallback,
+      taskVersion: task.version,
+      policyRevision: after.policy.revision,
+      latencyMs,
+      deadlineMs: provider === "jev" ? 2_000 : null,
+      qualification: "unqualified",
+      message:
+        "Advisory only. Policy routing and explicit human decisions remain authoritative.",
+    });
   });
 }

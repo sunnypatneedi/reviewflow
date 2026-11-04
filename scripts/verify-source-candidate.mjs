@@ -26,7 +26,13 @@ const revision = execFileSync("git", ["rev-parse", "HEAD"], {
   encoding: "utf8",
 }).trim();
 const folder = mkdtempSync(join(tmpdir(), "reviewflow-clean-candidate-"));
-const { stage, archive } = packageSource({
+const {
+  stage,
+  archive,
+  revision: sourceRevision,
+  files,
+} = packageSource({
+  revision,
   stage: join(folder, "stage"),
   archive: join(folder, "reviewflow-source.tar.gz"),
 });
@@ -98,6 +104,13 @@ function inventory(directory, prefix = "") {
           ];
     });
 }
+assert.equal(sourceRevision, revision, "Package must use the recorded commit");
+const sorted = (rows) => [...rows].sort((a, b) => a[0].localeCompare(b[0]));
+assert.deepEqual(
+  sorted(inventory(stage)),
+  sorted(files),
+  "Scanned stage must match the allowlisted committed blobs",
+);
 assert.deepEqual(
   inventory(join(extracted, "reviewflow-source")),
   inventory(stage),
@@ -113,7 +126,8 @@ const manifest = {
   archive,
   sha256: createHash("sha256").update(readFileSync(archive)).digest("hex"),
   secrets: "gitleaks candidate scan passed",
-  inventory: "staged/extracted paths and SHA-256 digests match",
+  inventory: "committed/staged/extracted paths and SHA-256 digests match",
+  fileCount: files.length,
   verification: "full isolated harness passed from extracted archive",
   published: false,
 };

@@ -257,12 +257,14 @@ export function registerTeamRoutes(router: IRouter, helpers: Helpers) {
     if (enabled && maxCalls < 1)
       throw new FactoryError("A positive call cap is required", 400);
     await db.transaction(async (tx) => {
-      await assertCurrentRole(tx, context.project.id, helpers.identity(req), [
-        "owner",
-      ]);
+      // Consistent budget -> membership order with outbound admission. Do not
+      // retain a membership lock while waiting for the project call-budget lock.
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtextextended(${`jev:${context.project.id}`}, 0))`,
       );
+      await assertCurrentRole(tx, context.project.id, helpers.identity(req), [
+        "owner",
+      ]);
       const current = await jevBudget(context.project.id, tx);
       if (expectedRevision !== current.revision || maxCalls < current.used)
         throw new FactoryError(

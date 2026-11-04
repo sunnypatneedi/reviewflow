@@ -271,7 +271,7 @@ test("synthetic multiplayer: shared selection, owner roles, blind auditor, expor
 test("Jev is off by default and atomic lifetime reservations include failures and concurrent calls", async () => {
   assert.equal((await jevBudget(projectId)).enabled, false);
   await assert.rejects(
-    reserveJevCall(projectId, "test", "synthetic-item"),
+    reserveJevCall(projectId, "test", "synthetic-item", async () => {}),
     /disabled/,
   );
   assert.equal(
@@ -298,7 +298,7 @@ test("Jev is off by default and atomic lifetime reservations include failures an
   );
   const raced = await Promise.allSettled(
     [1, 2, 3].map((index) =>
-      reserveJevCall(projectId, "mock-only", "synthetic-" + index),
+      reserveJevCall(projectId, "mock-only", "synthetic-" + index, async () => {}),
     ),
   );
   assert.equal(raced.filter((value) => value.status === "fulfilled").length, 2);

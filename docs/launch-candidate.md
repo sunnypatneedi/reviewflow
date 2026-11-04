@@ -29,7 +29,11 @@ Concurrent note edits merge with Yjs. The server validates each proposed update 
 
 `POST /api/reviewflow/tasks/:taskId/routing-advice` requires an expected task version. `provider` defaults to `rules`; `simulator` is synthetic. `jev` requires Clerk mode, server live opt-in, signed-in project access, assistance-enabled policy, owner-enabled lifetime call budget and explicit approval of the exact outbound question/evidence/answer. Source data is limited to 32 KB. The existing typed Jev adapter is reused; there is no OpenAI adapter.
 
-One potentially billed attempt is reserved before each call, including failures. The provider fetch has a two-second abort deadline, a 64 KB response limit, typed validation and no retries in this endpoint. At most one request per project and four per API process may call the provider concurrently; excess requests use policy fallback. A call cap is not a currency budget. Policy/source/membership are checked again after the response. Protected lanes cannot be overridden. Results include the measured request latency and a recommendation marked `applied: false` and `automaticAcceptance: false`; final human decisions and release gates remain separate. Jev latency, quality and billing have not been measured live.
+Routing admission waits for the project budget lock, then validates current membership, locked policy revision, source identity/version and protected-lane state in the same transaction that reserves the call. Budget controls use the same budget-before-membership lock order. Rejected admission consumes no call. Trace proposals also revalidate role, work claim, policy, quarantine, comparison version and request lease; queued evidence work revalidates policy/quarantine, source, runtime opt-in and job lease. Queued work is project-authorized work rather than a continuing interactive user session.
+
+The admission transaction's commit is the outbound authorization boundary. A guard change committed before that grant prevents invocation; changes after admission cannot recall an in-flight call. Provider I/O runs after commit, outside database locks, and result fencing still applies separately.
+
+One potentially billed attempt is reserved before each admitted call, including failures. The provider fetch has a two-second abort deadline, a 64 KB response limit, typed validation and no retries in this endpoint. At most one request per project and four per API process may call the provider concurrently; excess requests use policy fallback. A call cap is not a currency budget. Policy/source/membership are checked again after the response. Protected lanes cannot be overridden. Results include the measured request latency and a recommendation marked `applied: false` and `automaticAcceptance: false`; final human decisions and release gates remain separate. Jev latency, quality and billing have not been measured live.
 
 ## Repeatable verification
 
@@ -45,7 +49,7 @@ pnpm audit
 
 The browser harness binds to loopback, requires an isolated disposable database, supplies explicit synthetic identities, prohibits live-provider requests and blocks external browser traffic. Production code has no synthetic-header authentication path. It exercises project creation, roles/assignment, two simultaneous note editors, reconnect, keyboard focus, routing preview, review, independent blind audit, export, revocation, desktop/mobile layout and axe WCAG A/AA checks. Axe does not replace manual assistive-technology testing. Browser captures use synthetic data only.
 
-The backend suite exercises stale versions, parallel review fencing, job leases, provider failure and deadline, concurrent routing fallback, quarantine during a response, ticket replay, malformed CRDT state, role revocation, cross-project access and blind-audit exposure. Local routing samples report actual warm synthetic request observations; they are not live inference benchmarks.
+The backend suite exercises stale versions, parallel review fencing, job leases, provider failure and deadline, concurrent routing fallback, guard changes during a held budget lock with zero outbound invocations, quarantine during a response, ticket replay, malformed CRDT state, role revocation, cross-project access and blind-audit exposure. Local routing samples report actual warm synthetic request observations; they are not live inference benchmarks.
 
 For an exact clean source candidate, install a trusted gitleaks binary and run:
 
@@ -53,7 +57,7 @@ For an exact clean source candidate, install a trusted gitleaks binary and run:
 REVIEWFLOW_GITLEAKS=/path/to/gitleaks pnpm run verify:candidate
 ```
 
-This command refuses a dirty checkout, creates a new temporary stage, excludes nested environment/credential files and unreviewed images, checks screenshot links, scans the candidate, produces a deterministic portable archive, extracts it and runs the full isolated harness there. It writes the revision, SHA-256 and verification manifest outside the repository. It does not publish anything. A directory scan does not clear Git history; scan the exact intended publication history separately.
+Run packaging from a Git checkout. This command refuses a dirty checkout and pins the exact commit. The packager reads only allowlisted immutable Git blobs from that commit, with further credential/screenshot exclusions; it never recursively copies working-tree files. Ignored prose, metadata and generated files cannot enter merely because Git status reports clean. The verifier creates a fresh stage, checks its complete paths/content hashes against the committed blob inventory, checks screenshot links, scans the candidate, produces a deterministic portable archive, compares extracted paths/content hashes and runs the full isolated harness there. It writes the revision, SHA-256 and verification manifest outside the repository. It does not publish anything. A directory scan does not clear Git history; scan the exact intended publication history separately.
 
 ## Quality baseline and ownership
 

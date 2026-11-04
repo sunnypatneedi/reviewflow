@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { assertFactoryAssistance } from "./lib/factories";
+import { assertFactoryAssistance, lockFactory } from "./lib/factories";
 import { reserveJevCall, finishJevCall } from "./lib/jev-budget";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
@@ -301,7 +301,19 @@ export class EvaluationWorker {
       if (!task) throw new ProviderError("Evaluation task no longer exists");
       await db.transaction(tx => assertFactoryAssistance(tx, job.projectId, "evidence", job.taskId));
       if (!["pending", "proposed", "in_review"].includes(task.status)) throw new ProviderError("Task no longer needs evaluation");
-      const reservation = job.mode === "live" ? await reserveJevCall(job.projectId, "evidence", job.taskId) : null;
+      const reservation = job.mode === "live" ? await reserveJevCall(job.projectId, "evidence", job.taskId, async tx => {
+        if (!isLiveInferenceEnabled()) throw new ProviderError("Live inference was disabled before admission");
+        await lockFactory(tx, job.projectId, "evidence");
+        await assertFactoryAssistance(tx, job.projectId, "evidence", job.taskId);
+        const [currentJob] = await tx.select().from(jobsTable).where(and(
+          eq(jobsTable.id, job.id), eq(jobsTable.status, "running"),
+          eq(jobsTable.leaseOwner, this.workerId), eq(jobsTable.attempts, job.attempts),
+          sql`${jobsTable.leaseExpiresAt} > NOW()`,
+        )).for("share");
+        const [currentTask] = await tx.select().from(tasksTable).where(and(eq(tasksTable.projectId, job.projectId), eq(tasksTable.id, job.taskId))).for("share");
+        if (!currentJob || !currentTask || currentTask.version !== task.version || currentTask.contentHash !== task.contentHash ||
+            !["pending", "proposed", "in_review"].includes(currentTask.status)) throw new ProviderError("Evaluation admission changed");
+      }) : null;
       let result;
       try { result = await this.evaluate(task, job.mode as EvaluationMode); if (reservation) await finishJevCall(reservation, "succeeded"); }
       catch (error) { if (reservation) await finishJevCall(reservation, "failed"); throw error; }

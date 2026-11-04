@@ -596,3 +596,192 @@ test("concurrent authentication cannot overfill the 16-editor room", async () =>
   );
   clients.forEach((c) => c.ws.close());
 });
+test("guard changes committed during the budget wait prevent outbound admission and consume no call", async () => {
+  const { factoryPoliciesTable } = await import("@workspace/db");
+  const { DEFAULT_FACTORY_POLICY } = await import("../lib/factory-engine");
+  const realFetch = globalThis.fetch,
+    originalKey = process.env.TYPESAFE_API_KEY;
+  let providerCalls = 0;
+  process.env.TYPESAFE_API_KEY = "synthetic-never-transmitted";
+  globalThis.fetch = (async (url, options) => {
+    if (String(url) === "https://api.typesafe.ai/v1/systemone") {
+      providerCalls++;
+      return new Response("Synthetic upstream failure", { status: 503 });
+    }
+    assert.match(
+      String(url),
+      /^http:\/\/127\.0\.0\.1:/,
+      "Only loopback HTTP or intercepted provider calls are allowed",
+    );
+    return realFetch(url, options);
+  }) as typeof fetch;
+  try {
+    for (const mutation of [
+      "revoked",
+      "quarantined",
+      "policy_disabled",
+      "source_changed",
+      "finalized",
+    ] as const) {
+      const scope = randomUUID(),
+        item = randomUUID(),
+        actor = `synthetic-admission-${randomUUID()}`;
+      await db
+        .insert(projectsTable)
+        .values({
+          id: scope,
+          ownerId: owner,
+          name: "Synthetic outbound admission",
+        });
+      await db
+        .insert(membershipsTable)
+        .values({
+          id: randomUUID(),
+          projectId: scope,
+          userId: actor,
+          role: "reviewer",
+        });
+      await db
+        .insert(tasksTable)
+        .values({
+          id: item,
+          projectId: scope,
+          externalId: "admission",
+          question: "Synthetic question",
+          evidence: "Synthetic evidence",
+          candidateAnswer: "Synthetic answer",
+          risk: "low",
+          contentHash: "synthetic-admission-hash",
+          mode: "demo",
+        });
+      await db
+        .insert(factoryItemsTable)
+        .values({
+          id: randomUUID(),
+          projectId: scope,
+          factory: "evidence",
+          itemId: item,
+        });
+      await db
+        .insert(jevControlsTable)
+        .values({ projectId: scope, enabled: true, maxCalls: 1 });
+      const lock = await pool.connect();
+      let pending: Promise<Response> | undefined;
+      try {
+        await lock.query("BEGIN");
+        const pid = (await lock.query("SELECT pg_backend_pid() AS pid")).rows[0]
+          .pid;
+        await lock.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+          [`jev:${scope}`],
+        );
+        pending = fetch(base + `/tasks/${item}/routing-advice`, {
+          method: "POST",
+          headers: {
+            origin,
+            "content-type": "application/json",
+            "x-synthetic-user": actor,
+            "x-reviewflow-project": scope,
+          },
+          body: JSON.stringify({
+            provider: "jev",
+            expectedVersion: 1,
+            allowOutbound: true,
+          }),
+        });
+        const end = Date.now() + 4000;
+        while (
+          !(
+            await pool.query(
+              "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1::int = ANY(pg_blocking_pids(pid))) AS blocked",
+              [pid],
+            )
+          ).rows[0].blocked
+        ) {
+          assert.ok(
+            Date.now() < end,
+            "Request must reach the delayed budget admission",
+          );
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        if (mutation === "revoked")
+          await db
+            .update(membershipsTable)
+            .set({ role: "revoked" })
+            .where(
+              and(
+                eq(membershipsTable.projectId, scope),
+                eq(membershipsTable.userId, actor),
+              ),
+            );
+        else if (mutation === "quarantined")
+          await db
+            .update(factoryItemsTable)
+            .set({ quarantined: true })
+            .where(eq(factoryItemsTable.itemId, item));
+        else if (mutation === "policy_disabled")
+          await db
+            .insert(factoryPoliciesTable)
+            .values({
+              id: randomUUID(),
+              projectId: scope,
+              factory: "evidence",
+              revision: 1,
+              definition: {
+                ...DEFAULT_FACTORY_POLICY,
+                assistanceAllowed: false,
+              },
+              createdBy: owner,
+            });
+        else if (mutation === "source_changed")
+          await db
+            .update(tasksTable)
+            .set({ version: 2, contentHash: "synthetic-new-hash" })
+            .where(eq(tasksTable.id, item));
+        else
+          await db
+            .update(tasksTable)
+            .set({ status: "finalized", finalLabel: "supported" })
+            .where(eq(tasksTable.id, item));
+      } finally {
+        await lock.query("COMMIT");
+        lock.release();
+      }
+      assert.ok(pending);
+      const response = await pending;
+      const body = (await response.json()) as any;
+      assert.equal(
+        response.status,
+        mutation === "revoked"
+          ? 403
+          : ["policy_disabled", "source_changed"].includes(mutation)
+            ? 409
+            : 200,
+        JSON.stringify(body),
+      );
+      if (mutation === "quarantined")
+        assert.equal(body.effectiveLane, "quarantine");
+      if (mutation === "finalized")
+        assert.equal(body.effectiveLane, "complete");
+      assert.equal(
+        providerCalls,
+        0,
+        `No outbound transport after ${mutation} commits before admission`,
+      );
+      assert.equal(
+        (
+          await db
+            .select()
+            .from(jevCallsTable)
+            .where(eq(jevCallsTable.projectId, scope))
+        ).length,
+        0,
+        "Rejected admission rolls back its reservation",
+      );
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+    if (originalKey === undefined) delete process.env.TYPESAFE_API_KEY;
+    else process.env.TYPESAFE_API_KEY = originalKey;
+  }
+});

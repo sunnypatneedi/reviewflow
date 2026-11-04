@@ -232,3 +232,42 @@ test("trace API: import, blind reveal, concurrent human reviews, scoped immutabl
   assert.equal((await call(`${path}/confirm-labelstudio`, { expectedVersion: comparison.version, evidenceRefs: [] })).status, 409);
   assert.equal((await db.select().from(traceRecordsTable).where(eq(traceRecordsTable.projectId, ids[1]))).length, 0);
 });
+
+test("trace proposal admission rechecks quarantine after a delayed budget reservation", async () => {
+  const { factoryItemsTable, jevCallsTable } = await import("@workspace/db");
+  const request = (path: string, body?: unknown, headers: Record<string, string> = {}) => call(path, body, { ...headers, "x-project": "lease" });
+  const input = structuredClone(document);
+  for (const run of input.runs) { run.id = `admission-${run.id}`; run.scenarioId = "admission-case"; }
+  assert.equal((await request("/imports", { document: input })).status, 201);
+  const comparison = (await (await request("/comparisons")).json() as any[]).find(row => row.scenarioId === "admission-case");
+  const realFetch = globalThis.fetch, key = process.env.TYPESAFE_API_KEY, optIn = process.env.TRACE_ALLOW_LIVE_JEV;
+  process.env.TYPESAFE_API_KEY = "synthetic-no-transmission"; process.env.TRACE_ALLOW_LIVE_JEV = "true";
+  let calls = 0, pending: Promise<Response> | undefined;
+  globalThis.fetch = (async (url, options) => {
+    if (String(url).startsWith("https://api.typesafe.ai/")) { calls++; return new Response("Synthetic upstream failure", { status: 503 }); }
+    assert.match(String(url), /^http:\/\/127\.0\.0\.1:/); return realFetch(url, options);
+  }) as typeof fetch;
+  const previous = (await db.select().from(jevCallsTable).where(eq(jevCallsTable.projectId, ids[2]))).length;
+  const lock = await pool.connect();
+  try {
+    await lock.query("BEGIN");
+    const pid = (await lock.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    await lock.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`jev:${ids[2]}`]);
+    pending = request(`/comparisons/${comparison.id}/proposals`, { provider: "jev", consent: true, outboundReviewed: true }, { "x-test-mode": "live" });
+    const end = Date.now() + 4000;
+    while (!(await pool.query("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1::int = ANY(pg_blocking_pids(pid))) AS blocked", [pid])).rows[0].blocked) {
+      assert.ok(Date.now() < end, "Trace must reach the budget wait"); await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    await db.update(factoryItemsTable).set({ quarantined: true }).where(and(eq(factoryItemsTable.projectId, ids[2]), eq(factoryItemsTable.factory, "preference"), eq(factoryItemsTable.itemId, comparison.id)));
+  } finally {
+    await lock.query("COMMIT"); lock.release();
+    try { if (pending) assert.equal((await pending).status, 409); }
+    finally {
+      globalThis.fetch = realFetch;
+      if (key === undefined) delete process.env.TYPESAFE_API_KEY; else process.env.TYPESAFE_API_KEY = key;
+      if (optIn === undefined) delete process.env.TRACE_ALLOW_LIVE_JEV; else process.env.TRACE_ALLOW_LIVE_JEV = optIn;
+    }
+  }
+  assert.equal(calls, 0);
+  assert.equal((await db.select().from(jevCallsTable).where(eq(jevCallsTable.projectId, ids[2]))).length, previous);
+});

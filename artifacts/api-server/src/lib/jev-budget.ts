@@ -24,16 +24,21 @@ export async function jevBudget(
     remaining: Math.max(0, (control?.maxCalls ?? 0) - used),
   };
 }
-/** A reservation is never refunded: a timeout or process loss may still be billed. */
+/** A reservation is never refunded: a timeout or process loss may still be billed.
+ * Admission runs after the budget wait, in this transaction. Callers must lock
+ * and validate every outbound guard here; network I/O starts only after commit.
+ */
 export async function reserveJevCall(
   projectId: string,
   purpose: string,
   itemId: string,
+  admit: (tx: FactoryTransaction) => Promise<void>,
 ) {
   return db.transaction(async (tx) => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${`jev:${projectId}`}, 0))`,
     );
+    await admit(tx);
     const [control] = await tx
       .select()
       .from(jevControlsTable)
