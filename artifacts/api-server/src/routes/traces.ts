@@ -43,15 +43,21 @@ const metadata = (release: TraceObject) => ({
   id: release.id, name: release.name, createdAt: release.createdAt,
   itemCount: release.itemCount, trainingCount: release.trainingCount, digest: release.digest,
 });
-async function recordTraceExposure(projectId: string, actor: string) {
-  await locked(projectId, async tx => {
+async function recordTraceExposure(projectId: string, actor: string, assistedKit = false) {
+  return locked(projectId, async tx => {
     await assertCurrentRole(tx, projectId, actor, EXPORT_ROLES);
-    for (const value of await rows(tx, projectId, "comparison")) {
+    if (assistedKit) {
+      const policy = await assertFactoryRelease(tx, projectId, "preference");
+      if (!policy.definition.assistanceAllowed) throw new FactoryError("Assistance is disabled by this factory policy", 403);
+    }
+    const comparisons = await rows(tx, projectId, "comparison"), runs = await rows(tx, projectId, "run");
+    for (const value of comparisons) {
       if (!value.reveals.some((entry: TraceObject) => entry.actor === actor)) {
         value.reveals.push({ actor, createdAt: new Date().toISOString(), proposalPresent: Boolean(value.proposal), reason: "export_access" });
         await save(tx, projectId, "comparison", value.id, value);
       }
     }
+    return { comparisons, runs };
   });
 }
 
@@ -287,9 +293,9 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
     const condition = req.query.condition ?? "human_only";
     if (!["human_only", "model_assisted"].includes(String(condition))) throw new TraceError("Choose human_only or model_assisted kit condition");
     if (condition === "model_assisted" && !factory.definition.assistanceAllowed) throw new FactoryError("Assistance is disabled by this factory policy", 403);
-    if (condition === "model_assisted") await recordTraceExposure(project.id, actor);
-    const comparisons = await rows(db, project.id, "comparison");
-    const validation = { schemaVersion: 1, runs: await rows(db, project.id, "run"),
+    const captured = condition === "model_assisted" ? await recordTraceExposure(project.id, actor, true) : null;
+    const comparisons = captured?.comparisons ?? await rows(db, project.id, "comparison");
+    const validation = { schemaVersion: 1, runs: captured?.runs ?? await rows(db, project.id, "run"),
       comparisons: comparisons.map(({ review, history, reveals, quality, proposal, version, ...comparison }) => comparison), issues: [] };
     const kit = await tracePython("labelstudio", { validation, condition,
       proposals: comparisons.filter(c => c.proposal).map(c => ({ comparisonId: c.id, outcome: c.proposal.decision === "escalate" ? "escalation" : c.proposal.decision, provider: c.proposal.provider, simulated: c.proposal.simulated })) });

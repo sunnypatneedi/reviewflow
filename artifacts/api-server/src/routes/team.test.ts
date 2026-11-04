@@ -11,6 +11,9 @@ import {
   tasksTable,
   exposuresTable,
   projectsTable,
+  auditsTable,
+  auditItemsTable,
+  auditDecisionsTable,
 } from "@workspace/db";
 import { DEFAULT_FACTORY_POLICY } from "../lib/factory-engine";
 import { and, eq } from "drizzle-orm";
@@ -573,4 +576,76 @@ test("untracked legacy exposure history cannot qualify a new independent release
       .set({ exposureTrackingEnabled: true })
       .where(eq(projectsTable.id, projectId));
   }
+});
+test("overlapping audit assignments cannot reuse an auditor after learning an outcome", async () => {
+  const actor = "synthetic-overlap-" + randomUUID();
+  assert.equal(
+    (
+      await call(owner, "/members", {
+        userId: actor,
+        role: "auditor",
+        expectedRevision: -1,
+      })
+    ).status,
+    200,
+  );
+  const firstResponse = await call(actor, "/audits", {
+    sampleSize: 1,
+    independent: true,
+    seed: "overlap",
+  });
+  assert.equal(firstResponse.status, 201);
+  const first = (await firstResponse.json()) as any;
+  assert.equal(
+    (
+      await call(actor, "/audits", {
+        sampleSize: 1,
+        independent: true,
+        seed: "overlap-again",
+      })
+    ).status,
+    409,
+    "Only one independent assignment may be active per actor and project",
+  );
+  const [audit] = await db
+    .select()
+    .from(auditsTable)
+    .where(eq(auditsTable.id, first.id));
+  const [item] = await db
+    .select()
+    .from(auditItemsTable)
+    .where(eq(auditItemsTable.auditId, first.id));
+  // Simulates an already-stored overlapping assignment from before the guard.
+  const secondId = randomUUID(),
+    secondItemId = randomUUID();
+  await db
+    .insert(auditsTable)
+    .values({ ...audit, id: secondId, required: false });
+  await db
+    .insert(auditItemsTable)
+    .values({ ...item, id: secondItemId, auditId: secondId });
+  assert.equal(
+    (
+      await call(actor, "/audits/" + first.id + "/decisions", {
+        auditItemId: item.id,
+        label: item.originalLabel,
+      })
+    ).status,
+    201,
+  );
+  const second = await call(actor, "/audits/" + secondId + "/decisions", {
+    auditItemId: secondItemId,
+    label: item.originalLabel,
+  });
+  assert.equal(second.status, 409);
+  assert.match(((await second.json()) as any).error, /not accessed/);
+  assert.equal(
+    (
+      await db
+        .select()
+        .from(auditDecisionsTable)
+        .where(eq(auditDecisionsTable.auditId, secondId))
+    ).length,
+    0,
+  );
 });

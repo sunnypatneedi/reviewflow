@@ -48,10 +48,16 @@ factory queue shows audit assignments only.
 
 Audit outcomes also enter the exposure ledger: agreement/disagreement status can
 reveal the original label after a choice. That actor cannot later be reused as a
-fresh independent auditor for the same population. Preference reviews hide other
+fresh independent auditor for the same population. Only one independent audit
+may be active per actor/project, and decision submission rechecks exposure for
+the item under the same lock, including overlapping assignments stored earlier.
+Preference reviews hide other
 people's judgments until reveal, and preference release/assisted-kit access marks
 the actor's reveal history so later reviews cannot be called human-only. Earlier
 human-only decisions and frozen releases retain their original history.
+Assisted kits are constructed from the exact comparison/run snapshot whose
+reveal history was recorded; a concurrent import cannot add an unmarked proposal
+to that kit.
 
 Migration `0004_team_and_budgets` marks **existing projects as having untracked
 historical exposure** and enables tracking by default for new projects. Legacy
@@ -90,7 +96,7 @@ New endpoints: `GET /context`, `GET/POST /projects`, `GET/POST /members`,
 OpenAPI and generated clients/validators are updated. Source migrations remain
 restricted to the repository's disposable database harness.
 
-The full isolated verification passes 73 server tests, 8 frontend tests and 36
+The full isolated verification passes 75 server tests, 8 frontend tests and 36
 Python checks (one optional SDK check skipped), plus type checks, production
 builds, migration preservation and evidence/preference API end-to-end flows.
 New regressions include concurrent first sign-in, cross-project denial, all five
@@ -98,6 +104,8 @@ roles, assignment/revocation, stale authority after demotion, adjudication and
 export exposure, repeated-auditor rejection, ten concurrent budget updates,
 atomic reservations, legacy qualification denial and project discovery after
 personal membership revocation.
+Overlapping precreated audits and an import racing assisted-kit generation have
+deterministic regressions as well.
 
 A local Chromium flow used four separate browser contexts with an explicit
 test-only authentication stub and all external browser requests blocked. It

@@ -8,7 +8,7 @@ import { db, pool, projectsTable, traceRecordsTable, jevControlsTable } from "@w
 import { registerTraceRoutes } from "./traces";
 import { roleAllows, type ProjectRole } from "./authorization";
 
-const ids = [`trace-test-${randomUUID()}`, `trace-test-${randomUUID()}`, `trace-test-${randomUUID()}`];
+const ids = Array.from({ length: 4 }, () => "trace-test-" + randomUUID());
 let server: Server, base: string;
 before(async () => {
   assert.equal(process.env.REVIEWFLOW_DISPOSABLE_DB, "1", "Trace API tests require the disposable database harness");
@@ -16,7 +16,7 @@ before(async () => {
   app.use(express.json());
   app.locals.runtimeConfig = { appMode: "clerk", liveInferenceEnabled: true };
   registerTraceRoutes(router, {
-    ensureProject: async req => ({ project: { id: req.get("x-project") === "lease" ? ids[2] : req.get("x-project") === "other" ? ids[1] : ids[0], mode: req.get("x-test-mode") === "live" ? "live" : "demo" },
+    ensureProject: async req => ({ project: { id: req.get("x-project") === "kit" ? ids[3] : req.get("x-project") === "lease" ? ids[2] : req.get("x-project") === "other" ? ids[1] : ids[0], mode: req.get("x-test-mode") === "live" ? "live" : "demo" },
       userId: "test-user", role: (req.get("x-role") ?? "owner") as ProjectRole }),
     identity: req => req.get("x-actor") ?? "test-user",
     requireProjectAccess: async (_req, res, context, roles) => {
@@ -106,6 +106,37 @@ const document = {
     provenance: { source: "private/path", reviewerEmail: "private@example.test" }, candidateIdentity: `candidate-${id}`, kind: "scripted",
   })),
 };
+test("assisted kits use exactly the comparison snapshot marked as revealed", async () => {
+  const headers = { "x-project": "kit", "x-actor": "synthetic-kit-observer" };
+  const request = (path: string, body?: unknown) => call(path, body, headers);
+  assert.equal((await request("/imports", { document })).status, 201);
+  const first = (await (await request("/comparisons")).json() as any[])[0];
+  assert.equal((await request("/comparisons/" + first.id + "/proposals", { provider: "simulator" })).status, 200);
+  const original = db.transaction; let importedAfterSnapshot = false;
+  (db as any).transaction = async (...args: any[]) => {
+    (db as any).transaction = original;
+    const captured = await (original as any).apply(db, args);
+    const later = structuredClone(document);
+    for (const run of later.runs) { run.id = "kit-later-" + run.id; run.scenarioId = "kit-later"; }
+    assert.equal((await request("/imports", { document: later })).status, 201);
+    const current = await (await request("/comparisons")).json() as any[];
+    const added = current.find(item => item.id !== first.id);
+    assert.equal((await request("/comparisons/" + added.id + "/proposals", { provider: "simulator" })).status, 200);
+    importedAfterSnapshot = true; return captured;
+  };
+  try {
+    const response = await request("/labelstudio?condition=model_assisted");
+    assert.equal(response.status, 200, await response.clone().text());
+    const kit = await response.json() as any;
+    assert.ok(importedAfterSnapshot);
+    assert.equal(kit.manifest.length, 1, "Concurrent new comparison is outside the captured kit");
+    assert.equal(kit.manifest[0].comparisonId, first.id);
+    const current = await (await request("/comparisons")).json() as any[];
+    assert.equal(current.find(item => item.id === first.id).revealed, true);
+    const added = current.find(item => item.id !== first.id);
+    assert.equal(added.proposalAvailable, true); assert.equal(added.revealed, false);
+  } finally { (db as any).transaction = original; }
+});
 
 test("trace API: import, blind reveal, concurrent human reviews, scoped immutable release and nonbinary exclusions", async () => {
   assert.equal((await call("/imports", { document }, { "x-role": "reviewer" })).status, 403);

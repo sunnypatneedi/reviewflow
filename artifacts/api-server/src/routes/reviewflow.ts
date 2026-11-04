@@ -840,6 +840,8 @@ router.post("/reviewflow/audits", async (req, res): Promise<void> => {
     if (independent) {
       await lockExposure(tx, project.id, actorId);
       await assertUnexposed(tx, project.id, actorId, frame.eligible.map(row => row.taskId));
+      const active = await tx.select({ id: auditsTable.id }).from(auditsTable).where(and(eq(auditsTable.projectId, project.id), eq(auditsTable.auditorId, actorId), eq(auditsTable.independent, true), inArray(auditsTable.status, ["in_progress", "blocked"])));
+      if (active.length) throw new FactoryError("Finish the assigned independent audit before creating another.");
     }
     const [created] = await tx.insert(auditsTable).values({
       id: auditId,
@@ -960,6 +962,7 @@ router.post("/reviewflow/audits/:id/decisions", async (req, res): Promise<void> 
   const decisionCommitted = await db.transaction(async (tx) => {
     await assertCurrentRole(tx, project.id, actorId, AUDIT_ROLES);
     await lockExposure(tx, project.id, actorId);
+    if (audit.independent) await assertUnexposed(tx, project.id, actorId, [item.taskId]);
     await tx.select({ id: auditsTable.id }).from(auditsTable).where(eq(auditsTable.id, audit.id)).for("update");
     await assertFactoryNotQuarantined(tx, project.id, "evidence", item.taskId);
     const [currentTask] = await tx.select().from(tasksTable).where(and(eq(tasksTable.id, item.taskId), eq(tasksTable.projectId, project.id))).for("update");
