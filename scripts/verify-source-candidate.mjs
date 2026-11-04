@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -80,6 +81,28 @@ with tarfile.open(archive, 'r:gz') as tar:
   archive,
   extracted,
 ]);
+function inventory(directory, prefix = "") {
+  return readdirSync(directory, { withFileTypes: true })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((entry) => {
+      const name = prefix + entry.name;
+      return entry.isDirectory()
+        ? inventory(join(directory, entry.name), name + "/")
+        : [
+            [
+              name,
+              createHash("sha256")
+                .update(readFileSync(join(directory, entry.name)))
+                .digest("hex"),
+            ],
+          ];
+    });
+}
+assert.deepEqual(
+  inventory(join(extracted, "reviewflow-source")),
+  inventory(stage),
+  "Extracted source must exactly match the scanned stage",
+);
 execFileSync("sh", ["scripts/verify-isolated.sh"], {
   cwd: join(extracted, "reviewflow-source"),
   env: process.env,
@@ -90,6 +113,7 @@ const manifest = {
   archive,
   sha256: createHash("sha256").update(readFileSync(archive)).digest("hex"),
   secrets: "gitleaks candidate scan passed",
+  inventory: "staged/extracted paths and SHA-256 digests match",
   verification: "full isolated harness passed from extracted archive",
   published: false,
 };

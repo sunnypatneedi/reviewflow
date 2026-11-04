@@ -174,7 +174,12 @@ export function attachCollaboration(server: Server, config: RuntimeConfig) {
   async function sync(ws: WebSocket, ack?: number) {
     const scope = peers.get(ws);
     if (!scope) return;
+    if (ws.readyState !== WebSocket.OPEN) {
+      peers.delete(ws);
+      return;
+    }
     if (scope.expires < Date.now()) {
+      peers.delete(ws);
       ws.close(1000, "Refresh collaboration session");
       return;
     }
@@ -258,6 +263,18 @@ export function attachCollaboration(server: Server, config: RuntimeConfig) {
                 429,
               );
             await sharedNoteState(ticket); // Fresh membership, blind-audit and source checks.
+            if (ws.readyState !== WebSocket.OPEN) return;
+            if (
+              [...peers.values()].filter(
+                (p) =>
+                  p.projectId === ticket.projectId &&
+                  p.taskId === ticket.taskId,
+              ).length >= 16
+            )
+              throw new FactoryError(
+                "This shared note has 16 connected editors",
+                429,
+              );
             peers.set(ws, { ...ticket, expires: Date.now() + 300_000 });
             clearTimeout(timer);
             await sync(ws);
@@ -277,7 +294,8 @@ export function attachCollaboration(server: Server, config: RuntimeConfig) {
             await Promise.all(
               [...peers]
                 .filter(
-                  ([, p]) =>
+                  ([peer, p]) =>
+                    peer !== ws &&
                     p.projectId === scope.projectId &&
                     p.taskId === scope.taskId,
                 )
@@ -285,6 +303,10 @@ export function attachCollaboration(server: Server, config: RuntimeConfig) {
                   sync(peer, peer === ws ? message.id : undefined),
                 ),
             );
+            // A sender may flush queued typing immediately on its ack. It must
+            // arrive only after recipient fan-out is done and we accept work.
+            busy = false;
+            await sync(ws, message.id);
           }
         } catch (error) {
           closeFailure(ws, error);

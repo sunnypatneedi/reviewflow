@@ -9,9 +9,12 @@ replacement repository. The private working history remains excluded.
 ## Candidate boundary
 
 Run `node scripts/package-source.mjs` (or the package script that invokes it).
-It replaces `/tmp/reviewflow-source-stage` and writes
-`releases/reviewflow-source.tar.gz`. The `releases` directory is outside the
-allowlist, so an archive can never package itself.
+It creates a fresh temporary stage and archive under a unique candidate directory.
+Explicit `REVIEWFLOW_SOURCE_STAGE` and `REVIEWFLOW_SOURCE_ARCHIVE` paths must not
+already exist. Existing operator directories are never deleted. The `releases`
+directory is outside the allowlist, so an archive cannot package itself.
+Use [the clean candidate verifier](launch-candidate.md) to require a clean revision,
+scan the stage, compare the extracted inventory and run the full harness.
 
 The explicit allowlist is:
 
@@ -20,7 +23,7 @@ The explicit allowlist is:
   `tsconfig.json`;
 - project material: `.env.example`, `LICENSE`, `README.md`, `CONTRIBUTING.md`,
   `SECURITY.md`, `THIRD_PARTY_NOTICES.md`, `.github`, and `docs`;
-- the original synthetic review capture `screenshots/reviewflow-review.png`;
+- the explicitly reviewed synthetic captures enumerated in `scripts/package-source.mjs`;
 - application source: `artifacts/api-server` and `artifacts/reviewflow`;
 - shared and operational source: `lib`, `scripts`, and the new `python`
   Trace2Preference package (not the user's separately developed Python kit).
@@ -30,7 +33,8 @@ The copier rejects symlinks and special files. It excludes `.agents`, `.cache`,
 `attached_assets`, `artifacts/mockup-sandbox`, old screenshots, `node_modules`,
 `dist`, `releases`, TypeScript build metadata, Python bytecode and local virtual
 environments, logs, runtime traces, and dumps
-at any depth. Account configuration, the old overview screenshot, prompt
+at any depth, plus nested environment files and credential/key filenames. Account
+configuration, unreviewed screenshots, prompt
 attachments, mockup-only code, generated build output, and local runtime state
 therefore cannot enter the candidate. Workspace globs may still mention the
 excluded mockup package; pnpm tolerates an unmatched workspace glob.

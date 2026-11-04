@@ -458,3 +458,141 @@ test("shared notes count as exposure and cannot be reopened inside an existing b
     await db.delete(auditsTable).where(eq(auditsTable.id, auditId));
   }
 });
+test("queued typing waits for a ready sender acknowledgement even if another recipient is blocked", async () => {
+  await db
+    .update(membershipsTable)
+    .set({ role: "reviewer" })
+    .where(
+      and(
+        eq(membershipsTable.projectId, projectId),
+        eq(membershipsTable.userId, reviewer),
+      ),
+    );
+  const a = connect(await ticket(owner)),
+    b = connect(await ticket(reviewer));
+  await until(
+    () =>
+      a.messages.some((m) => m.type === "state") &&
+      b.messages.some((m) => m.type === "state"),
+  );
+  const doc = new Y.Doc();
+  Y.applyUpdate(doc, Buffer.from(a.messages[0].state, "base64"));
+  let unlock!: () => void,
+    locked = false;
+  const hold = db.transaction(async (tx) => {
+    await tx
+      .select()
+      .from(membershipsTable)
+      .where(
+        and(
+          eq(membershipsTable.projectId, projectId),
+          eq(membershipsTable.userId, reviewer),
+        ),
+      )
+      .for("update");
+    locked = true;
+    await new Promise<void>((resolve) => {
+      unlock = resolve;
+    });
+  });
+  await until(() => locked);
+  a.ws.on("message", (raw) => {
+    if (JSON.parse(raw.toString()).ack === 10) {
+      doc
+        .getText("notes")
+        .insert(doc.getText("notes").length, " queued-second");
+      a.ws.send(JSON.stringify({ type: "update", id: 11, state: encode(doc) }));
+    }
+  });
+  try {
+    doc.getText("notes").insert(doc.getText("notes").length, " queued-first");
+    a.ws.send(JSON.stringify({ type: "update", id: 10, state: encode(doc) }));
+    // A real membership row lock holds only recipient B's read authorization.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.equal(
+      a.messages.some((m) => m.ack === 10),
+      false,
+      "Do not ack while still unable to accept the sender's next update",
+    );
+  } finally {
+    unlock();
+    await hold;
+  }
+  await until(() => a.messages.some((m) => m.ack === 11));
+  assert.equal(
+    a.messages.some((m) => m.type === "error"),
+    false,
+  );
+  assert.equal(a.ws.readyState, WebSocket.OPEN);
+  a.ws.close();
+  b.ws.close();
+});
+test("cancelled authentication does not leak a room slot after its authorization resolves", async () => {
+  const token = await ticket(owner);
+  let unlock!: () => void,
+    locked = false;
+  const hold = db.transaction(async (tx) => {
+    await tx
+      .select()
+      .from(membershipsTable)
+      .where(
+        and(
+          eq(membershipsTable.projectId, projectId),
+          eq(membershipsTable.userId, owner),
+        ),
+      )
+      .for("update");
+    locked = true;
+    await new Promise<void>((resolve) => {
+      unlock = resolve;
+    });
+  });
+  await until(() => locked);
+  const cancelled = connect(token);
+  try {
+    await until(() => cancelled.ws.readyState === WebSocket.OPEN);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    cancelled.ws.close();
+    await until(() => cancelled.ws.readyState === WebSocket.CLOSED);
+  } finally {
+    unlock();
+    await hold;
+  }
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(
+    cancelled.messages.some((m) => m.type === "state"),
+    false,
+  );
+  // The following 16-editor admission regression also proves no ghost slot remains.
+});
+test("concurrent authentication cannot overfill the 16-editor room", async () => {
+  await until(() => sockets.every((ws) => ws.readyState !== WebSocket.OPEN));
+  const actors = Array.from(
+    { length: 17 },
+    () => `synthetic-room-${randomUUID()}`,
+  );
+  await db.insert(membershipsTable).values(
+    actors.map((userId) => ({
+      id: randomUUID(),
+      projectId,
+      userId,
+      role: "reviewer",
+    })),
+  );
+  const tokens = await Promise.all(actors.map((actor) => ticket(actor)));
+  const clients = tokens.map((token) => connect(token));
+  await until(() =>
+    clients.every((c) =>
+      c.messages.some((m) => m.type === "state" || m.type === "error"),
+    ),
+  );
+  assert.equal(
+    clients.filter((c) => c.messages.some((m) => m.type === "state")).length,
+    16,
+  );
+  assert.equal(
+    clients.filter((c) => c.messages.some((m) => m.type === "error")).length,
+    1,
+  );
+  clients.forEach((c) => c.ws.close());
+});
