@@ -12,6 +12,11 @@ export interface ReviewInput {
   taskId: string;
   version: number;
   action: ReviewInputAction;
+  /**
+     * Current fencing token when an active claim exists or claims are required
+     * @nullable
+     */
+  claimToken?: string | null;
   /** @nullable */
   correctedLabel?: ReviewInputCorrectedLabel;
   /**
@@ -26,7 +31,7 @@ export interface ReviewInput {
   evidenceExcerpt?: string | null;
   /**
      * @minimum 0
-     * @maximum 7200000
+     * @maximum 604800000
      */
   activeMs: number;
 }

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { assertFactoryAssistance } from "./lib/factories";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   db,
@@ -154,6 +155,7 @@ async function saveSuccess(
   maxAttempts: number,
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    await assertFactoryAssistance(tx, job.projectId, "evidence", job.taskId);
     // Fence the lease before touching any domain row. An expired or reclaimed
     // worker cannot publish a proposal even if its provider call later returns.
     const fenced = await tx.update(jobsTable).set({
@@ -296,6 +298,8 @@ export class EvaluationWorker {
     try {
       const task = await loadTask(job);
       if (!task) throw new ProviderError("Evaluation task no longer exists");
+      await db.transaction(tx => assertFactoryAssistance(tx, job.projectId, "evidence", job.taskId));
+      if (!["pending", "proposed", "in_review"].includes(task.status)) throw new ProviderError("Task no longer needs evaluation");
       const result = await this.evaluate(task, job.mode as EvaluationMode);
       await saveSuccess(job, result, this.workerId, this.maxAttempts);
     } catch (error) {

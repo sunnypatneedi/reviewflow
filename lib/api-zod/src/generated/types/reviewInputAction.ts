@@ -13,4 +13,5 @@ export const ReviewInputAction = {
   accept: 'accept',
   correct: 'correct',
   escalate: 'escalate',
+  label: 'label',
 } as const;

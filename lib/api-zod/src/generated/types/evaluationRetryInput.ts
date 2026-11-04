@@ -11,4 +11,6 @@ export interface EvaluationRetryInput {
   taskId: string;
   mode: EvaluationRetryInputMode;
   ownerConsent: boolean;
+  /** Required for live mode; confirms review of actual outbound task text for private data */
+  outboundReviewed?: boolean;
 }

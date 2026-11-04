@@ -9,69 +9,66 @@ export interface HealthStatus {
   status: string;
 }
 
-export type Label = typeof Label[keyof typeof Label];
-
+export type Label = (typeof Label)[keyof typeof Label];
 
 export const Label = {
-  supported: 'supported',
-  contradicted: 'contradicted',
-  insufficient_evidence: 'insufficient_evidence',
+  supported: "supported",
+  contradicted: "contradicted",
+  insufficient_evidence: "insufficient_evidence",
 } as const;
 
-export type Risk = typeof Risk[keyof typeof Risk];
-
+export type Risk = (typeof Risk)[keyof typeof Risk];
 
 export const Risk = {
-  low: 'low',
-  medium: 'medium',
-  high: 'high',
+  low: "low",
+  medium: "medium",
+  high: "high",
 } as const;
 
-export type TaskStatus = typeof TaskStatus[keyof typeof TaskStatus];
-
+export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
 
 export const TaskStatus = {
-  pending: 'pending',
-  proposed: 'proposed',
-  in_review: 'in_review',
-  escalated: 'escalated',
-  finalized: 'finalized',
+  pending: "pending",
+  proposed: "proposed",
+  in_review: "in_review",
+  escalated: "escalated",
+  finalized: "finalized",
 } as const;
 
 export interface TaskInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   externalId: string;
   /**
-     * @minLength 1
-     * @maxLength 5000
-     */
+   * @minLength 1
+   * @maxLength 5000
+   */
   question: string;
   /**
-     * @minLength 1
-     * @maxLength 30000
-     */
+   * @minLength 1
+   * @maxLength 30000
+   */
   evidence: string;
   /**
-     * @minLength 1
-     * @maxLength 10000
-     */
+   * @minLength 1
+   * @maxLength 10000
+   */
   candidateAnswer: string;
   /**
-     * @maxLength 120
-     * @nullable
-     */
+   * @maxLength 120
+   * @nullable
+   */
   scenarioFamilyId?: string | null;
   risk: Risk;
 }
 
 export interface TaskImportInput {
   /**
-     * @minItems 1
-     * @maxItems 200
-     */
+   * @minItems 1
+   * @maxItems 200
+   */
   tasks: TaskInput[];
 }
 
@@ -81,15 +78,14 @@ export interface ImportResult {
   total: number;
 }
 
-export type ProposalMode = typeof ProposalMode[keyof typeof ProposalMode];
-
+export type ProposalMode = (typeof ProposalMode)[keyof typeof ProposalMode];
 
 export const ProposalMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;
 
-export type ProposalProbabilities = {[key: string]: number};
+export type ProposalProbabilities = { [key: string]: number };
 
 export interface Proposal {
   id: string;
@@ -98,21 +94,21 @@ export interface Proposal {
   model: string;
   label: Label;
   /**
-     * @minimum 0
-     * @maximum 1
-     */
+   * @minimum 0
+   * @maximum 1
+   */
   labelProbability: number;
   probabilities: ProposalProbabilities;
   /**
-     * @minimum 0
-     * @maximum 1
-     */
+   * @minimum 0
+   * @maximum 1
+   */
   injectionProbability: number;
   complexity: number;
   /**
-     * @minimum 0
-     * @maximum 1
-     */
+   * @minimum 0
+   * @maximum 1
+   */
   confidence: number;
   latencyMs: number;
   /** @nullable */
@@ -122,24 +118,23 @@ export interface Proposal {
   createdAt: string;
 }
 
-export type TaskMode = typeof TaskMode[keyof typeof TaskMode];
-
+export type TaskMode = (typeof TaskMode)[keyof typeof TaskMode];
 
 export const TaskMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;
 
 /**
  * @nullable
  */
-export type TaskFinalLabel = typeof TaskFinalLabel[keyof typeof TaskFinalLabel] | null;
-
+export type TaskFinalLabel =
+  (typeof TaskFinalLabel)[keyof typeof TaskFinalLabel] | null;
 
 export const TaskFinalLabel = {
-  supported: 'supported',
-  contradicted: 'contradicted',
-  insufficient_evidence: 'insufficient_evidence',
+  supported: "supported",
+  contradicted: "contradicted",
+  insufficient_evidence: "insufficient_evidence",
 } as const;
 
 export interface Task {
@@ -161,30 +156,32 @@ export interface Task {
   createdAt: string;
 }
 
-export type EvaluateInputMode = typeof EvaluateInputMode[keyof typeof EvaluateInputMode];
-
+export type EvaluateInputMode =
+  (typeof EvaluateInputMode)[keyof typeof EvaluateInputMode];
 
 export const EvaluateInputMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;
 
 export interface EvaluateInput {
   /**
-     * @minItems 1
-     * @maxItems 25
-     */
+   * @minItems 1
+   * @maxItems 25
+   */
   taskIds: string[];
   mode: EvaluateInputMode;
   ownerConsent: boolean;
+  /** Required for live mode; confirms review of actual outbound task text for private data */
+  outboundReviewed?: boolean;
 }
 
-export type EvaluateResultMode = typeof EvaluateResultMode[keyof typeof EvaluateResultMode];
-
+export type EvaluateResultMode =
+  (typeof EvaluateResultMode)[keyof typeof EvaluateResultMode];
 
 export const EvaluateResultMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;
 
 export interface EvaluateResult {
@@ -194,54 +191,242 @@ export interface EvaluateResult {
   mode: EvaluateResultMode;
 }
 
-export type EvaluationRetryInputMode = typeof EvaluationRetryInputMode[keyof typeof EvaluationRetryInputMode];
+export type EvaluationRetryInputMode =
+  (typeof EvaluationRetryInputMode)[keyof typeof EvaluationRetryInputMode];
+
+export const EvaluationRetryInputMode = {
+  demo: "demo",
+  live: "live",
+} as const;
+
+export interface EvaluationRetryInput {
+  taskId: string;
+  mode: EvaluationRetryInputMode;
+  ownerConsent: boolean;
+  /** Required for live mode; confirms review of actual outbound task text for private data */
+  outboundReviewed?: boolean;
+}
+
+export type EvaluationJobMode =
+  (typeof EvaluationJobMode)[keyof typeof EvaluationJobMode];
+
+export const EvaluationJobMode = {
+  demo: "demo",
+  live: "live",
+} as const;
+
+export type EvaluationJobStatus =
+  (typeof EvaluationJobStatus)[keyof typeof EvaluationJobStatus];
+
+export const EvaluationJobStatus = {
+  queued: "queued",
+  running: "running",
+  succeeded: "succeeded",
+  failed: "failed",
+} as const;
+
+export interface EvaluationJob {
+  id: string;
+  taskId: string;
+  mode: EvaluationJobMode;
+  status: EvaluationJobStatus;
+  attempts: number;
+  /** @nullable */
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ReviewItem {
   task: Task;
   routingReasons: string[];
 }
 
-export type ReviewInputAction = typeof ReviewInputAction[keyof typeof ReviewInputAction];
-
+export type ReviewInputAction =
+  (typeof ReviewInputAction)[keyof typeof ReviewInputAction];
 
 export const ReviewInputAction = {
-  accept: 'accept',
-  correct: 'correct',
-  escalate: 'escalate',
+  accept: "accept",
+  correct: "correct",
+  escalate: "escalate",
+  label: "label",
 } as const;
 
 /**
  * @nullable
  */
-export type ReviewInputCorrectedLabel = typeof ReviewInputCorrectedLabel[keyof typeof ReviewInputCorrectedLabel] | null;
-
+export type ReviewInputCorrectedLabel =
+  | (typeof ReviewInputCorrectedLabel)[keyof typeof ReviewInputCorrectedLabel]
+  | null;
 
 export const ReviewInputCorrectedLabel = {
-  supported: 'supported',
-  contradicted: 'contradicted',
-  insufficient_evidence: 'insufficient_evidence',
+  supported: "supported",
+  contradicted: "contradicted",
+  insufficient_evidence: "insufficient_evidence",
 } as const;
 
 export interface ReviewInput {
   taskId: string;
   version: number;
   action: ReviewInputAction;
+  /**
+   * Current fencing token when an active claim exists or claims are required
+   * @nullable
+   */
+  claimToken?: string | null;
   /** @nullable */
   correctedLabel?: ReviewInputCorrectedLabel;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   reason?: string | null;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   evidenceExcerpt?: string | null;
   /**
-     * @minimum 0
-     * @maximum 7200000
-     */
+   * @minimum 0
+   * @maximum 604800000
+   */
   activeMs: number;
+}
+
+export type FactoryPolicySchemaVersion =
+  (typeof FactoryPolicySchemaVersion)[keyof typeof FactoryPolicySchemaVersion];
+
+export const FactoryPolicySchemaVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type FactoryPolicyHighRiskLane =
+  (typeof FactoryPolicyHighRiskLane)[keyof typeof FactoryPolicyHighRiskLane];
+
+export const FactoryPolicyHighRiskLane = {
+  human_review: "human_review",
+  escalation: "escalation",
+} as const;
+
+export interface FactoryPolicy {
+  schemaVersion: FactoryPolicySchemaVersion;
+  assistanceAllowed: boolean;
+  requireAssignments: boolean;
+  highRiskLane: FactoryPolicyHighRiskLane;
+  /**
+   * @minimum 0
+   * @maximum 1
+   */
+  minimumConfidence: number;
+  /**
+   * @minimum 0
+   * @maximum 1
+   */
+  redirectionThreshold: number;
+}
+
+export interface FactoryPolicyInput {
+  /** @minimum 0 */
+  expectedRevision: number;
+  definition: FactoryPolicy;
+}
+
+export interface FactoryClaimInput {
+  /** @minimum 1 */
+  expectedVersion: number;
+  /**
+   * Current control revision required for explicit owner reassignment
+   * @minimum 0
+   */
+  expectedRevision?: number;
+  /**
+   * @minimum 1
+   * @maximum 15
+   */
+  minutes?: number;
+  /** @nullable */
+  claimToken?: string | null;
+  /** Current member user ID; authenticated owner required to assign another member */
+  assignedTo?: string;
+  /** Explicit owner reassignment of another active assignee */
+  reassign?: boolean;
+}
+
+export interface FactoryQuarantineInput {
+  /** @minimum 0 */
+  expectedRevision: number;
+  quarantined: boolean;
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   */
+  reason: string;
+}
+
+export type FactoryQueueFactory =
+  (typeof FactoryQueueFactory)[keyof typeof FactoryQueueFactory];
+
+export const FactoryQueueFactory = {
+  evidence: "evidence",
+  preference: "preference",
+} as const;
+
+export type FactoryQueuePolicy = {
+  revision: number;
+  definition: FactoryPolicy;
+};
+
+export type FactoryQueueItemsItemWorkKind =
+  (typeof FactoryQueueItemsItemWorkKind)[keyof typeof FactoryQueueItemsItemWorkKind];
+
+export const FactoryQueueItemsItemWorkKind = {
+  task: "task",
+  comparison: "comparison",
+  audit: "audit",
+} as const;
+
+export type FactoryQueueItemsItemLane =
+  (typeof FactoryQueueItemsItemLane)[keyof typeof FactoryQueueItemsItemLane];
+
+export const FactoryQueueItemsItemLane = {
+  human_review: "human_review",
+  assistance: "assistance",
+  escalation: "escalation",
+  blind_audit: "blind_audit",
+  quarantine: "quarantine",
+  complete: "complete",
+} as const;
+
+export type FactoryQueueItemsItem = {
+  id: string;
+  workKind: FactoryQueueItemsItemWorkKind;
+  title: string;
+  version: number;
+  lane: FactoryQueueItemsItemLane;
+  reasons: string[];
+  automaticAcceptance: false;
+  quarantined: boolean;
+  /** @nullable */
+  quarantineReason: string | null;
+  controlRevision: number;
+  /** @nullable */
+  assignedTo: string | null;
+  /** @nullable */
+  expiresAt: string | null;
+  /** @nullable */
+  claimToken: string | null;
+};
+
+export type FactoryQueueCounts = { [key: string]: number };
+
+export interface FactoryQueue {
+  factory: FactoryQueueFactory;
+  policy: FactoryQueuePolicy;
+  items: FactoryQueueItemsItem[];
+  counts: FactoryQueueCounts;
+  actor: string;
+  canConfigure: boolean;
+  releaseGate: string;
 }
 
 export interface Metrics {
@@ -264,19 +449,20 @@ export interface Metrics {
 
 export interface ReleaseInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   name: string;
   includeSourceText: boolean;
+  /** Explicit confirmation of actual source-text privacy review; required when includeSourceText is true */
+  privacyReviewed?: boolean;
 }
 
-export type ReleaseMode = typeof ReleaseMode[keyof typeof ReleaseMode];
-
+export type ReleaseMode = (typeof ReleaseMode)[keyof typeof ReleaseMode];
 
 export const ReleaseMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;
 
 export interface Release {
@@ -305,92 +491,27 @@ export interface Audit {
 
 export interface AuditInput {
   /**
-     * @minimum 1
-     * @maximum 200
-     */
+   * @minimum 1
+   * @maximum 200
+   */
   sampleSize: number;
   /**
-     * @maxLength 120
-     * @nullable
-     */
+   * @maxLength 120
+   * @nullable
+   */
   seed?: string | null;
   independent: boolean;
   required: boolean;
 }
-export type BootstrapMode = typeof BootstrapMode[keyof typeof BootstrapMode];
 
-
-export const BootstrapMode = {
-  demo: 'demo',
-  live: 'live',
-} as const;
-
-export interface Bootstrap {
-  projectName: string;
-  mode: BootstrapMode;
-  liveCredentialConfigured: boolean;
-  providerModel: string;
-  shadowPolicyVersion: string;
-  metrics: Metrics;
-  tasks: Task[];
-  releases: Release[];
-}
-
-export type ListEvaluationJobsParams = {
-/**
- * Task IDs in the selected evaluation batch.
- * @minItems 1
- * @maxItems 200
- */
-taskIds: string[];
-mode?: ListEvaluationJobsMode;
-};
-
-
-export interface AuditAdjudicationDispute {
-  id: string;
+export interface AuditDecisionInput {
   auditItemId: string;
-  taskId: string;
-  status: string;
-  originalLabel: Label;
-  auditLabel: Label;
-  question: string;
-  evidence: string;
-  candidateAnswer: string;
-  resolvedLabel: Label;
-}
-
-export interface AuditTaskDecision {
   label: Label;
-  /** @nullable */
-  reason?: string | null;
-  selfCheck: boolean;
-  included: boolean;
-}
-
-export type AuditAdjudicationDetail = Audit & {
-  disputes: AuditAdjudicationDispute[];
-};
-
-export interface AdjudicationInput {
-  resolvedLabel: Label;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   reason?: string | null;
-}
-
-export interface AuditDispute {
-  id: string;
-  auditId: string;
-  auditItemId: string;
-  taskId: string;
-  originalLabel: Label;
-  auditLabel: Label;
-  status: string;
-  resolvedLabel: Label;
-  adjudicatorId: string;
 }
 
 export interface AuditDecisionResult {
@@ -406,27 +527,13 @@ export interface AuditDecisionResult {
   status: string;
 }
 
-export interface AuditDecisionInput {
-  auditItemId: string;
+export interface AuditTaskDecision {
   label: Label;
-  /**
-     * @maxLength 2000
-     * @nullable
-     */
+  /** @nullable */
   reason?: string | null;
+  selfCheck: boolean;
+  included: boolean;
 }
-
-export interface AuditDisputeSummary {
-  id: string;
-  auditItemId: string;
-  taskId: string;
-  status: string;
-}
-
-export type AuditDetail = Audit & {
-  items: AuditItem[];
-  disputes: AuditDisputeSummary[];
-};
 
 export interface AuditItem {
   id: string;
@@ -441,48 +548,88 @@ export interface AuditItem {
   decision: AuditTaskDecision | null;
 }
 
-export const EvaluationRetryInputMode = {
-  demo: 'demo',
-  live: 'live',
+export interface AuditDisputeSummary {
+  id: string;
+  auditItemId: string;
+  taskId: string;
+  status: string;
+}
+
+export type AuditDetail = Audit & {
+  items: AuditItem[];
+  disputes: AuditDisputeSummary[];
+};
+
+export interface AuditAdjudicationDispute {
+  id: string;
+  auditItemId: string;
+  taskId: string;
+  status: string;
+  originalLabel: Label;
+  auditLabel: Label;
+  question: string;
+  evidence: string;
+  candidateAnswer: string;
+  resolvedLabel: Label;
+}
+
+export type AuditAdjudicationDetail = Audit & {
+  disputes: AuditAdjudicationDispute[];
+};
+
+export interface AdjudicationInput {
+  resolvedLabel: Label;
+  /**
+   * @maxLength 2000
+   * @nullable
+   */
+  reason?: string | null;
+}
+
+export interface AuditDispute {
+  id: string;
+  auditId: string;
+  auditItemId: string;
+  taskId: string;
+  originalLabel: Label;
+  auditLabel: Label;
+  status: string;
+  resolvedLabel: Label;
+  adjudicatorId: string;
+}
+
+export type BootstrapMode = (typeof BootstrapMode)[keyof typeof BootstrapMode];
+
+export const BootstrapMode = {
+  demo: "demo",
+  live: "live",
 } as const;
 
-export const EvaluationJobStatus = {
-  queued: 'queued',
-  running: 'running',
-  succeeded: 'succeeded',
-  failed: 'failed',
-} as const;
+export interface Bootstrap {
+  projectName: string;
+  mode: BootstrapMode;
+  liveCredentialConfigured: boolean;
+  providerModel: string;
+  shadowPolicyVersion: string;
+  metrics: Metrics;
+  tasks: Task[];
+  releases: Release[];
+}
 
-export const EvaluationJobMode = {
-  demo: 'demo',
-  live: 'live',
-} as const;
+export type ListEvaluationJobsParams = {
+  /**
+   * Task IDs in the selected evaluation batch.
+   * @minItems 1
+   * @maxItems 200
+   */
+  taskIds: string[];
+  mode?: ListEvaluationJobsMode;
+};
 
-export type EvaluationJobStatus = typeof EvaluationJobStatus[keyof typeof EvaluationJobStatus];
+export type ListEvaluationJobsMode =
+  (typeof ListEvaluationJobsMode)[keyof typeof ListEvaluationJobsMode];
 
 export const ListEvaluationJobsMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;
-
-export interface EvaluationJob {
-  id: string;
-  taskId: string;
-  mode: EvaluationJobMode;
-  status: EvaluationJobStatus;
-  attempts: number;
-  /** @nullable */
-  lastError: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type EvaluationJobMode = typeof EvaluationJobMode[keyof typeof EvaluationJobMode];
-
-export interface EvaluationRetryInput {
-  taskId: string;
-  mode: EvaluationRetryInputMode;
-  ownerConsent: boolean;
-}
-
-export type ListEvaluationJobsMode = typeof ListEvaluationJobsMode[keyof typeof ListEvaluationJobsMode];

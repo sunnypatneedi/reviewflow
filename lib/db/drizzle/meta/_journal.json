@@ -22,6 +22,13 @@
       "when": 1789879712178,
       "tag": "0002_release_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789879712179,
+      "tag": "0003_factories",
+      "breakpoints": true
     }
   ]
 }

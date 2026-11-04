@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { db, projectsTable, tasksTable, proposalsTable, reviewsTable, auditsTable, auditItemsTable, auditDecisionsTable, auditDisputesTable, releasesTable } from "@workspace/db";
 import { samplingFrameHash, selectDeterministicSample } from "./audits";
+import { assertFactoryRelease } from "./factories";
 
 type Task = typeof tasksTable.$inferSelect;
 type Review = typeof reviewsTable.$inferSelect;
@@ -15,7 +16,7 @@ const labels = ["supported", "contradicted", "insufficient_evidence"];
 const hash = (text: string) => createHash("sha256").update(text).digest("hex");
 
 export function originalFinalReview(task: Task, reviews: Review[], version = task.version, label = task.finalLabel) {
-  const rows = reviews.filter(r => r.taskId === task.id && r.projectId === task.projectId && r.taskVersion === version - 1 && ["accept", "correct"].includes(r.action));
+  const rows = reviews.filter(r => r.taskId === task.id && r.projectId === task.projectId && r.taskVersion === version - 1 && ["accept", "correct", "label"].includes(r.action));
   return rows.length === 1 && rows[0].label === label ? rows[0] : undefined;
 }
 
@@ -114,7 +115,7 @@ export function releaseSamplingFrame(tasks: Task[], reviews: Review[], auditorId
     // The original review remains immutable. Subsequent audit snapshots bind the
     // current adjudication pointer/version, rather than treating it as a review.
     const original = task.finalAdjudicationId
-      ? reviews.filter(r => r.taskId === task.id && r.projectId === task.projectId && ["accept", "correct"].includes(r.action)).sort((a, b) => b.taskVersion - a.taskVersion)[0]
+      ? reviews.filter(r => r.taskId === task.id && r.projectId === task.projectId && ["accept", "correct", "label"].includes(r.action)).sort((a, b) => b.taskVersion - a.taskVersion)[0]
       : originalFinalReview(task, reviews);
     if (!original || !task.finalLabel) return [];
     const reviewerId = task.finalAdjudicationId ? disputes.find(d => d.id === task.finalAdjudicationId)?.adjudicatorId : original.reviewerId;
@@ -143,10 +144,12 @@ function auditCoversCurrentPopulation(audit: Audit, tasks: Task[], evidence: Evi
   });
 }
 
-export async function createRelease(projectId: string, name: string, includeSourceText: boolean, actorId: string) {
+export async function createRelease(projectId: string, name: string, includeSourceText: boolean, actorId: string, privacyReviewed = false) {
+  if (includeSourceText && !privacyReviewed) return blocked("including source text requires explicit confirmation that the actual text was reviewed for private data");
   // Every read, gate, provenance field and byte is from one MVCC snapshot.
   // A concurrent correction can yield a valid before/after release, never a mix.
   return db.transaction(async tx => {
+    const factory = await assertFactoryRelease(tx, projectId, "evidence");
     const [project] = await tx.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) return blocked("project missing");
     const tasks = await tx.select().from(tasksTable).where(eq(tasksTable.projectId, projectId)).orderBy(tasksTable.id);
@@ -172,18 +175,21 @@ export async function createRelease(projectId: string, name: string, includeSour
     const lines = tasks.map(t => {
       const final = finalDecisions.get(t.id)!;
       const proposal = proposals.find(p => p.id === final.review.proposalId && p.taskId === t.id);
-      if (!proposal) return blocked("final review proposal missing");
+      if (!proposal && (final.review.action !== "label" || final.review.proposalId !== null)) return blocked("final review proposal missing");
       return JSON.stringify({ external_id: t.externalId, label: t.finalLabel, risk: t.risk, mode: t.mode,
         ...(includeSourceText ? { question: t.question, evidence: t.evidence, candidate_answer: t.candidateAnswer } : {}),
-        provenance: { task_hash: t.contentHash, task_version: t.version, proposal_id: proposal.id, review_id: final.review.id,
+        provenance: { task_hash: t.contentHash, task_version: t.version, proposal_id: proposal?.id ?? null, review_id: final.review.id,
+          review_mode: final.review.proposalId === null ? "human_only" : "model_assisted", factory_policy_revision: final.review.factoryPolicyRevision,
           ...(final.chain.length ? { original_review_id: final.review.id, adjudication_id: final.chain[0].id, adjudication_ids: final.chain.map(d => d.id) } : {}),
           rubric_version: project.rubricVersion, policy_version: project.shadowPolicyVersion, release_audit_policy_version: policy,
-          audit_ids: covering.map(a => a.id), model: proposal.returnedModel } });
+          audit_ids: covering.map(a => a.id), model: proposal?.returnedModel ?? null } });
     });
     const jsonl = lines.join("\n") + "\n", digest = hash(jsonl);
     const [release] = await tx.insert(releasesTable).values({ id: randomUUID(), projectId, name: name.trim(), mode: project.mode, itemCount: tasks.length,
       includeSourceText, digest, jsonl, createdBy: actorId, manifest: { source_hashes: tasks.map(t => t.contentHash), rubric_version: project.rubricVersion,
         policy_version: project.shadowPolicyVersion, release_audit_policy_version: policy, audit_ids: covering.map(a => a.id),
+        factory: { name: "evidence", ...factory },
+        privacy_reviewed: privacyReviewed,
         content_digest: digest, model_versions: [...new Set(proposals.map(p => p.returnedModel))] } }).returning();
     return release;
   }, { isolationLevel: "repeatable read" });

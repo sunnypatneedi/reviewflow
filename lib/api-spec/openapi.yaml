@@ -315,6 +315,65 @@ paths:
               schema: { $ref: "#/components/schemas/AuditDispute" }
         "403": { description: Auditor or original reviewer cannot adjudicate }
         "409": { description: Disagreement already resolved }
+  /reviewflow/factories/{factory}:
+    parameters:
+      - { in: path, name: factory, required: true, schema: { type: string, enum: [evidence, preference] } }
+    get:
+      operationId: getFactoryQueue
+      tags: [reviewflow]
+      responses:
+        "200":
+          description: Routed work metadata, policy revision and actor-scoped work claims; no labels or candidate identities
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FactoryQueue" }
+  /reviewflow/factories/{factory}/policy:
+    parameters:
+      - { in: path, name: factory, required: true, schema: { type: string, enum: [evidence, preference] } }
+    post:
+      operationId: createFactoryPolicyRevision
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FactoryPolicyInput" }
+      responses:
+        "201": { description: Immutable policy revision created }
+        "403": { description: Owner required }
+        "409": { description: Policy changed; reload }
+  /reviewflow/factories/{factory}/items/{id}/claim:
+    parameters:
+      - { in: path, name: factory, required: true, schema: { type: string, enum: [evidence, preference] } }
+      - { in: path, name: id, required: true, schema: { type: string } }
+    post:
+      operationId: claimFactoryWork
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FactoryClaimInput" }
+      responses:
+        "201": { description: "Expiring claim created with a new fencing token; token returned only to assignee" }
+        "403": { description: Role cannot assign this member }
+        "409": { description: "Version, current claim or quarantine conflict" }
+  /reviewflow/factories/{factory}/items/{id}/quarantine:
+    parameters:
+      - { in: path, name: factory, required: true, schema: { type: string, enum: [evidence, preference] } }
+      - { in: path, name: id, required: true, schema: { type: string } }
+    post:
+      operationId: setFactoryQuarantine
+      tags: [reviewflow]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FactoryQuarantineInput" }
+      responses:
+        "200": { description: "Hold updated, claims revoked, audit event committed" }
+        "403": { description: Owner required }
+        "409": { description: Controls changed; reload }
 components:
   schemas:
     HealthStatus:
@@ -409,6 +468,7 @@ components:
           items: { type: string }
         mode: { type: string, enum: [demo, live] }
         ownerConsent: { type: boolean }
+        outboundReviewed: { type: boolean, description: Required for live mode; confirms review of actual outbound task text for private data }
     EvaluateResult:
       type: object
       required: [processed, failed, queued, mode]
@@ -424,6 +484,7 @@ components:
         taskId: { type: string }
         mode: { type: string, enum: [demo, live] }
         ownerConsent: { type: boolean }
+        outboundReviewed: { type: boolean, description: Required for live mode; confirms review of actual outbound task text for private data }
     EvaluationJob:
       type: object
       required: [id, taskId, mode, status, attempts, lastError, createdAt, updatedAt]
@@ -450,11 +511,80 @@ components:
       properties:
         taskId: { type: string }
         version: { type: integer }
-        action: { type: string, enum: [accept, correct, escalate] }
+        action: { type: string, enum: [accept, correct, escalate, label] }
+        claimToken: { type: [string, "null"], description: Current fencing token when an active claim exists or claims are required }
         correctedLabel: { type: ["string", "null"], enum: [supported, contradicted, insufficient_evidence, null] }
         reason: { type: ["string", "null"], maxLength: 2000 }
         evidenceExcerpt: { type: ["string", "null"], maxLength: 2000 }
-        activeMs: { type: integer, minimum: 0, maximum: 7200000 }
+        activeMs: { type: integer, minimum: 0, maximum: 604800000 }
+    FactoryPolicy:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, assistanceAllowed, requireAssignments, highRiskLane, minimumConfidence, redirectionThreshold]
+      properties:
+        schemaVersion: { type: integer, enum: [1] }
+        assistanceAllowed: { type: boolean }
+        requireAssignments: { type: boolean }
+        highRiskLane: { type: string, enum: [human_review, escalation] }
+        minimumConfidence: { type: number, minimum: 0, maximum: 1 }
+        redirectionThreshold: { type: number, minimum: 0, maximum: 1 }
+    FactoryPolicyInput:
+      type: object
+      required: [expectedRevision, definition]
+      properties:
+        expectedRevision: { type: integer, minimum: 0 }
+        definition: { $ref: "#/components/schemas/FactoryPolicy" }
+    FactoryClaimInput:
+      type: object
+      required: [expectedVersion]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        expectedRevision: { type: integer, minimum: 0, description: Current control revision required for explicit owner reassignment }
+        minutes: { type: integer, minimum: 1, maximum: 15, default: 10 }
+        claimToken: { type: [string, "null"] }
+        assignedTo: { type: string, description: Current member user ID; authenticated owner required to assign another member }
+        reassign: { type: boolean, description: Explicit owner reassignment of another active assignee }
+    FactoryQuarantineInput:
+      type: object
+      required: [expectedRevision, quarantined, reason]
+      properties:
+        expectedRevision: { type: integer, minimum: 0 }
+        quarantined: { type: boolean }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+    FactoryQueue:
+      type: object
+      required: [factory, policy, items, counts, actor, canConfigure, releaseGate]
+      properties:
+        factory: { type: string, enum: [evidence, preference] }
+        policy:
+          type: object
+          required: [revision, definition]
+          properties:
+            revision: { type: integer }
+            definition: { $ref: "#/components/schemas/FactoryPolicy" }
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, workKind, title, version, lane, reasons, automaticAcceptance, quarantined, quarantineReason, controlRevision, assignedTo, expiresAt, claimToken]
+            properties:
+              id: { type: string }
+              workKind: { type: string, enum: [task, comparison, audit] }
+              title: { type: string }
+              version: { type: integer }
+              lane: { type: string, enum: [human_review, assistance, escalation, blind_audit, quarantine, complete] }
+              reasons: { type: array, items: { type: string } }
+              automaticAcceptance: { type: boolean, enum: [false] }
+              quarantined: { type: boolean }
+              quarantineReason: { type: [string, "null"] }
+              controlRevision: { type: integer }
+              assignedTo: { type: [string, "null"] }
+              expiresAt: { type: [string, "null"], format: date-time }
+              claimToken: { type: [string, "null"] }
+        counts: { type: object, additionalProperties: { type: integer } }
+        actor: { type: string }
+        canConfigure: { type: boolean }
+        releaseGate: { type: string }
     Metrics:
       type: object
       required: [total, pending, proposed, escalated, finalized, failures, corrections, correctionDenominator, shadowCoverage, averageReviewMs, averageLatencyMs, independentAccuracy]
@@ -477,6 +607,7 @@ components:
       properties:
         name: { type: string, minLength: 1, maxLength: 120 }
         includeSourceText: { type: boolean }
+        privacyReviewed: { type: boolean, description: Explicit confirmation of actual source-text privacy review; required when includeSourceText is true }
     Release:
       type: object
       required: [id, name, itemCount, mode, digest, createdAt, includeSourceText]

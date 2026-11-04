@@ -106,7 +106,7 @@ assert.equal(emptyQueue.body, null);
 
 const released = await request("/reviewflow/releases", {
   method: "POST",
-  body: JSON.stringify({ name: "isolated-e2e", includeSourceText: true }),
+  body: JSON.stringify({ name: "isolated-e2e", includeSourceText: true, privacyReviewed: true }),
 });
 assert.equal(released.response.status, 201);
 assert.equal(released.body.itemCount, 21);

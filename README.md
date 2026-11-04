@@ -48,6 +48,9 @@ context, unmatched runs, and nonbinary outcomes stay in the complete record;
 only eligible human-finalized directional preferences enter training JSONL.
 
 The original **Tasks → Review → Releases** evidence-labeling path remains.
+**Factories & lanes** adds human-only evidence review, versioned routing policies,
+expiring work claims and quarantine gates. See the [implementation and launch
+boundaries](docs/factory-lanes.md).
 This command uses a temporary database; stopping it discards that demo only.
 See [setup](docs/setup.md) and the reusable [Python CLI](docs/trace-python.md).
 

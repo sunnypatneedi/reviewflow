@@ -1,4 +1,5 @@
-import express, { type Express } from "express";
+import express, { type Express, type ErrorRequestHandler } from "express";
+import { FactoryError } from "./lib/factory-engine";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
@@ -66,5 +67,9 @@ app.use(protectCredentialedWrites(config));
 app.use(enforceLiveInference(config));
 
 app.use("/api", router);
+app.use(((error, _req, res, next) => {
+  if (error instanceof FactoryError) res.status(error.status).json({ error: error.message });
+  else next(error);
+}) satisfies ErrorRequestHandler);
 
 export default app;

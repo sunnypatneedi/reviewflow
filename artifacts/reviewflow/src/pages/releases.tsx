@@ -14,14 +14,16 @@ export default function Releases() {
   
   const [name, setName] = useState("");
   const [includeSourceText, setIncludeSourceText] = useState(false);
+  const [privacyReviewed, setPrivacyReviewed] = useState(false);
 
   const handleCreate = () => {
     createRelease.mutate({
-      data: { name, includeSourceText }
+      data: { name, includeSourceText, privacyReviewed }
     }, {
       onSuccess: () => {
         setName("");
         setIncludeSourceText(false);
+        setPrivacyReviewed(false);
         queryClient.invalidateQueries({ queryKey: getListReleasesQueryKey() });
       }
     });
@@ -108,10 +110,12 @@ export default function Releases() {
               <input type="checkbox" id="includeSource" className="mt-1 accent-primary" checked={includeSourceText} onChange={e => setIncludeSourceText(e.target.checked)} />
               <label htmlFor="includeSource" className="text-sm text-foreground/80 leading-tight">
                 Include Source Text<br/>
-                <span className="text-xs text-muted-foreground">Embeds full evidence text in export. Increases file size significantly.</span>
+                <span className="text-xs text-muted-foreground">Embeds the question, evidence and candidate answer. Review that text for private data before sharing.</span>
               </label>
             </div>
-            <Button className="w-full" onClick={handleCreate} disabled={!name || createRelease.isPending}>
+            {includeSourceText && <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={privacyReviewed} onChange={event => setPrivacyReviewed(event.target.checked)} />I reviewed the actual source text for private data and authorize including it.</label>}
+            {createRelease.isError && <p role="alert" className="text-sm text-destructive">{createRelease.error.message}</p>}
+            <Button className="w-full" onClick={handleCreate} disabled={!name || createRelease.isPending || (includeSourceText && !privacyReviewed)}>
               {createRelease.isPending ? "Cutting Release..." : "Cut Release"}
             </Button>
           </div>

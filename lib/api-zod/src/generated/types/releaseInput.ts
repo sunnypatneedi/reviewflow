@@ -13,4 +13,6 @@ export interface ReleaseInput {
      */
   name: string;
   includeSourceText: boolean;
+  /** Explicit confirmation of actual source-text privacy review; required when includeSourceText is true */
+  privacyReviewed?: boolean;
 }

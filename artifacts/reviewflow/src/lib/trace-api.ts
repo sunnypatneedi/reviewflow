@@ -1,6 +1,15 @@
 export const traceBase = "/api/reviewflow/traces";
 
 export async function traceRequest<T>(path: string, body?: unknown): Promise<T> {
+  // Claims are scoped to the authenticated actor by the server. Fetch the current
+  // fencing token so the preference workbench can use a claim from Factories.
+  const comparisonId = /^\/comparisons\/([^/]+)\//.exec(path)?.[1];
+  if (body && typeof body === "object" && comparisonId) {
+    const claims = await fetch("/api/reviewflow/factories/preference", { credentials: "same-origin" });
+    if (!claims.ok) throw new Error("Could not verify work claim. Reload the factory queue.");
+    const queue = await claims.json() as { items: Array<{ id: string; claimToken: string | null }> };
+    body = { ...body, claimToken: queue.items.find(item => item.id === decodeURIComponent(comparisonId))?.claimToken ?? null };
+  }
   const response = await fetch(`${traceBase}${path}`, {
     credentials: "same-origin",
     headers: { Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json", "x-reviewflow-csrf": "1" }) },

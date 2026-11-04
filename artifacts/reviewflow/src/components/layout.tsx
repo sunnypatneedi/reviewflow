@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 const NAV_ITEMS = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
+  { href: "/factories", label: "Factories & lanes", icon: ListTodo },
   { href: "/traces", label: "Trace2Preference", icon: GitCompareArrows },
   { href: "/review", label: "Review", icon: CheckSquare },
   { href: "/audits", label: "Audits", icon: ShieldCheck },

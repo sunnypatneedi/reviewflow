@@ -17,6 +17,7 @@ import Audits from '@/pages/audits';
 import Releases from '@/pages/releases';
 import Settings from '@/pages/settings';
 import Traces from '@/pages/traces';
+import Factories from '@/pages/factories';
 
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -123,6 +124,7 @@ function AppRoutes() {
             {appMode === "clerk" && <Route path="/sign-up/*?" component={SignUpPage} />}
             <Route path="/"><HomeRedirect /></Route>
             <Route path="/tasks"><ProtectedRoute component={Tasks} /></Route>
+            <Route path="/factories"><ProtectedRoute component={Factories} /></Route>
             <Route path="/traces"><ProtectedRoute component={Traces} /></Route>
             <Route path="/review"><ProtectedRoute component={Review} /></Route>
             <Route path="/audits"><ProtectedRoute component={Audits} /></Route>

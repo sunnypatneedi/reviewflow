@@ -15,4 +15,6 @@ export interface EvaluateInput {
   taskIds: string[];
   mode: EvaluateInputMode;
   ownerConsent: boolean;
+  /** Required for live mode; confirms review of actual outbound task text for private data */
+  outboundReviewed?: boolean;
 }

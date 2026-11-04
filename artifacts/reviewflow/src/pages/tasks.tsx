@@ -78,7 +78,8 @@ export default function Tasks() {
       data: {
         taskIds: Array.from(selectedTasks),
         mode: evalMode,
-        ownerConsent: consent
+        ownerConsent: consent,
+        outboundReviewed: consent
       }
     }, {
       onSuccess: () => {
@@ -98,7 +99,7 @@ export default function Tasks() {
     }
     setRetryingJobId(job.id);
     retryEvaluationJob.mutate({
-      data: { taskId: job.taskId, mode: job.mode, ownerConsent: consent },
+      data: { taskId: job.taskId, mode: job.mode, ownerConsent: consent, outboundReviewed: consent },
     }, {
       onSettled: () => setRetryingJobId(null),
       onSuccess: () => {
@@ -266,7 +267,7 @@ export default function Tasks() {
               <div className="flex items-start gap-2 pt-2 bg-amber-50 p-3 rounded-md border border-amber-200">
                 <input type="checkbox" id="consent" className="mt-1 accent-amber-600" checked={consent} onChange={e => setConsent(e.target.checked)} />
                 <label htmlFor="consent" className="text-xs text-amber-900 leading-tight">
-                  I explicitly authorize hitting the live API for these tasks, incurring real usage costs.
+                  I reviewed the actual task text for private data and authorize sending it to the live provider, incurring real usage costs.
                 </label>
               </div>
             )}

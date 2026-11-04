@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { db, traceRecordsTable } from "@workspace/db";
 import { RELEASE_ROLES, REVIEW_ROLES, type ProjectRole } from "./authorization";
+import { assertFactoryRelease, assertFactoryWork } from "../lib/factories";
+import { FactoryError } from "../lib/factory-engine";
 import {
   TraceError, assertVersion, assertNoReferenceLeakage, comparisonView, measuredEffort, publicProposal, shareableEvidence, stableJson, traceHash, traceProposal,
   tracePython, validateReview, type TraceObject,
@@ -50,7 +52,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
         if (!await helpers.requireProjectAccess(req, res, context, roles)) return;
         await action(req, res, context, helpers.identity(req));
       } catch (error) {
-        if (error instanceof TraceError) res.status(error.status).json({ error: error.message });
+        if (error instanceof TraceError || error instanceof FactoryError) res.status(error.status).json({ error: error.message });
         else res.status(500).json({ error: "Trace operation failed; no partial update was committed" });
       }
     });
@@ -104,6 +106,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
   });
   route("post", "/comparisons/:id/reveal", REVIEW_ROLES, async (req, res, { project }, actor) => {
     const updated = await locked(project.id, async tx => {
+      await assertFactoryWork(tx, { projectId: project.id, factory: "preference", itemId: String(req.params.id), actorId: actor, claimToken: req.body?.claimToken, assistance: true });
       const value = await find(tx, project.id, "comparison", String(req.params.id));
       if (!value.reveals.some((entry: TraceObject) => entry.actor === actor)) {
         value.reveals.push({ actor, createdAt: new Date().toISOString(), proposalPresent: Boolean(value.proposal) });
@@ -116,6 +119,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
   route("post", "/comparisons/:id/reviews", REVIEW_ROLES, async (req, res, context, actor) => {
     const input = validateReview(req.body ?? {});
     const updated = await locked(context.project.id, async tx => {
+      const { policy } = await assertFactoryWork(tx, { projectId: context.project.id, factory: "preference", itemId: String(req.params.id), actorId: actor, claimToken: req.body?.claimToken });
       const value = await find(tx, context.project.id, "comparison", String(req.params.id));
       assertVersion(value, input.expectedVersion);
       if (value.review?.decision === "escalate" && context.userId && !RELEASE_ROLES.includes(context.role!)) throw new TraceError("An owner or adjudicator must resolve escalated comparisons", 403);
@@ -124,6 +128,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
         decision: input.decision, evidenceRefs: input.evidenceRefs, effort: input.effort,
         actor, assisted: value.reveals.some((entry: TraceObject) => entry.actor === actor),
         interface: "reviewflow", createdAt: new Date().toISOString(), revision: value.version + 1,
+        factoryPolicyRevision: policy.revision,
       };
       value.version++;
       if (value.quality.createdAt) value.qualityHistory = [...(value.qualityHistory ?? []), value.quality];
@@ -140,6 +145,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
     }
     const effort = measuredEffort(req.body?.effort, ["auditMs", "waitingMs"]);
     const updated = await locked(project.id, async tx => {
+      await assertFactoryWork(tx, { projectId: project.id, factory: "preference", itemId: String(req.params.id), actorId: actor, claimToken: req.body?.claimToken });
       const value = await find(tx, project.id, "comparison", String(req.params.id));
       assertVersion(value, req.body.expectedVersion);
       if (value.quality.createdAt) value.qualityHistory = [...(value.qualityHistory ?? []), value.quality];
@@ -150,7 +156,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
     });
     res.json(comparisonView(updated, actor));
   });
-  route("post", "/comparisons/:id/proposals", REVIEW_ROLES, async (req, res, context) => {
+  route("post", "/comparisons/:id/proposals", REVIEW_ROLES, async (req, res, context, actor) => {
     const provider = req.body?.provider ?? "simulator";
     if (provider !== "simulator" && provider !== "jev") throw new TraceError("Choose simulator or jev");
     if (provider === "jev") {
@@ -160,6 +166,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
     }
     const requestId = randomUUID();
     const snapshot = await locked(context.project.id, async tx => {
+      await assertFactoryWork(tx, { projectId: context.project.id, factory: "preference", itemId: String(req.params.id), actorId: actor, claimToken: req.body?.claimToken, assistance: true });
       const value = await find(tx, context.project.id, "comparison", String(req.params.id));
       if (value.proposal) throw new TraceError("A proposal already exists for this comparison", 409);
       if (value.proposalRequest?.expiresAt > Date.now()) throw new TraceError("A proposal request is already running; retry after its bounded lease expires", 409);
@@ -173,6 +180,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
     try {
       const proposal = await traceProposal(snapshot, provider);
       await locked(context.project.id, async tx => {
+        await assertFactoryWork(tx, { projectId: context.project.id, factory: "preference", itemId: snapshot.id, actorId: actor, claimToken: req.body?.claimToken, assistance: true });
         const value = await find(tx, context.project.id, "comparison", snapshot.id);
         assertVersion(value, snapshot.version);
         if (value.proposal || value.proposalRequest?.requestId !== requestId) throw new TraceError("Another proposal request superseded this result. No result was overwritten.", 409);
@@ -199,6 +207,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
   route("post", "/releases", RELEASE_ROLES, async (req, res, { project }) => {
     if (typeof req.body?.name !== "string" || !req.body.name.trim() || req.body.name.length > 150) throw new TraceError("A release name (1–150 characters) is required");
     const release = await locked(project.id, async tx => {
+      const factory = await assertFactoryRelease(tx, project.id, "preference");
       const comparisons = await rows(tx, project.id, "comparison");
       if (!comparisons.length) throw new TraceError("Import traces before creating a release", 409);
       const decisions = comparisons.filter(row => row.review).map(row => ({
@@ -220,6 +229,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
         const publicReview = (review: TraceObject) => ({
           decision: review.decision, evidenceRefs: review.evidenceRefs, effort: review.effort,
           assisted: review.assisted, interface: review.interface, createdAt: review.createdAt, revision: review.revision,
+          factoryPolicyRevision: review.factoryPolicyRevision ?? null,
         });
         record.reviewHistory = [...source.history, ...(source.review ? [source.review] : [])].map(publicReview);
         record.assistedReveals = source.reveals.map((reveal: TraceObject) => ({
@@ -233,7 +243,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
           reviewMode: source.pendingAnnotation.reviewMode, importedAt: source.pendingAnnotation.importedAt, finalized: false } : null;
       }
       // Python owns pseudonymization/grouped splitting and exclusion semantics.
-      const snapshot = { schemaVersion: 1, rubricVersion: "trace-preference-v1", createdAt: new Date().toISOString(), ...shareableEvidence(exported, salts[0].value) };
+      const snapshot = { schemaVersion: 1, rubricVersion: "trace-preference-v1", factory: { name: "preference", ...factory }, createdAt: new Date().toISOString(), ...shareableEvidence(exported, salts[0].value) };
       const value = { id: randomUUID(), name: req.body.name.trim(), createdAt: snapshot.createdAt,
         itemCount: exported.complete.length, trainingCount: exported.training.length,
         digest: traceHash(stableJson(snapshot)), snapshot };
@@ -252,8 +262,10 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
       : release.snapshot.training.map((row: TraceObject) => JSON.stringify(row)).join("\n") + (release.snapshot.training.length ? "\n" : ""));
   });
   route("get", "/labelstudio", RELEASE_ROLES, async (req, res, { project }) => {
+    const factory = await assertFactoryRelease(db, project.id, "preference");
     const condition = req.query.condition ?? "human_only";
     if (!["human_only", "model_assisted"].includes(String(condition))) throw new TraceError("Choose human_only or model_assisted kit condition");
+    if (condition === "model_assisted" && !factory.definition.assistanceAllowed) throw new FactoryError("Assistance is disabled by this factory policy", 403);
     const comparisons = await rows(db, project.id, "comparison");
     const validation = { schemaVersion: 1, runs: await rows(db, project.id, "run"),
       comparisons: comparisons.map(({ review, history, reveals, quality, proposal, version, ...comparison }) => comparison), issues: [] };
@@ -279,6 +291,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
         proposals: comparisons.filter(c => c.proposal).map(c => ({ comparisonId: c.id, outcome: c.proposal.decision === "escalate" ? "escalation" : c.proposal.decision, provider: c.proposal.provider, simulated: c.proposal.simulated })) });
       const result = await tracePython("reconcile", { manifest: kit.manifest, annotations: req.body.annotations });
       for (const decision of result.decisions) {
+        await assertFactoryWork(tx, { projectId: project.id, factory: "preference", itemId: decision.comparisonId, actorId: actor, claimToken: req.body?.claimTokens?.[decision.comparisonId], assistance: req.body.reviewMode === "model_assisted" });
         const value = await find(tx, project.id, "comparison", decision.comparisonId);
         assertVersion(value, req.body.expectedVersions[value.id]);
         if (value.pendingAnnotation) throw new TraceError("Confirm the existing pending annotation before importing another", 409);
@@ -301,6 +314,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
   });
   route("post", "/comparisons/:id/confirm-labelstudio", RELEASE_ROLES, async (req, res, { project }, actor) => {
     const updated = await locked(project.id, async tx => {
+      const { policy } = await assertFactoryWork(tx, { projectId: project.id, factory: "preference", itemId: String(req.params.id), actorId: actor, claimToken: req.body?.claimToken });
       const value = await find(tx, project.id, "comparison", String(req.params.id));
       assertVersion(value, req.body?.expectedVersion);
       if (!value.pendingAnnotation) throw new TraceError("No pending Label Studio annotation to confirm", 409);
@@ -310,6 +324,7 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
         actor, assisted: value.pendingAnnotation.reviewMode === "model_assisted",
         interface: "labelstudio", createdAt: new Date().toISOString(), revision: value.version + 1,
         confirmationInterface: "reviewflow", annotationDigest: value.pendingAnnotation.annotationDigest };
+      value.review.factoryPolicyRevision = policy.revision;
       value.pendingAnnotation = null;
       value.version++;
       if (value.quality.createdAt) value.qualityHistory = [...(value.qualityHistory ?? []), value.quality];

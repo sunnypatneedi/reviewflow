@@ -5,10 +5,7 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import {
-  useMutation,
-  useQuery
-} from '@tanstack/react-query';
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MutationFunction,
   QueryFunction,
@@ -16,8 +13,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult
-} from '@tanstack/react-query';
+  UseQueryResult,
+} from "@tanstack/react-query";
 
 import type {
   AdjudicationInput,
@@ -33,6 +30,10 @@ import type {
   EvaluateResult,
   EvaluationJob,
   EvaluationRetryInput,
+  FactoryClaimInput,
+  FactoryPolicyInput,
+  FactoryQuarantineInput,
+  FactoryQueue,
   HealthStatus,
   ImportResult,
   ListEvaluationJobsParams,
@@ -42,26 +43,27 @@ import type {
   ReviewInput,
   ReviewItem,
   Task,
-  TaskImportInput
-} from './api.schemas';
+  TaskImportInput,
+} from "./api.schemas";
 
-import { customFetch } from '../custom-fetch';
-import type { ErrorType , BodyType } from '../custom-fetch';
+import { customFetch } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
-      type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
-
+type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
-
-const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
+const withQueryKey = <T extends object, K>(
+  query: T,
+  queryKey: K,
+): T & { queryKey: K } => {
   const result = { queryKey } as T & { queryKey: K };
   for (const key of Object.keys(query)) {
     // The explicit queryKey always wins, matching the previous
     // `{ ...query, queryKey }` spread where it was set last.
-    if (key === 'queryKey') continue;
+    if (key === "queryKey") continue;
     Object.defineProperty(result, key, {
       enumerable: true,
       configurable: true,
@@ -72,1210 +74,2132 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 export const getHealthCheckUrl = () => {
+  return `/api/healthz`;
+};
 
-
-  return `/api/healthz`
-}
-
-export const healthCheck = async ( options?: Parameters<typeof customFetch>[1]): Promise<HealthStatus> => {
-
-  return customFetch<HealthStatus>(getHealthCheckUrl(),
-  {
+export const healthCheck = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<HealthStatus> => {
+  return customFetch<HealthStatus>(getHealthCheckUrl(), {
     ...options,
-    method: 'GET'
-
-
-  }
-);}
-
+    method: "GET",
+  });
+};
 
 export const getHealthCheckQueryKey = () => {
-    return [
-    `/api/healthz`
-    ] as const;
-    }
+  return [`/api/healthz`] as const;
+};
 
+export const getHealthCheckQueryOptions = <
+  TData = Awaited<ReturnType<typeof healthCheck>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheck>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
+  const queryKey = queryOptions?.queryKey ?? getHealthCheckQueryKey();
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheck>>> = ({
+    signal,
+  }) => healthCheck({ signal, ...requestOptions });
 
-  const queryKey =  queryOptions?.queryKey ?? getHealthCheckQueryKey();
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheck>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
+export type HealthCheckQueryResult = NonNullable<
+  Awaited<ReturnType<typeof healthCheck>>
+>;
+export type HealthCheckQueryError = ErrorType<unknown>;
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheck>>> = ({ signal }) => healthCheck({ signal, ...requestOptions });
+export function useHealthCheck<
+  TData = Awaited<ReturnType<typeof healthCheck>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheck>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getHealthCheckQueryOptions(options);
 
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type HealthCheckQueryResult = NonNullable<Awaited<ReturnType<typeof healthCheck>>>
-export type HealthCheckQueryError = ErrorType<unknown>
-
-
-export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getHealthCheckQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
 
 export const getGetBootstrapUrl = () => {
+  return `/api/reviewflow/bootstrap`;
+};
 
-
-  return `/api/reviewflow/bootstrap`
-}
-
-export const getBootstrap = async ( options?: Parameters<typeof customFetch>[1]): Promise<Bootstrap> => {
-
-  return customFetch<Bootstrap>(getGetBootstrapUrl(),
-  {
+export const getBootstrap = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<Bootstrap> => {
+  return customFetch<Bootstrap>(getGetBootstrapUrl(), {
     ...options,
-    method: 'GET'
-
-
-  }
-);}
-
+    method: "GET",
+  });
+};
 
 export const getGetBootstrapQueryKey = () => {
-    return [
-    `/api/reviewflow/bootstrap`
-    ] as const;
-    }
+  return [`/api/reviewflow/bootstrap`] as const;
+};
 
+export const getGetBootstrapQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBootstrap>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getBootstrap>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-export const getGetBootstrapQueryOptions = <TData = Awaited<ReturnType<typeof getBootstrap>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBootstrap>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
+  const queryKey = queryOptions?.queryKey ?? getGetBootstrapQueryKey();
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getBootstrap>>> = ({
+    signal,
+  }) => getBootstrap({ signal, ...requestOptions });
 
-  const queryKey =  queryOptions?.queryKey ?? getGetBootstrapQueryKey();
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBootstrap>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
+export type GetBootstrapQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBootstrap>>
+>;
+export type GetBootstrapQueryError = ErrorType<unknown>;
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBootstrap>>> = ({ signal }) => getBootstrap({ signal, ...requestOptions });
+export function useGetBootstrap<
+  TData = Awaited<ReturnType<typeof getBootstrap>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getBootstrap>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBootstrapQueryOptions(options);
 
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBootstrap>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetBootstrapQueryResult = NonNullable<Awaited<ReturnType<typeof getBootstrap>>>
-export type GetBootstrapQueryError = ErrorType<unknown>
-
-
-export function useGetBootstrap<TData = Awaited<ReturnType<typeof getBootstrap>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBootstrap>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetBootstrapQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-
 export const getImportTasksUrl = () => {
+  return `/api/reviewflow/tasks/import`;
+};
 
-
-  return `/api/reviewflow/tasks/import`
-}
-
-export const importTasks = async (taskImportInput: TaskImportInput, options?: Parameters<typeof customFetch>[1]): Promise<ImportResult> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+export const importTasks = async (
+  taskImportInput: TaskImportInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<ImportResult> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
       if (value !== undefined) headers[name] = value;
     }
     return headers;
   };
-return customFetch<ImportResult>(getImportTasksUrl(),
-  {
+  return customFetch<ImportResult>(getImportTasksUrl(), {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(taskImportInput)
-  }
-);}
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(taskImportInput),
+  });
+};
 
+export const getImportTasksMutationKey = () => ["importTasks"] as const;
 
-export const getImportTasksMutationKey = () => ['importTasks'] as const;
+export const getImportTasksMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importTasks>>,
+    TError,
+    ImportTasksMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof importTasks>>,
+  TError,
+  ImportTasksMutationVariables,
+  TContext
+> => {
+  const mutationKey = getImportTasksMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
 
-export const getImportTasksMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importTasks>>, TError,ImportTasksMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof importTasks>>, TError,ImportTasksMutationVariables, TContext> => {
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof importTasks>>,
+    ImportTasksMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
 
-const mutationKey = getImportTasksMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+    return importTasks(data, requestOptions);
+  };
 
+  return { mutationFn, ...mutationOptions };
+};
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importTasks>>, ImportTasksMutationVariables> = (props) => {
-          const {data} = props ?? {};
+export type ImportTasksMutationResult = NonNullable<
+  Awaited<ReturnType<typeof importTasks>>
+>;
+export type ImportTasksMutationBody = BodyType<TaskImportInput>;
+export type ImportTasksMutationError = ErrorType<void>;
+export type ImportTasksMutationVariables = { data: BodyType<TaskImportInput> };
 
-          return  importTasks(data,requestOptions)
-        }
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type ImportTasksMutationResult = NonNullable<Awaited<ReturnType<typeof importTasks>>>
-    export type ImportTasksMutationBody = BodyType<TaskImportInput>
-    export type ImportTasksMutationError = ErrorType<void>
-    export type ImportTasksMutationVariables = {data: BodyType<TaskImportInput>}
-
-    export const useImportTasks = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importTasks>>, TError,ImportTasksMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof importTasks>>,
-        TError,
-        ImportTasksMutationVariables,
-        TContext
-      > => {
-      return useMutation(getImportTasksMutationOptions(options));
-    }
+export const useImportTasks = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importTasks>>,
+    TError,
+    ImportTasksMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof importTasks>>,
+  TError,
+  ImportTasksMutationVariables,
+  TContext
+> => {
+  return useMutation(getImportTasksMutationOptions(options));
+};
 
 export const getListTasksUrl = () => {
+  return `/api/reviewflow/tasks`;
+};
 
-
-  return `/api/reviewflow/tasks`
-}
-
-export const listTasks = async ( options?: Parameters<typeof customFetch>[1]): Promise<Task[]> => {
-
-  return customFetch<Task[]>(getListTasksUrl(),
-  {
+export const listTasks = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<Task[]> => {
+  return customFetch<Task[]>(getListTasksUrl(), {
     ...options,
-    method: 'GET'
-
-
-  }
-);}
-
+    method: "GET",
+  });
+};
 
 export const getListTasksQueryKey = () => {
-    return [
-    `/api/reviewflow/tasks`
-    ] as const;
-    }
+  return [`/api/reviewflow/tasks`] as const;
+};
 
+export const getListTasksQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTasks>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listTasks>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-export const getListTasksQueryOptions = <TData = Awaited<ReturnType<typeof listTasks>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTasks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
+  const queryKey = queryOptions?.queryKey ?? getListTasksQueryKey();
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTasks>>> = ({
+    signal,
+  }) => listTasks({ signal, ...requestOptions });
 
-  const queryKey =  queryOptions?.queryKey ?? getListTasksQueryKey();
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTasks>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
+export type ListTasksQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTasks>>
+>;
+export type ListTasksQueryError = ErrorType<unknown>;
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTasks>>> = ({ signal }) => listTasks({ signal, ...requestOptions });
+export function useListTasks<
+  TData = Awaited<ReturnType<typeof listTasks>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listTasks>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTasksQueryOptions(options);
 
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTasks>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListTasksQueryResult = NonNullable<Awaited<ReturnType<typeof listTasks>>>
-export type ListTasksQueryError = ErrorType<unknown>
-
-
-export function useListTasks<TData = Awaited<ReturnType<typeof listTasks>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTasks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListTasksQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-export const getListEvaluationJobsUrl = (params: ListEvaluationJobsParams,) => {
+export const getListEvaluationJobsUrl = (params: ListEvaluationJobsParams) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
-
     if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
+      normalizedParams.append(key, value === null ? "null" : String(value));
     }
   });
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/reviewflow/evaluation-jobs?${stringifiedParams}` : `/api/reviewflow/evaluation-jobs`
-}
-export const getEvaluateTasksUrl = () => {
+  return stringifiedParams.length > 0
+    ? `/api/reviewflow/evaluation-jobs?${stringifiedParams}`
+    : `/api/reviewflow/evaluation-jobs`;
+};
 
-
-  return `/api/reviewflow/evaluate`
-}
-
-export const evaluateTasks = async (evaluateInput: EvaluateInput, options?: Parameters<typeof customFetch>[1]): Promise<EvaluateResult> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customFetch<EvaluateResult>(getEvaluateTasksUrl(),
-  {
+export const listEvaluationJobs = async (
+  params: ListEvaluationJobsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<EvaluationJob[]> => {
+  return customFetch<EvaluationJob[]>(getListEvaluationJobsUrl(params), {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(evaluateInput)
-  }
-);}
+    method: "GET",
+  });
+};
 
-
-export const getEvaluateTasksMutationKey = () => ['evaluateTasks'] as const;
-
-export const getEvaluateTasksMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof evaluateTasks>>, TError,EvaluateTasksMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof evaluateTasks>>, TError,EvaluateTasksMutationVariables, TContext> => {
-
-const mutationKey = getEvaluateTasksMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof evaluateTasks>>, EvaluateTasksMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  evaluateTasks(data,requestOptions)
-        }
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type EvaluateTasksMutationResult = NonNullable<Awaited<ReturnType<typeof evaluateTasks>>>
-    export type EvaluateTasksMutationBody = BodyType<EvaluateInput>
-    export type EvaluateTasksMutationError = ErrorType<void>
-    export type EvaluateTasksMutationVariables = {data: BodyType<EvaluateInput>}
-
-    export const useEvaluateTasks = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof evaluateTasks>>, TError,EvaluateTasksMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof evaluateTasks>>,
-        TError,
-        EvaluateTasksMutationVariables,
-        TContext
-      > => {
-      return useMutation(getEvaluateTasksMutationOptions(options));
-    }
-
-export const getGetNextReviewUrl = () => {
-
-
-  return `/api/reviewflow/review/next`
-}
-
-export const getNextReview = async ( options?: Parameters<typeof customFetch>[1]): Promise<ReviewItem | null> => {
-
-  return customFetch<ReviewItem | null>(getGetNextReviewUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-export const getGetNextReviewQueryKey = () => {
-    return [
-    `/api/reviewflow/review/next`
-    ] as const;
-    }
-
-
-export const getGetNextReviewQueryOptions = <TData = Awaited<ReturnType<typeof getNextReview>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNextReview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListEvaluationJobsQueryKey = (
+  params?: ListEvaluationJobsParams,
 ) => {
+  return [
+    `/api/reviewflow/evaluation-jobs`,
+    ...(params ? [params] : []),
+  ] as const;
+};
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+export const getListEvaluationJobsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listEvaluationJobs>>,
+  TError = ErrorType<void>,
+>(
+  params: ListEvaluationJobsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listEvaluationJobs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetNextReviewQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getListEvaluationJobsQueryKey(params);
 
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listEvaluationJobs>>
+  > = ({ signal }) => listEvaluationJobs(params, { signal, ...requestOptions });
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNextReview>>> = ({ signal }) => getNextReview({ signal, ...requestOptions });
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listEvaluationJobs>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
+export type ListEvaluationJobsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listEvaluationJobs>>
+>;
+export type ListEvaluationJobsQueryError = ErrorType<void>;
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNextReview>>, TError, TData> & { queryKey: QueryKey }
-}
+export function useListEvaluationJobs<
+  TData = Awaited<ReturnType<typeof listEvaluationJobs>>,
+  TError = ErrorType<void>,
+>(
+  params: ListEvaluationJobsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listEvaluationJobs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListEvaluationJobsQueryOptions(params, options);
 
-export type GetNextReviewQueryResult = NonNullable<Awaited<ReturnType<typeof getNextReview>>>
-export type GetNextReviewQueryError = ErrorType<unknown>
-
-
-export function useGetNextReview<TData = Awaited<ReturnType<typeof getNextReview>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNextReview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetNextReviewQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
-
-export const getSubmitReviewUrl = () => {
-
-
-  return `/api/reviewflow/reviews`
-}
-
-export const submitReview = async (reviewInput: ReviewInput, options?: Parameters<typeof customFetch>[1]): Promise<Task> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customFetch<Task>(getSubmitReviewUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(reviewInput)
-  }
-);}
-
-
-export const getSubmitReviewMutationKey = () => ['submitReview'] as const;
-
-export const getSubmitReviewMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitReview>>, TError,SubmitReviewMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof submitReview>>, TError,SubmitReviewMutationVariables, TContext> => {
-
-const mutationKey = getSubmitReviewMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitReview>>, SubmitReviewMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  submitReview(data,requestOptions)
-        }
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type SubmitReviewMutationResult = NonNullable<Awaited<ReturnType<typeof submitReview>>>
-    export type SubmitReviewMutationBody = BodyType<ReviewInput>
-    export type SubmitReviewMutationError = ErrorType<void>
-    export type SubmitReviewMutationVariables = {data: BodyType<ReviewInput>}
-
-    export const useSubmitReview = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitReview>>, TError,SubmitReviewMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof submitReview>>,
-        TError,
-        SubmitReviewMutationVariables,
-        TContext
-      > => {
-      return useMutation(getSubmitReviewMutationOptions(options));
-    }
-
-export const getGetMetricsUrl = () => {
-
-
-  return `/api/reviewflow/metrics`
-}
-
-export const getMetrics = async ( options?: Parameters<typeof customFetch>[1]): Promise<Metrics> => {
-
-  return customFetch<Metrics>(getGetMetricsUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-export const getGetMetricsQueryKey = () => {
-    return [
-    `/api/reviewflow/metrics`
-    ] as const;
-    }
-
-
-export const getGetMetricsQueryOptions = <TData = Awaited<ReturnType<typeof getMetrics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMetrics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetMetricsQueryKey();
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMetrics>>> = ({ signal }) => getMetrics({ signal, ...requestOptions });
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMetrics>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetMetricsQueryResult = NonNullable<Awaited<ReturnType<typeof getMetrics>>>
-export type GetMetricsQueryError = ErrorType<unknown>
-
-
-export function useGetMetrics<TData = Awaited<ReturnType<typeof getMetrics>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMetrics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetMetricsQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-export const getListReleasesUrl = () => {
-
-
-  return `/api/reviewflow/releases`
-}
-
-export const listReleases = async ( options?: Parameters<typeof customFetch>[1]): Promise<Release[]> => {
-
-  return customFetch<Release[]>(getListReleasesUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-export const getListReleasesQueryKey = () => {
-    return [
-    `/api/reviewflow/releases`
-    ] as const;
-    }
-
-
-export const getListReleasesQueryOptions = <TData = Awaited<ReturnType<typeof listReleases>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listReleases>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListReleasesQueryKey();
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listReleases>>> = ({ signal }) => listReleases({ signal, ...requestOptions });
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listReleases>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListReleasesQueryResult = NonNullable<Awaited<ReturnType<typeof listReleases>>>
-export type ListReleasesQueryError = ErrorType<unknown>
-
-
-export function useListReleases<TData = Awaited<ReturnType<typeof listReleases>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listReleases>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListReleasesQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-export const getCreateReleaseUrl = () => {
-
-
-  return `/api/reviewflow/releases`
-}
-
-export const createRelease = async (releaseInput: ReleaseInput, options?: Parameters<typeof customFetch>[1]): Promise<Release> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customFetch<Release>(getCreateReleaseUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(releaseInput)
-  }
-);}
-
-
-export const getCreateReleaseMutationKey = () => ['createRelease'] as const;
-
-export const getCreateReleaseMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRelease>>, TError,CreateReleaseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createRelease>>, TError,CreateReleaseMutationVariables, TContext> => {
-
-const mutationKey = getCreateReleaseMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRelease>>, CreateReleaseMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  createRelease(data,requestOptions)
-        }
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type CreateReleaseMutationResult = NonNullable<Awaited<ReturnType<typeof createRelease>>>
-    export type CreateReleaseMutationBody = BodyType<ReleaseInput>
-    export type CreateReleaseMutationError = ErrorType<void>
-    export type CreateReleaseMutationVariables = {data: BodyType<ReleaseInput>}
-
-    export const useCreateRelease = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRelease>>, TError,CreateReleaseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof createRelease>>,
-        TError,
-        CreateReleaseMutationVariables,
-        TContext
-      > => {
-      return useMutation(getCreateReleaseMutationOptions(options));
-    }
-
-export const getDownloadReleaseUrl = (id: string,) => {
-
-
-  return `/api/reviewflow/releases/${id}/download`
-}
-
-export const downloadRelease = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<Response> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customFetch<Response>(getDownloadReleaseUrl(id),
-  {
-    ...options,
-    method: 'GET',
-    headers: { Accept: 'application/x-ndjson', ...getHeaders(options?.headers) }
-
-  }
-);}
-
-
-export const getDownloadReleaseQueryKey = (id: string,) => {
-    return [
-    `/api/reviewflow/releases/${id}/download`
-    ] as const;
-    }
-
-
-export const getDownloadReleaseQueryOptions = <TData = Awaited<ReturnType<typeof downloadRelease>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadRelease>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getDownloadReleaseQueryKey(id);
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadRelease>>> = ({ signal }) => downloadRelease(id, { signal, ...requestOptions });
-
-
-   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadRelease>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type DownloadReleaseQueryResult = NonNullable<Awaited<ReturnType<typeof downloadRelease>>>
-export type DownloadReleaseQueryError = ErrorType<unknown>
-
-
-export function useDownloadRelease<TData = Awaited<ReturnType<typeof downloadRelease>>, TError = ErrorType<unknown>>(
- id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadRelease>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getDownloadReleaseQueryOptions(id,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-export const getListAuditsUrl = () => {
-
-
-  return `/api/reviewflow/audits`
-}
-
-export const listAudits = async ( options?: Parameters<typeof customFetch>[1]): Promise<Audit[]> => {
-
-  return customFetch<Audit[]>(getListAuditsUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-export const getListAuditsQueryKey = () => {
-    return [
-    `/api/reviewflow/audits`
-    ] as const;
-    }
-
-
-export const getListAuditsQueryOptions = <TData = Awaited<ReturnType<typeof listAudits>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAudits>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListAuditsQueryKey();
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAudits>>> = ({ signal }) => listAudits({ signal, ...requestOptions });
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAudits>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListAuditsQueryResult = NonNullable<Awaited<ReturnType<typeof listAudits>>>
-export type ListAuditsQueryError = ErrorType<unknown>
-
-
-export function useListAudits<TData = Awaited<ReturnType<typeof listAudits>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAudits>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListAuditsQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-export const getCreateAuditUrl = () => {
-
-
-  return `/api/reviewflow/audits`
-}
-
-export const createAudit = async (auditInput: AuditInput, options?: Parameters<typeof customFetch>[1]): Promise<Audit> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customFetch<Audit>(getCreateAuditUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(auditInput)
-  }
-);}
-
-
-export const getCreateAuditMutationKey = () => ['createAudit'] as const;
-
-export const getCreateAuditMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAudit>>, TError,CreateAuditMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createAudit>>, TError,CreateAuditMutationVariables, TContext> => {
-
-const mutationKey = getCreateAuditMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAudit>>, CreateAuditMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  createAudit(data,requestOptions)
-        }
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type CreateAuditMutationResult = NonNullable<Awaited<ReturnType<typeof createAudit>>>
-    export type CreateAuditMutationBody = BodyType<AuditInput>
-    export type CreateAuditMutationError = ErrorType<void>
-    export type CreateAuditMutationVariables = {data: BodyType<AuditInput>}
-
-    export const useCreateAudit = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAudit>>, TError,CreateAuditMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof createAudit>>,
-        TError,
-        CreateAuditMutationVariables,
-        TContext
-      > => {
-      return useMutation(getCreateAuditMutationOptions(options));
-    }
-
-export const getGetAuditUrl = (id: string,) => {
-
-
-  return `/api/reviewflow/audits/${id}`
-}
-
-export const getAudit = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<AuditDetail> => {
-
-  return customFetch<AuditDetail>(getGetAuditUrl(id),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-export const getGetAuditQueryKey = (id: string,) => {
-    return [
-    `/api/reviewflow/audits/${id}`
-    ] as const;
-    }
-
-
-export const getGetAuditQueryOptions = <TData = Awaited<ReturnType<typeof getAudit>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetAuditQueryKey(id);
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAudit>>> = ({ signal }) => getAudit(id, { signal, ...requestOptions });
-
-
-   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAudit>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetAuditQueryResult = NonNullable<Awaited<ReturnType<typeof getAudit>>>
-export type GetAuditQueryError = ErrorType<void>
-
-
-export function useGetAudit<TData = Awaited<ReturnType<typeof getAudit>>, TError = ErrorType<void>>(
- id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetAuditQueryOptions(id,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-export const getSubmitAuditDecisionUrl = (id: string,) => {
-
-
-  return `/api/reviewflow/audits/${id}/decisions`
-}
-
-export const submitAuditDecision = async (id: string,
-    auditDecisionInput: AuditDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<AuditDecisionResult> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customFetch<AuditDecisionResult>(getSubmitAuditDecisionUrl(id),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(auditDecisionInput)
-  }
-);}
-
-
-export const getSubmitAuditDecisionMutationKey = () => ['submitAuditDecision'] as const;
-
-export const getSubmitAuditDecisionMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAuditDecision>>, TError,SubmitAuditDecisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof submitAuditDecision>>, TError,SubmitAuditDecisionMutationVariables, TContext> => {
-
-const mutationKey = getSubmitAuditDecisionMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitAuditDecision>>, SubmitAuditDecisionMutationVariables> = (props) => {
-          const {id,data} = props ?? {};
-
-          return  submitAuditDecision(id,data,requestOptions)
-        }
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type SubmitAuditDecisionMutationResult = NonNullable<Awaited<ReturnType<typeof submitAuditDecision>>>
-    export type SubmitAuditDecisionMutationBody = BodyType<AuditDecisionInput>
-    export type SubmitAuditDecisionMutationError = ErrorType<void>
-    export type SubmitAuditDecisionMutationVariables = {id: string;data: BodyType<AuditDecisionInput>}
-
-    export const useSubmitAuditDecision = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAuditDecision>>, TError,SubmitAuditDecisionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof submitAuditDecision>>,
-        TError,
-        SubmitAuditDecisionMutationVariables,
-        TContext
-      > => {
-      return useMutation(getSubmitAuditDecisionMutationOptions(options));
-    }
-
-export const getGetAuditAdjudicationUrl = (id: string,) => {
-
-
-  return `/api/reviewflow/audits/${id}/adjudication`
-}
-
-export const getAuditAdjudication = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<AuditAdjudicationDetail> => {
-
-  return customFetch<AuditAdjudicationDetail>(getGetAuditAdjudicationUrl(id),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-export const getGetAuditAdjudicationQueryKey = (id: string,) => {
-    return [
-    `/api/reviewflow/audits/${id}/adjudication`
-    ] as const;
-    }
-
-
-export const getGetAuditAdjudicationQueryOptions = <TData = Awaited<ReturnType<typeof getAuditAdjudication>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditAdjudication>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetAuditAdjudicationQueryKey(id);
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuditAdjudication>>> = ({ signal }) => getAuditAdjudication(id, { signal, ...requestOptions });
-
-
-   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuditAdjudication>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetAuditAdjudicationQueryResult = NonNullable<Awaited<ReturnType<typeof getAuditAdjudication>>>
-export type GetAuditAdjudicationQueryError = ErrorType<void>
-
-
-export function useGetAuditAdjudication<TData = Awaited<ReturnType<typeof getAuditAdjudication>>, TError = ErrorType<void>>(
- id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuditAdjudication>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetAuditAdjudicationQueryOptions(id,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-export const getAdjudicateAuditDisputeUrl = (id: string,
-    disputeId: string,) => {
-
-
-  return `/api/reviewflow/audits/${id}/disputes/${disputeId}/adjudicate`
-}
-
-export const adjudicateAuditDispute = async (id: string,
-    disputeId: string,
-    adjudicationInput: AdjudicationInput, options?: Parameters<typeof customFetch>[1]): Promise<AuditDispute> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customFetch<AuditDispute>(getAdjudicateAuditDisputeUrl(id,disputeId),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(adjudicationInput)
-  }
-);}
-
-
-export const getAdjudicateAuditDisputeMutationKey = () => ['adjudicateAuditDispute'] as const;
-
-export const getAdjudicateAuditDisputeMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adjudicateAuditDispute>>, TError,AdjudicateAuditDisputeMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof adjudicateAuditDispute>>, TError,AdjudicateAuditDisputeMutationVariables, TContext> => {
-
-const mutationKey = getAdjudicateAuditDisputeMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adjudicateAuditDispute>>, AdjudicateAuditDisputeMutationVariables> = (props) => {
-          const {id,disputeId,data} = props ?? {};
-
-          return  adjudicateAuditDispute(id,disputeId,data,requestOptions)
-        }
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type AdjudicateAuditDisputeMutationResult = NonNullable<Awaited<ReturnType<typeof adjudicateAuditDispute>>>
-    export type AdjudicateAuditDisputeMutationBody = BodyType<AdjudicationInput>
-    export type AdjudicateAuditDisputeMutationError = ErrorType<void>
-    export type AdjudicateAuditDisputeMutationVariables = {id: string;disputeId: string;data: BodyType<AdjudicationInput>}
-
-    export const useAdjudicateAuditDispute = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adjudicateAuditDispute>>, TError,AdjudicateAuditDisputeMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof adjudicateAuditDispute>>,
-        TError,
-        AdjudicateAuditDisputeMutationVariables,
-        TContext
-      > => {
-      return useMutation(getAdjudicateAuditDisputeMutationOptions(options));
-    }
-
-
-export const getListEvaluationJobsQueryOptions = <TData = Awaited<ReturnType<typeof listEvaluationJobs>>, TError = ErrorType<void>>(params: ListEvaluationJobsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEvaluationJobs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListEvaluationJobsQueryKey(params);
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEvaluationJobs>>> = ({ signal }) => listEvaluationJobs(params, { signal, ...requestOptions });
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEvaluationJobs>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListEvaluationJobsQueryResult = NonNullable<Awaited<ReturnType<typeof listEvaluationJobs>>>
-
-export const listEvaluationJobs = async (params: ListEvaluationJobsParams, options?: Parameters<typeof customFetch>[1]): Promise<EvaluationJob[]> => {
-
-  return customFetch<EvaluationJob[]>(getListEvaluationJobsUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-    export type RetryEvaluationJobMutationVariables = {data: BodyType<EvaluationRetryInput>}
-
-export const getRetryEvaluationJobMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryEvaluationJob>>, TError,RetryEvaluationJobMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof retryEvaluationJob>>, TError,RetryEvaluationJobMutationVariables, TContext> => {
-
-const mutationKey = getRetryEvaluationJobMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryEvaluationJob>>, RetryEvaluationJobMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  retryEvaluationJob(data,requestOptions)
-        }
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export const useRetryEvaluationJob = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryEvaluationJob>>, TError,RetryEvaluationJobMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof retryEvaluationJob>>,
-        TError,
-        RetryEvaluationJobMutationVariables,
-        TContext
-      > => {
-      return useMutation(getRetryEvaluationJobMutationOptions(options));
-    }
-
-    export type RetryEvaluationJobMutationBody = BodyType<EvaluationRetryInput>
-
-    export type RetryEvaluationJobMutationResult = NonNullable<Awaited<ReturnType<typeof retryEvaluationJob>>>
-
-export function useListEvaluationJobs<TData = Awaited<ReturnType<typeof listEvaluationJobs>>, TError = ErrorType<void>>(
- params: ListEvaluationJobsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEvaluationJobs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListEvaluationJobsQueryOptions(params,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-export const retryEvaluationJob = async (evaluationRetryInput: EvaluationRetryInput, options?: Parameters<typeof customFetch>[1]): Promise<EvaluateResult> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customFetch<EvaluateResult>(getRetryEvaluationJobUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(evaluationRetryInput)
-  }
-);}
-
-export type ListEvaluationJobsQueryError = ErrorType<void>
-
-export const getListEvaluationJobsQueryKey = (params?: ListEvaluationJobsParams,) => {
-    return [
-    `/api/reviewflow/evaluation-jobs`, ...(params ? [params] : [])
-    ] as const;
-    }
 
 export const getRetryEvaluationJobUrl = () => {
+  return `/api/reviewflow/evaluation-jobs/retry`;
+};
 
+export const retryEvaluationJob = async (
+  evaluationRetryInput: EvaluationRetryInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<EvaluateResult> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<EvaluateResult>(getRetryEvaluationJobUrl(), {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(evaluationRetryInput),
+  });
+};
 
-  return `/api/reviewflow/evaluation-jobs/retry`
+export const getRetryEvaluationJobMutationKey = () =>
+  ["retryEvaluationJob"] as const;
+
+export const getRetryEvaluationJobMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof retryEvaluationJob>>,
+    TError,
+    RetryEvaluationJobMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof retryEvaluationJob>>,
+  TError,
+  RetryEvaluationJobMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRetryEvaluationJobMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof retryEvaluationJob>>,
+    RetryEvaluationJobMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return retryEvaluationJob(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RetryEvaluationJobMutationResult = NonNullable<
+  Awaited<ReturnType<typeof retryEvaluationJob>>
+>;
+export type RetryEvaluationJobMutationBody = BodyType<EvaluationRetryInput>;
+export type RetryEvaluationJobMutationError = ErrorType<void>;
+export type RetryEvaluationJobMutationVariables = {
+  data: BodyType<EvaluationRetryInput>;
+};
+
+export const useRetryEvaluationJob = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof retryEvaluationJob>>,
+    TError,
+    RetryEvaluationJobMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof retryEvaluationJob>>,
+  TError,
+  RetryEvaluationJobMutationVariables,
+  TContext
+> => {
+  return useMutation(getRetryEvaluationJobMutationOptions(options));
+};
+
+export const getEvaluateTasksUrl = () => {
+  return `/api/reviewflow/evaluate`;
+};
+
+export const evaluateTasks = async (
+  evaluateInput: EvaluateInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<EvaluateResult> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<EvaluateResult>(getEvaluateTasksUrl(), {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(evaluateInput),
+  });
+};
+
+export const getEvaluateTasksMutationKey = () => ["evaluateTasks"] as const;
+
+export const getEvaluateTasksMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof evaluateTasks>>,
+    TError,
+    EvaluateTasksMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof evaluateTasks>>,
+  TError,
+  EvaluateTasksMutationVariables,
+  TContext
+> => {
+  const mutationKey = getEvaluateTasksMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof evaluateTasks>>,
+    EvaluateTasksMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return evaluateTasks(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EvaluateTasksMutationResult = NonNullable<
+  Awaited<ReturnType<typeof evaluateTasks>>
+>;
+export type EvaluateTasksMutationBody = BodyType<EvaluateInput>;
+export type EvaluateTasksMutationError = ErrorType<void>;
+export type EvaluateTasksMutationVariables = { data: BodyType<EvaluateInput> };
+
+export const useEvaluateTasks = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof evaluateTasks>>,
+    TError,
+    EvaluateTasksMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof evaluateTasks>>,
+  TError,
+  EvaluateTasksMutationVariables,
+  TContext
+> => {
+  return useMutation(getEvaluateTasksMutationOptions(options));
+};
+
+export const getGetNextReviewUrl = () => {
+  return `/api/reviewflow/review/next`;
+};
+
+export const getNextReview = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<ReviewItem | null> => {
+  return customFetch<ReviewItem | null>(getGetNextReviewUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetNextReviewQueryKey = () => {
+  return [`/api/reviewflow/review/next`] as const;
+};
+
+export const getGetNextReviewQueryOptions = <
+  TData = Awaited<ReturnType<typeof getNextReview>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getNextReview>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetNextReviewQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getNextReview>>> = ({
+    signal,
+  }) => getNextReview({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getNextReview>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetNextReviewQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getNextReview>>
+>;
+export type GetNextReviewQueryError = ErrorType<unknown>;
+
+export function useGetNextReview<
+  TData = Awaited<ReturnType<typeof getNextReview>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getNextReview>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetNextReviewQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
 }
 
-    export type RetryEvaluationJobMutationError = ErrorType<void>
+export const getSubmitReviewUrl = () => {
+  return `/api/reviewflow/reviews`;
+};
 
-export const getRetryEvaluationJobMutationKey = () => ['retryEvaluationJob'] as const;
+export const submitReview = async (
+  reviewInput: ReviewInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<Task> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<Task>(getSubmitReviewUrl(), {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(reviewInput),
+  });
+};
+
+export const getSubmitReviewMutationKey = () => ["submitReview"] as const;
+
+export const getSubmitReviewMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitReview>>,
+    TError,
+    SubmitReviewMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitReview>>,
+  TError,
+  SubmitReviewMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSubmitReviewMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitReview>>,
+    SubmitReviewMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return submitReview(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitReviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitReview>>
+>;
+export type SubmitReviewMutationBody = BodyType<ReviewInput>;
+export type SubmitReviewMutationError = ErrorType<void>;
+export type SubmitReviewMutationVariables = { data: BodyType<ReviewInput> };
+
+export const useSubmitReview = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitReview>>,
+    TError,
+    SubmitReviewMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitReview>>,
+  TError,
+  SubmitReviewMutationVariables,
+  TContext
+> => {
+  return useMutation(getSubmitReviewMutationOptions(options));
+};
+
+export const getGetMetricsUrl = () => {
+  return `/api/reviewflow/metrics`;
+};
+
+export const getMetrics = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<Metrics> => {
+  return customFetch<Metrics>(getGetMetricsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMetricsQueryKey = () => {
+  return [`/api/reviewflow/metrics`] as const;
+};
+
+export const getGetMetricsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMetrics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMetrics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMetricsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMetrics>>> = ({
+    signal,
+  }) => getMetrics({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMetrics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMetricsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMetrics>>
+>;
+export type GetMetricsQueryError = ErrorType<unknown>;
+
+export function useGetMetrics<
+  TData = Awaited<ReturnType<typeof getMetrics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMetrics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMetricsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getListReleasesUrl = () => {
+  return `/api/reviewflow/releases`;
+};
+
+export const listReleases = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<Release[]> => {
+  return customFetch<Release[]>(getListReleasesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListReleasesQueryKey = () => {
+  return [`/api/reviewflow/releases`] as const;
+};
+
+export const getListReleasesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listReleases>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listReleases>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListReleasesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listReleases>>> = ({
+    signal,
+  }) => listReleases({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listReleases>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListReleasesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listReleases>>
+>;
+export type ListReleasesQueryError = ErrorType<unknown>;
+
+export function useListReleases<
+  TData = Awaited<ReturnType<typeof listReleases>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listReleases>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListReleasesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getCreateReleaseUrl = () => {
+  return `/api/reviewflow/releases`;
+};
+
+export const createRelease = async (
+  releaseInput: ReleaseInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<Release> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<Release>(getCreateReleaseUrl(), {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(releaseInput),
+  });
+};
+
+export const getCreateReleaseMutationKey = () => ["createRelease"] as const;
+
+export const getCreateReleaseMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createRelease>>,
+    TError,
+    CreateReleaseMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createRelease>>,
+  TError,
+  CreateReleaseMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateReleaseMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createRelease>>,
+    CreateReleaseMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createRelease(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateReleaseMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createRelease>>
+>;
+export type CreateReleaseMutationBody = BodyType<ReleaseInput>;
+export type CreateReleaseMutationError = ErrorType<void>;
+export type CreateReleaseMutationVariables = { data: BodyType<ReleaseInput> };
+
+export const useCreateRelease = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createRelease>>,
+    TError,
+    CreateReleaseMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createRelease>>,
+  TError,
+  CreateReleaseMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateReleaseMutationOptions(options));
+};
+
+export const getDownloadReleaseUrl = (id: string) => {
+  return `/api/reviewflow/releases/${id}/download`;
+};
+
+export const downloadRelease = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<Response> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<Response>(getDownloadReleaseUrl(id), {
+    ...options,
+    method: "GET",
+    headers: {
+      Accept: "application/x-ndjson",
+      ...getHeaders(options?.headers),
+    },
+  });
+};
+
+export const getDownloadReleaseQueryKey = (id: string) => {
+  return [`/api/reviewflow/releases/${id}/download`] as const;
+};
+
+export const getDownloadReleaseQueryOptions = <
+  TData = Awaited<ReturnType<typeof downloadRelease>>,
+  TError = ErrorType<unknown>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof downloadRelease>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getDownloadReleaseQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadRelease>>> = ({
+    signal,
+  }) => downloadRelease(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof downloadRelease>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type DownloadReleaseQueryResult = NonNullable<
+  Awaited<ReturnType<typeof downloadRelease>>
+>;
+export type DownloadReleaseQueryError = ErrorType<unknown>;
+
+export function useDownloadRelease<
+  TData = Awaited<ReturnType<typeof downloadRelease>>,
+  TError = ErrorType<unknown>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof downloadRelease>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getDownloadReleaseQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getListAuditsUrl = () => {
+  return `/api/reviewflow/audits`;
+};
+
+export const listAudits = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<Audit[]> => {
+  return customFetch<Audit[]>(getListAuditsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAuditsQueryKey = () => {
+  return [`/api/reviewflow/audits`] as const;
+};
+
+export const getListAuditsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAudits>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAudits>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAuditsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAudits>>> = ({
+    signal,
+  }) => listAudits({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAudits>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAuditsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAudits>>
+>;
+export type ListAuditsQueryError = ErrorType<unknown>;
+
+export function useListAudits<
+  TData = Awaited<ReturnType<typeof listAudits>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAudits>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAuditsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getCreateAuditUrl = () => {
+  return `/api/reviewflow/audits`;
+};
+
+export const createAudit = async (
+  auditInput: AuditInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<Audit> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<Audit>(getCreateAuditUrl(), {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(auditInput),
+  });
+};
+
+export const getCreateAuditMutationKey = () => ["createAudit"] as const;
+
+export const getCreateAuditMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAudit>>,
+    TError,
+    CreateAuditMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createAudit>>,
+  TError,
+  CreateAuditMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateAuditMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createAudit>>,
+    CreateAuditMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createAudit(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateAuditMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createAudit>>
+>;
+export type CreateAuditMutationBody = BodyType<AuditInput>;
+export type CreateAuditMutationError = ErrorType<void>;
+export type CreateAuditMutationVariables = { data: BodyType<AuditInput> };
+
+export const useCreateAudit = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAudit>>,
+    TError,
+    CreateAuditMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createAudit>>,
+  TError,
+  CreateAuditMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateAuditMutationOptions(options));
+};
+
+export const getGetAuditUrl = (id: string) => {
+  return `/api/reviewflow/audits/${id}`;
+};
+
+export const getAudit = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<AuditDetail> => {
+  return customFetch<AuditDetail>(getGetAuditUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAuditQueryKey = (id: string) => {
+  return [`/api/reviewflow/audits/${id}`] as const;
+};
+
+export const getGetAuditQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAudit>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAudit>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAuditQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAudit>>> = ({
+    signal,
+  }) => getAudit(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getAudit>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
+};
+
+export type GetAuditQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAudit>>
+>;
+export type GetAuditQueryError = ErrorType<void>;
+
+export function useGetAudit<
+  TData = Awaited<ReturnType<typeof getAudit>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAudit>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAuditQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getSubmitAuditDecisionUrl = (id: string) => {
+  return `/api/reviewflow/audits/${id}/decisions`;
+};
+
+export const submitAuditDecision = async (
+  id: string,
+  auditDecisionInput: AuditDecisionInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<AuditDecisionResult> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<AuditDecisionResult>(getSubmitAuditDecisionUrl(id), {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(auditDecisionInput),
+  });
+};
+
+export const getSubmitAuditDecisionMutationKey = () =>
+  ["submitAuditDecision"] as const;
+
+export const getSubmitAuditDecisionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitAuditDecision>>,
+    TError,
+    SubmitAuditDecisionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitAuditDecision>>,
+  TError,
+  SubmitAuditDecisionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSubmitAuditDecisionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitAuditDecision>>,
+    SubmitAuditDecisionMutationVariables
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return submitAuditDecision(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitAuditDecisionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitAuditDecision>>
+>;
+export type SubmitAuditDecisionMutationBody = BodyType<AuditDecisionInput>;
+export type SubmitAuditDecisionMutationError = ErrorType<void>;
+export type SubmitAuditDecisionMutationVariables = {
+  id: string;
+  data: BodyType<AuditDecisionInput>;
+};
+
+export const useSubmitAuditDecision = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitAuditDecision>>,
+    TError,
+    SubmitAuditDecisionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitAuditDecision>>,
+  TError,
+  SubmitAuditDecisionMutationVariables,
+  TContext
+> => {
+  return useMutation(getSubmitAuditDecisionMutationOptions(options));
+};
+
+export const getGetAuditAdjudicationUrl = (id: string) => {
+  return `/api/reviewflow/audits/${id}/adjudication`;
+};
+
+export const getAuditAdjudication = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<AuditAdjudicationDetail> => {
+  return customFetch<AuditAdjudicationDetail>(getGetAuditAdjudicationUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAuditAdjudicationQueryKey = (id: string) => {
+  return [`/api/reviewflow/audits/${id}/adjudication`] as const;
+};
+
+export const getGetAuditAdjudicationQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAuditAdjudication>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAuditAdjudication>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAuditAdjudicationQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAuditAdjudication>>
+  > = ({ signal }) => getAuditAdjudication(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAuditAdjudication>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAuditAdjudicationQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAuditAdjudication>>
+>;
+export type GetAuditAdjudicationQueryError = ErrorType<void>;
+
+export function useGetAuditAdjudication<
+  TData = Awaited<ReturnType<typeof getAuditAdjudication>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAuditAdjudication>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAuditAdjudicationQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getAdjudicateAuditDisputeUrl = (id: string, disputeId: string) => {
+  return `/api/reviewflow/audits/${id}/disputes/${disputeId}/adjudicate`;
+};
+
+export const adjudicateAuditDispute = async (
+  id: string,
+  disputeId: string,
+  adjudicationInput: AdjudicationInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<AuditDispute> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<AuditDispute>(
+    getAdjudicateAuditDisputeUrl(id, disputeId),
+    {
+      ...options,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getHeaders(options?.headers),
+      },
+      body: JSON.stringify(adjudicationInput),
+    },
+  );
+};
+
+export const getAdjudicateAuditDisputeMutationKey = () =>
+  ["adjudicateAuditDispute"] as const;
+
+export const getAdjudicateAuditDisputeMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adjudicateAuditDispute>>,
+    TError,
+    AdjudicateAuditDisputeMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adjudicateAuditDispute>>,
+  TError,
+  AdjudicateAuditDisputeMutationVariables,
+  TContext
+> => {
+  const mutationKey = getAdjudicateAuditDisputeMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adjudicateAuditDispute>>,
+    AdjudicateAuditDisputeMutationVariables
+  > = (props) => {
+    const { id, disputeId, data } = props ?? {};
+
+    return adjudicateAuditDispute(id, disputeId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdjudicateAuditDisputeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adjudicateAuditDispute>>
+>;
+export type AdjudicateAuditDisputeMutationBody = BodyType<AdjudicationInput>;
+export type AdjudicateAuditDisputeMutationError = ErrorType<void>;
+export type AdjudicateAuditDisputeMutationVariables = {
+  id: string;
+  disputeId: string;
+  data: BodyType<AdjudicationInput>;
+};
+
+export const useAdjudicateAuditDispute = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adjudicateAuditDispute>>,
+    TError,
+    AdjudicateAuditDisputeMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof adjudicateAuditDispute>>,
+  TError,
+  AdjudicateAuditDisputeMutationVariables,
+  TContext
+> => {
+  return useMutation(getAdjudicateAuditDisputeMutationOptions(options));
+};
+
+export const getGetFactoryQueueUrl = (factory: "evidence" | "preference") => {
+  return `/api/reviewflow/factories/${factory}`;
+};
+
+export const getFactoryQueue = async (
+  factory: "evidence" | "preference",
+  options?: Parameters<typeof customFetch>[1],
+): Promise<FactoryQueue> => {
+  return customFetch<FactoryQueue>(getGetFactoryQueueUrl(factory), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetFactoryQueueQueryKey = (
+  factory: "evidence" | "preference",
+) => {
+  return [`/api/reviewflow/factories/${factory}`] as const;
+};
+
+export const getGetFactoryQueueQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFactoryQueue>>,
+  TError = ErrorType<unknown>,
+>(
+  factory: "evidence" | "preference",
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFactoryQueue>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetFactoryQueueQueryKey(factory);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getFactoryQueue>>> = ({
+    signal,
+  }) => getFactoryQueue(factory, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: factory !== null && factory !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFactoryQueue>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetFactoryQueueQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFactoryQueue>>
+>;
+export type GetFactoryQueueQueryError = ErrorType<unknown>;
+
+export function useGetFactoryQueue<
+  TData = Awaited<ReturnType<typeof getFactoryQueue>>,
+  TError = ErrorType<unknown>,
+>(
+  factory: "evidence" | "preference",
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getFactoryQueue>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetFactoryQueueQueryOptions(factory, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getCreateFactoryPolicyRevisionUrl = (
+  factory: "evidence" | "preference",
+) => {
+  return `/api/reviewflow/factories/${factory}/policy`;
+};
+
+export const createFactoryPolicyRevision = async (
+  factory: "evidence" | "preference",
+  factoryPolicyInput: FactoryPolicyInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<void> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<void>(getCreateFactoryPolicyRevisionUrl(factory), {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(factoryPolicyInput),
+  });
+};
+
+export const getCreateFactoryPolicyRevisionMutationKey = () =>
+  ["createFactoryPolicyRevision"] as const;
+
+export const getCreateFactoryPolicyRevisionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createFactoryPolicyRevision>>,
+    TError,
+    CreateFactoryPolicyRevisionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createFactoryPolicyRevision>>,
+  TError,
+  CreateFactoryPolicyRevisionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateFactoryPolicyRevisionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createFactoryPolicyRevision>>,
+    CreateFactoryPolicyRevisionMutationVariables
+  > = (props) => {
+    const { factory, data } = props ?? {};
+
+    return createFactoryPolicyRevision(factory, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateFactoryPolicyRevisionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createFactoryPolicyRevision>>
+>;
+export type CreateFactoryPolicyRevisionMutationBody =
+  BodyType<FactoryPolicyInput>;
+export type CreateFactoryPolicyRevisionMutationError = ErrorType<void>;
+export type CreateFactoryPolicyRevisionMutationVariables = {
+  factory: "evidence" | "preference";
+  data: BodyType<FactoryPolicyInput>;
+};
+
+export const useCreateFactoryPolicyRevision = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createFactoryPolicyRevision>>,
+    TError,
+    CreateFactoryPolicyRevisionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createFactoryPolicyRevision>>,
+  TError,
+  CreateFactoryPolicyRevisionMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateFactoryPolicyRevisionMutationOptions(options));
+};
+
+export const getClaimFactoryWorkUrl = (
+  factory: "evidence" | "preference",
+  id: string,
+) => {
+  return `/api/reviewflow/factories/${factory}/items/${id}/claim`;
+};
+
+export const claimFactoryWork = async (
+  factory: "evidence" | "preference",
+  id: string,
+  factoryClaimInput: FactoryClaimInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<void> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<void>(getClaimFactoryWorkUrl(factory, id), {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(factoryClaimInput),
+  });
+};
+
+export const getClaimFactoryWorkMutationKey = () =>
+  ["claimFactoryWork"] as const;
+
+export const getClaimFactoryWorkMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof claimFactoryWork>>,
+    TError,
+    ClaimFactoryWorkMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof claimFactoryWork>>,
+  TError,
+  ClaimFactoryWorkMutationVariables,
+  TContext
+> => {
+  const mutationKey = getClaimFactoryWorkMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof claimFactoryWork>>,
+    ClaimFactoryWorkMutationVariables
+  > = (props) => {
+    const { factory, id, data } = props ?? {};
+
+    return claimFactoryWork(factory, id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ClaimFactoryWorkMutationResult = NonNullable<
+  Awaited<ReturnType<typeof claimFactoryWork>>
+>;
+export type ClaimFactoryWorkMutationBody = BodyType<FactoryClaimInput>;
+export type ClaimFactoryWorkMutationError = ErrorType<void>;
+export type ClaimFactoryWorkMutationVariables = {
+  factory: "evidence" | "preference";
+  id: string;
+  data: BodyType<FactoryClaimInput>;
+};
+
+export const useClaimFactoryWork = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof claimFactoryWork>>,
+    TError,
+    ClaimFactoryWorkMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof claimFactoryWork>>,
+  TError,
+  ClaimFactoryWorkMutationVariables,
+  TContext
+> => {
+  return useMutation(getClaimFactoryWorkMutationOptions(options));
+};
+
+export const getSetFactoryQuarantineUrl = (
+  factory: "evidence" | "preference",
+  id: string,
+) => {
+  return `/api/reviewflow/factories/${factory}/items/${id}/quarantine`;
+};
+
+export const setFactoryQuarantine = async (
+  factory: "evidence" | "preference",
+  id: string,
+  factoryQuarantineInput: FactoryQuarantineInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<void> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<void>(getSetFactoryQuarantineUrl(factory, id), {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(factoryQuarantineInput),
+  });
+};
+
+export const getSetFactoryQuarantineMutationKey = () =>
+  ["setFactoryQuarantine"] as const;
+
+export const getSetFactoryQuarantineMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setFactoryQuarantine>>,
+    TError,
+    SetFactoryQuarantineMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setFactoryQuarantine>>,
+  TError,
+  SetFactoryQuarantineMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetFactoryQuarantineMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setFactoryQuarantine>>,
+    SetFactoryQuarantineMutationVariables
+  > = (props) => {
+    const { factory, id, data } = props ?? {};
+
+    return setFactoryQuarantine(factory, id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetFactoryQuarantineMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setFactoryQuarantine>>
+>;
+export type SetFactoryQuarantineMutationBody = BodyType<FactoryQuarantineInput>;
+export type SetFactoryQuarantineMutationError = ErrorType<void>;
+export type SetFactoryQuarantineMutationVariables = {
+  factory: "evidence" | "preference";
+  id: string;
+  data: BodyType<FactoryQuarantineInput>;
+};
+
+export const useSetFactoryQuarantine = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setFactoryQuarantine>>,
+    TError,
+    SetFactoryQuarantineMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setFactoryQuarantine>>,
+  TError,
+  SetFactoryQuarantineMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetFactoryQuarantineMutationOptions(options));
+};
