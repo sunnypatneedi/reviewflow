@@ -20,7 +20,7 @@ web_pid=""
 proxy_pid=""
 cleanup() {
   for pid in "$proxy_pid" "$web_pid" "$worker_pid" "$api_pid"; do
-    [ -z "$pid" ] || kill -TERM -- "-$pid" >/dev/null 2>&1 || true
+    [ -z "$pid" ] || kill -TERM "$pid" >/dev/null 2>&1 || true
   done
   rm -f "$pid_file"
 }
@@ -32,21 +32,21 @@ pnpm --filter @workspace/api-server run build
 
 APP_MODE=demo LIVE_INFERENCE_ENABLED=false TRUSTED_ORIGINS="$trusted_origins" \
   SESSION_SECRET=isolated-preview-session-secret PORT="$api_port" \
-  setsid node --enable-source-maps artifacts/api-server/dist/index.mjs &
+  node scripts/run-detached.mjs node --enable-source-maps artifacts/api-server/dist/index.mjs &
 api_pid=$!
 
 APP_MODE=demo LIVE_INFERENCE_ENABLED=false \
   SESSION_SECRET=isolated-preview-session-secret WORKER_PORT="$worker_port" \
-  setsid node --enable-source-maps artifacts/api-server/dist/worker.mjs &
+  node scripts/run-detached.mjs node --enable-source-maps artifacts/api-server/dist/worker.mjs &
 worker_pid=$!
 
 APP_MODE=demo PORT="$web_port" BASE_PATH=/ \
-  setsid pnpm --filter @workspace/reviewflow run dev &
+  node scripts/run-detached.mjs pnpm --filter @workspace/reviewflow run dev &
 web_pid=$!
 
 PORT="$proxy_port" REVIEWFLOW_API_ORIGIN="http://127.0.0.1:$api_port" \
   REVIEWFLOW_WEB_ORIGIN="http://127.0.0.1:$web_port" \
-  setsid node scripts/same-origin-proxy.mjs &
+  node scripts/run-detached.mjs node scripts/same-origin-proxy.mjs &
 proxy_pid=$!
 
 node -e '

@@ -1,3 +1,5 @@
+import { RoutingAdvice } from "@/components/routing-advice";
+import { SharedNotes } from "@/components/shared-notes";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -502,6 +504,9 @@ export default function Factories() {
                             {evidence.data.candidateAnswer}
                           </p>
                         </div>
+                    {factory === "evidence" && current.workKind !== "audit" && !current.quarantined && current.lane !== "complete" && (
+                      <div className="space-y-3"><RoutingAdvice key={`route:${current.id}:${current.version}`} taskId={current.id} version={current.version} /><SharedNotes key={current.id} taskId={current.id} onCopy={setReason} /></div>
+                    )}
                         {!current.quarantined &&
                           current.lane !== "complete" && (
                             <label>

@@ -12,18 +12,18 @@ values are package entries reported by pnpm, not inferred licenses.
 
 | SPDX/license value reported by package metadata | Production entries | Development entries |
 |---|---:|---:|
-| MIT | 119 | 339 |
-| Apache-2.0 | 2 | 7 |
-| ISC | 7 | 28 |
+| 0BSD | 1 | 1 |
+| Apache-2.0 | 2 | 9 |
 | BSD-2-Clause | 1 | 3 |
 | BSD-3-Clause | 1 | 5 |
-| 0BSD | 1 | 1 |
-| Unlicense | 1 | 1 |
-| Python-2.0 | 0 | 1 |
+| BlueOak-1.0.0 | 0 | 2 |
 | CC-BY-4.0 | 0 | 1 |
-| MPL-2.0 | 0 | 1 |
-| BlueOak-1.0.0 | 0 | 1 |
+| ISC | 7 | 26 |
+| MIT | 123 | 327 |
 | MIT AND ISC | 0 | 1 |
+| MPL-2.0 | 0 | 3 |
+| Python-2.0 | 0 | 1 |
+| Unlicense | 1 | 1 |
 
 Neither command reported an `Unknown` license entry in the regenerated,
 installed graph. The earlier unknown-license Replit SDK and optional Vite
@@ -35,6 +35,13 @@ Lucide React as ISC; Drizzle ORM and Drizzle Zod as Apache-2.0;
 `caniuse-lite` as CC-BY-4.0; and `lightningcss` as MPL-2.0. The lockfile and
 package distributions are authoritative for the complete versioned graph.
 This inventory is not legal advice.
+
+The launch candidate adds Yjs and ws (MIT) for shared notes, and development-only
+Playwright (Apache-2.0) and axe tooling (MPL-2.0) for browser/accessibility checks.
+The screenshot set contains only scripted synthetic data; the overview and live
+shared-note captures were produced by the committed isolated browser harness.
+Advisory-driven dependency overrides are pinned in `pnpm-workspace.yaml`; the
+complete locked build and journeys are rerun after updates.
 
 ## shadcn/ui-derived component wrappers
 

@@ -86,7 +86,7 @@ function providerFailure(status: number, response: Response): ProviderError {
   });
 }
 
-async function live(task: EvaluationTask): Promise<EvaluationResult> {
+async function live(task: EvaluationTask, timeoutMs = 20_000): Promise<EvaluationResult> {
   const key = process.env.TYPESAFE_API_KEY;
   if (!key) {
     throw new ProviderError("Live Jev credentials are not configured", { status: 401 });
@@ -129,7 +129,7 @@ async function live(task: EvaluationTask): Promise<EvaluationResult> {
       method: "POST",
       headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
     throw new ProviderError(error instanceof Error ? error.message : "Jev request failed", {
@@ -140,7 +140,17 @@ async function live(task: EvaluationTask): Promise<EvaluationResult> {
 
   let raw: any;
   try {
-    raw = await response.json();
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("No response body");
+    const chunks: Uint8Array[] = []; let size = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 64_000) { await reader.cancel(); throw new Error("Response exceeds limit"); }
+      chunks.push(value);
+    }
+    raw = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch {
     throw new ProviderError("Jev returned invalid JSON", { status: response.status });
   }
@@ -177,8 +187,8 @@ async function live(task: EvaluationTask): Promise<EvaluationResult> {
   };
 }
 
-export function evaluateTask(task: EvaluationTask, mode: EvaluationMode): Promise<EvaluationResult> {
-  return mode === "demo" ? Promise.resolve(simulated(task)) : live(task);
+export function evaluateTask(task: EvaluationTask, mode: EvaluationMode, timeoutMs = 20_000): Promise<EvaluationResult> {
+  return mode === "demo" ? Promise.resolve(simulated(task)) : live(task, timeoutMs);
 }
 
 export function getRetryDelayMs(error: unknown, attempt: number): number {

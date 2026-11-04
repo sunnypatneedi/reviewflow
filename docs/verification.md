@@ -1,3 +1,5 @@
+> Current local candidate adds WebSocket shared notes, optional routing advice, accessibility and clean-source checks. See [launch candidate](launch-candidate.md). Historical results below remain scoped to their recorded revisions.
+
 # Experimental-alpha verification
 
 ## Scope and repeatability

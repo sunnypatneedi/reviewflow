@@ -7,7 +7,9 @@
     "typecheck": "node --check reviewflow-e2e.mjs && node --check same-origin-proxy.mjs && node --check package-source.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.11.0",
     "@types/node": "catalog:",
+    "playwright": "1.62.1",
     "tsx": "catalog:"
   }
 }

@@ -1,0 +1,100 @@
+#!/usr/bin/env node
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import {
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  readdirSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { packageSource } from "./package-source.mjs";
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+if (
+  execFileSync("git", ["status", "--porcelain"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim()
+)
+  throw new Error("Commit the candidate first: clean checkout required");
+const revision = execFileSync("git", ["rev-parse", "HEAD"], {
+  cwd: root,
+  encoding: "utf8",
+}).trim();
+const folder = mkdtempSync(join(tmpdir(), "reviewflow-clean-candidate-"));
+const { stage, archive } = packageSource({
+  stage: join(folder, "stage"),
+  archive: join(folder, "reviewflow-source.tar.gz"),
+});
+// Check every screenshot reference in shipped Markdown against the actual artifact.
+function checkLinks(directory) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) checkLinks(path);
+    else if (entry.name.endsWith(".md")) {
+      for (const match of readFileSync(path, "utf8").matchAll(
+        /\]\(([^)\s]*screenshots\/[^)\s]+)\)/g,
+      )) {
+        if (!existsSync(resolve(dirname(path), match[1])))
+          throw new Error(`Missing screenshot in candidate: ${match[1]}`);
+      }
+    }
+  }
+}
+checkLinks(stage);
+const scanner = process.env.REVIEWFLOW_GITLEAKS;
+if (!scanner)
+  throw new Error(
+    "Set REVIEWFLOW_GITLEAKS to a trusted installed gitleaks binary; candidate scans are required",
+  );
+execFileSync(
+  scanner,
+  [
+    "dir",
+    stage,
+    "--redact",
+    "--report-format",
+    "json",
+    "--report-path",
+    join(folder, "secrets.json"),
+  ],
+  { stdio: "inherit" },
+);
+const extracted = join(folder, "extracted");
+execFileSync(process.env.PYTHON || "python3", [
+  "-c",
+  `
+import pathlib, sys, tarfile
+archive, destination = sys.argv[1:]
+with tarfile.open(archive, 'r:gz') as tar:
+ for member in tar:
+  path = pathlib.PurePosixPath(member.name)
+  if not member.isfile() or path.parts[0] != 'reviewflow-source' or '..' in path.parts: raise ValueError('Unsafe archive member')
+  target = pathlib.Path(destination).joinpath(*path.parts)
+  target.parent.mkdir(parents=True, exist_ok=True)
+  target.write_bytes(tar.extractfile(member).read()); target.chmod(member.mode)
+`,
+  archive,
+  extracted,
+]);
+execFileSync("sh", ["scripts/verify-isolated.sh"], {
+  cwd: join(extracted, "reviewflow-source"),
+  env: process.env,
+  stdio: "inherit",
+});
+const manifest = {
+  revision,
+  archive,
+  sha256: createHash("sha256").update(readFileSync(archive)).digest("hex"),
+  secrets: "gitleaks candidate scan passed",
+  verification: "full isolated harness passed from extracted archive",
+  published: false,
+};
+writeFileSync(
+  join(folder, "verification.json"),
+  JSON.stringify(manifest, null, 2) + "\n",
+);
+console.log(JSON.stringify(manifest, null, 2));

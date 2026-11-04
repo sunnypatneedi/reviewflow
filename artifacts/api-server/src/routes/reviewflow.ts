@@ -1,3 +1,5 @@
+import { registerRoutingRoutes } from "./routing";
+import { issueCollaborationTicket } from "../lib/collaboration";
 import { createHash, randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response as ExpressResponse } from "express";
 import { getAuth } from "@clerk/express";
@@ -1126,6 +1128,17 @@ router.post("/reviewflow/audits/:id/disputes/:disputeId/adjudicate", async (req,
   res.json({ id: dispute.id, auditId, auditItemId: dispute.auditItemId, taskId: dispute.taskId, originalLabel: dispute.originalLabel, auditLabel: dispute.auditLabel, status: "resolved", resolvedLabel, adjudicatorId: actorId });
 });
 
+router.post("/reviewflow/tasks/:taskId/collaboration-ticket", async (req, res) => {
+  const context = await ensureProject(req);
+  if (!(await requireProjectAccess(req, res, context, REVIEW_ROLES))) return;
+  const [task] = await db.select().from(tasksTable).where(and(eq(tasksTable.projectId, context.project.id), eq(tasksTable.id, req.params.taskId as string)));
+  if (!task) throw new FactoryError("Task not found", 404);
+  const origin = req.get("origin");
+  if (!origin || !req.app.locals.runtimeConfig.trustedOrigins.has(origin)) throw new FactoryError("Trusted origin required", 403);
+  res.set("Cache-Control", "no-store").json(await issueCollaborationTicket({ projectId: context.project.id, actorId: identity(req), taskId: task.id, contentHash: task.contentHash }, origin));
+});
+
+registerRoutingRoutes(router, { ensureProject, requireProjectAccess, identity });
 registerTraceRoutes(router, { ensureProject, requireProjectAccess, identity });
 registerFactoryRoutes(router, { ensureProject, requireProjectAccess, identity });
 registerTeamRoutes(router, { ensureProject, requireProjectAccess, identity });

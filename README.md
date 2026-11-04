@@ -10,10 +10,9 @@ Model proposals are suggestions, not ground truth. Human corrections retain the
 reviewer's decision, reason, and provenance; exports preserve those judgments
 rather than silently replacing them with a later model result.
 
-![ReviewFlow review queue](screenshots/reviewflow-review.png)
+![ReviewFlow workflow overview](screenshots/reviewflow-launch.png)
 
-*Actual synthetic-data capture of the original evidence-labeling workflow,
-not a Trace2Preference screenshot.*
+*Actual synthetic-data overview. See the [local launch candidate and release gates](docs/launch-candidate.md) for exact capability and qualification boundaries.*
 
 ## What is implemented
 
@@ -25,7 +24,8 @@ not a Trace2Preference screenshot.*
 - A deterministic, intentionally imperfect synthetic evaluator
 - Separate leased-job worker and a local same-origin development proxy
 - Optional Clerk mode with persisted project roles
-- An optional Jev adapter behind explicit server configuration and owner consent
+- Live CRDT shared notes for evidence review, with role, exposure and quarantine guards
+- An optional Jev adapter and routing-advice API behind server/project approval and call caps
 
 The supported first-run path is `APP_MODE=demo`. It needs neither hosted
 authentication nor Jev credentials. See **[local setup](docs/setup.md)**.
@@ -70,6 +70,8 @@ with scripted responders, not real models. No genuine human benchmark exists; se
 [verification results](docs/verification.md).
 
 ## Documentation
+
+- [Launch candidate, live collaboration, routing API and release gates](docs/launch-candidate.md)
 
 - [Setup and verification commands](docs/setup.md)
 - [Configuration variable template](.env.example)

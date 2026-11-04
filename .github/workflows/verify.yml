@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   isolated-verification:
     runs-on: ubuntu-24.04
@@ -46,3 +49,7 @@ jobs:
           sudo apt-get install -y postgresql-16
           echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
       - run: sh scripts/verify-isolated.sh
+      - name: Install isolated browser
+        run: pnpm --filter @workspace/scripts exec playwright install --with-deps chromium
+      - name: Synthetic browser and accessibility journeys
+        run: pnpm run test:browser

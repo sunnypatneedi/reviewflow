@@ -1,3 +1,5 @@
+> Updated candidate: live evidence shared notes and optional routing advice are now implemented. See [current launch boundaries](launch-candidate.md); historical verification below describes the earlier milestone.
+
 # Multiplayer and bounded provider preparation
 
 This milestone extends the factory implementation with working shared-project
