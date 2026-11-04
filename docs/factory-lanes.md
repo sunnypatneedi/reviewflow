@@ -75,6 +75,10 @@ Executed using Node 24.22.1 and an isolated PostgreSQL 16.11 cluster:
   tokens, cross-project denial, simulated member roles and explicit reassignment,
   token privacy, human-only release provenance, quarantine gates, late worker
   results, and preference review/quality reclaims.
+- Independent review identified and the implementation corrected two edge cases:
+  proposal-dependent correction requests now fail before mutating a proposal-less
+  task, and high-risk policy lanes require primitive strings rather than coercible
+  values. Regression checks cover both cases.
 - Local Chromium browser smoke: human-only decision, claim/renew, quarantine and
   export rejection, hold resolution, policy revision, required-claim rejection and
   successful resubmission, preference empty state, desktop/mobile layout and zero

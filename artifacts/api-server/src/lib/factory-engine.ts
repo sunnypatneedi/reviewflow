@@ -47,7 +47,8 @@ export function validateFactoryPolicy(input: unknown): FactoryPolicy {
     value.schemaVersion !== 1 ||
     typeof value.assistanceAllowed !== "boolean" ||
     typeof value.requireAssignments !== "boolean" ||
-    !["human_review", "escalation"].includes(String(value.highRiskLane)) ||
+    typeof value.highRiskLane !== "string" ||
+    !["human_review", "escalation"].includes(value.highRiskLane) ||
     ![value.minimumConfidence, value.redirectionThreshold].every(
       (n) => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1,
     )

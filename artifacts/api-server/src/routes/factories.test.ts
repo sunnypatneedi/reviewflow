@@ -375,6 +375,19 @@ test("human-only evidence decisions release without fabricating model provenance
     ).status,
     200,
   );
+  for (const action of ["accept", "correct"]) {
+    assert.equal(
+      (await call(s, "/reviews", { ...review, action })).status,
+      409,
+      "Proposal-dependent actions must fail before finalizing a proposal-less task",
+    );
+    const [unchanged] = await db
+      .select()
+      .from(tasksTable)
+      .where(eq(tasksTable.id, item.id));
+    assert.equal(unchanged.status, "pending");
+    assert.equal(unchanged.version, item.version);
+  }
   for (const row of queue.items)
     assert.equal(
       (

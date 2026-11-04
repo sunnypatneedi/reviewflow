@@ -684,7 +684,7 @@ router.post("/reviewflow/reviews", async (req, res): Promise<void> => {
   if (evidenceExcerpt != null && typeof evidenceExcerpt !== "string") { res.status(400).json({ error:"Evidence excerpt must be text" }); return; }
   if (!Number.isSafeInteger(activeMs) || activeMs < 0 || activeMs > 7 * 86400_000) { res.status(400).json({ error:"Invalid active review time" }); return; }
   if (["correct", "label"].includes(action) && (!LABELS.includes(correctedLabel) || !reason?.trim())) { res.status(400).json({ error:"Human labels and corrections require a label and reason" }); return; }
-  if (action === "accept" && !proposal) { res.status(409).json({ error:"No proposal exists to accept. Record a human label instead." }); return; }
+  if (["accept", "correct"].includes(action) && !proposal) { res.status(409).json({ error:"No proposal exists to accept or correct. Record a human label instead." }); return; }
   if (action === "escalate" && !reason?.trim()) { res.status(400).json({ error:"Escalations require a reason" }); return; }
   if (task.status === "finalized") { res.status(409).json({ error:"This task already has a final decision" }); return; }
   if (task.status === "escalated" && action === "escalate") { res.status(409).json({ error:"This task is already escalated" }); return; }

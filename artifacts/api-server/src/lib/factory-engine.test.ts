@@ -61,6 +61,9 @@ test("policy validation rejects attempts to add automatic acceptance or weaken r
     { redirectionThreshold: 2 },
     { requireAssignments: "false" },
     { highRiskLane: "complete" },
+    { highRiskLane: ["escalation"] },
+    { highRiskLane: { value: "escalation" } },
+    { highRiskLane: null },
   ]) {
     assert.throws(
       () => validateFactoryPolicy({ ...DEFAULT_FACTORY_POLICY, ...invalid }),
