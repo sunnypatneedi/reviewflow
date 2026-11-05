@@ -222,6 +222,108 @@ test("HTTP admission errors map Retry-After and existing cookies work at throttl
   }
 });
 
+test("cookie-discarding plain GET floods cannot grow projects or seed tasks past admission limits", async () => {
+  const originalConfig = app.locals.runtimeConfig;
+  const createdProjectIds: string[] = [];
+  const trackProject = (response: Response) => {
+    const cookie = response.headers.get("set-cookie")?.split(";", 1)[0];
+    assert.ok(cookie);
+    const signedValue = decodeURIComponent(cookie.slice(cookie.indexOf("=") + 1));
+    const demoId = /^s:([^.]+)\./.exec(signedValue)?.[1];
+    assert.ok(demoId);
+    createdProjectIds.push(`demo:${demoId}`);
+    return cookie;
+  };
+  const snapshot = async () => ({
+    projects: (await db.select({ id: projectsTable.id }).from(projectsTable)).length,
+    tasks: (await db.select({ id: tasksTable.id }).from(tasksTable)).length,
+  });
+  const initial = await snapshot();
+  const anonymousProjects = await db.select({ id: projectsTable.id })
+    .from(projectsTable).where(isNotNull(projectsTable.demoSessionId));
+  try {
+    app.locals.runtimeConfig = {
+      ...originalConfig,
+      demoProjectCap: anonymousProjects.length + 2,
+      demoProjectCreationWindowMax: anonymousProjects.length + 1,
+      demoProjectCreationWindowSeconds: 3600,
+    };
+    // Deliberately omit Origin, CSRF, and Cookie headers, exactly as in the
+    // reported attack. Native fetch does not retain Set-Cookie between calls.
+    const first = await fetch(`${baseUrl}/api/reviewflow/bootstrap`);
+    assert.equal(first.status, 200);
+    const cookie = trackProject(first);
+    assert.equal((await first.json() as { tasks: unknown[] }).tasks.length, 20);
+    const afterFirst = await snapshot();
+    assert.deepEqual(afterFirst, { projects: initial.projects + 1, tasks: initial.tasks + 20 });
+
+    const flood = async (status: number, code: string) => {
+      const responses = await Promise.all(Array.from({ length: 12 }, (_, i) =>
+        fetch(`${baseUrl}/api/reviewflow/${i % 2 ? "tasks" : "bootstrap"}`, {
+          // Invalid signatures must not bypass admission either.
+          headers: i % 3 ? {} : { cookie: "reviewflow_demo=s:forged.invalid" },
+        })));
+      for (const response of responses) {
+        assert.equal(response.status, status);
+        assert.equal(response.headers.get("set-cookie"), null);
+        assert.equal((await response.json() as { code: string }).code, code);
+        if (status === 429) assert.equal(response.headers.get("retry-after"), "3600");
+      }
+    };
+    await flood(429, "DEMO_CREATION_THROTTLED");
+    assert.deepEqual(await snapshot(), afterFirst);
+
+    // Raise only the window allowance: admit one last project, then verify
+    // the lifetime cap independently prevents continued cookie churn.
+    app.locals.runtimeConfig = {
+      ...app.locals.runtimeConfig,
+      demoProjectCreationWindowMax: anonymousProjects.length + 100,
+    };
+    const last = await fetch(`${baseUrl}/api/reviewflow/tasks`);
+    assert.equal(last.status, 200);
+    trackProject(last);
+    assert.equal((await last.json() as unknown[]).length, 20);
+    await flood(503, "DEMO_PROJECT_CAP_REACHED");
+    assert.deepEqual(await snapshot(), { projects: initial.projects + 2, tasks: initial.tasks + 40 });
+
+    const existing = await fetch(`${baseUrl}/api/reviewflow/bootstrap`, { headers: { cookie } });
+    assert.equal(existing.status, 200);
+    assert.equal((await existing.json() as { tasks: unknown[] }).tasks.length, 20);
+    assert.deepEqual(await snapshot(), { projects: initial.projects + 2, tasks: initial.tasks + 40 });
+  } finally {
+    app.locals.runtimeConfig = originalConfig;
+    // Remove only this test's fixtures so they do not consume the default
+    // creation allowance used by unrelated tests later in this file.
+    for (const projectId of createdProjectIds) {
+      await db.delete(tasksTable).where(eq(tasksTable.projectId, projectId));
+      await db.delete(projectsTable).where(eq(projectsTable.id, projectId));
+    }
+  }
+});
+
+test("concurrent first requests for one demo identity seed exactly once", async () => {
+  const { ensureDemoProject } = await import("./reviewflow");
+  const projects = await db.select({ id: projectsTable.id })
+    .from(projectsTable).where(isNotNull(projectsTable.demoSessionId));
+  const config = {
+    demoProjectCap: projects.length + 1,
+    demoProjectCreationWindowMax: projects.length + 1,
+    demoProjectCreationWindowSeconds: 3600,
+  };
+  const demoId = randomUUID();
+  const projectId = `demo:${demoId}`;
+  try {
+    const results = await Promise.all(Array.from({ length: 6 }, () => ensureDemoProject(demoId, config)));
+    assert.ok(results.every((project) => project.id === projectId));
+    const tasks = await db.select({ id: tasksTable.id })
+      .from(tasksTable).where(eq(tasksTable.projectId, projectId));
+    assert.equal(tasks.length, 20);
+  } finally {
+    await db.delete(tasksTable).where(eq(tasksTable.projectId, projectId));
+    await db.delete(projectsTable).where(eq(projectsTable.id, projectId));
+  }
+});
+
 test("concurrent reviews commit exactly one decision and protect final state and project scope", async () => {
   const session = await createSession();
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, session.projectId));
