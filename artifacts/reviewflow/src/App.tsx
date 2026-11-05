@@ -20,6 +20,7 @@ import Traces from '@/pages/traces';
 import Factories from '@/pages/factories';
 import Team from '@/pages/team';
 import Observability from '@/pages/observability';
+import Rubrics from '@/pages/rubrics';
 import { setProjectId } from '@workspace/api-client-react';
 setProjectId(sessionStorage.getItem("reviewflow.project"));
 
@@ -131,6 +132,7 @@ function AppRoutes() {
             <Route path="/"><HomeRedirect /></Route>
             <Route path="/tasks"><ProtectedRoute component={Tasks} /></Route>
             <Route path="/factories"><ProtectedRoute component={Factories} /></Route>
+            <Route path="/rubrics"><ProtectedRoute component={Rubrics} /></Route>
             <Route path="/observability"><ProtectedRoute component={Observability} /></Route>
             <Route path="/team"><ProtectedRoute component={Team} /></Route>
             <Route path="/traces"><ProtectedRoute component={Traces} /></Route>

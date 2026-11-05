@@ -167,6 +167,7 @@ export default function Factories() {
         >
           Refresh
         </Button>
+        <Link href="/rubrics" className="text-primary underline">Open generic rubric factory</Link>
         {factory === "preference" && (
           <Link href="/traces" className="text-primary underline">
             Open preference workbench

@@ -271,3 +271,50 @@ test("trace proposal admission rechecks quarantine after a delayed budget reserv
   assert.equal(calls, 0);
   assert.equal((await db.select().from(jevCallsTable).where(eq(jevCallsTable.projectId, ids[2]))).length, previous);
 });
+
+test("preference experiment identity dedupes and keeps immutable model history separate", async () => {
+  const request = (path: string, body?: unknown) => call(path, body, { "x-project": "kit" });
+  const input = structuredClone(document);
+  for (const run of input.runs) { run.id = `identity-${run.id}`; run.scenarioId = "identity-case"; }
+  assert.equal((await request("/imports", { document: input })).status, 201);
+  const comparison = (await (await request("/comparisons")).json() as any[]).find(row => row.scenarioId === "identity-case");
+  const path = `/comparisons/${comparison.id}/proposals`;
+  assert.equal((await request(path, { provider: "simulator", experimentRunId: "identity-first" })).status, 200);
+  const duplicate = await request(path, { provider: "simulator", experimentRunId: "identity-first" });
+  assert.equal(duplicate.status, 200); assert.equal((await duplicate.json() as any).cached, true);
+  assert.equal((await request(path, { provider: "simulator", experimentRunId: "identity-second" })).status, 200);
+  const evaluations = (await db.select().from(traceRecordsTable).where(and(eq(traceRecordsTable.projectId, ids[3]), eq(traceRecordsTable.kind, "evaluation"))))
+    .map(row => row.payload as any).filter(row => row.comparisonId === comparison.id && row.experimentRunId?.startsWith("identity-"));
+  assert.equal(evaluations.length, 2);
+  assert.notEqual(evaluations[0].evaluationId, evaluations[1].evaluationId);
+  assert.ok(evaluations.every(row => row.simulated === true && row.provenance === "captured"));
+  const cached = await request(path, { provider: "simulator", experimentRunId: "identity-first" });
+  assert.equal((await cached.json() as any).cached, true);
+  assert.equal((await request(path, { provider: "simulator", requestedModel: "future-model" })).status, 400);
+  const first = evaluations.find(row => row.experimentRunId === "identity-first");
+  const [current] = await db.select().from(traceRecordsTable).where(and(eq(traceRecordsTable.projectId, ids[3]), eq(traceRecordsTable.kind, "comparison"), eq(traceRecordsTable.key, comparison.id)));
+  assert.equal((current.payload as any).proposal.evaluationId, first.evaluationId);
+  await assert.rejects(db.update(traceRecordsTable).set({ payload: {} }).where(and(eq(traceRecordsTable.projectId, ids[3]), eq(traceRecordsTable.kind, "evaluation"))),
+    (error: any) => /immutable/.test(error.cause?.message ?? error.message));
+});
+
+
+test("exposed preference evaluation cannot be replaced by a new or cached experiment", async () => {
+  const request = (path: string, body?: unknown) => call(path, body, { "x-project": "kit" });
+  const comparison = (await (await request("/comparisons")).json() as any[]).find(row => row.scenarioId === "identity-case");
+  const path = `/comparisons/${comparison.id}`;
+  let visible = await (await request(`${path}/reveal`, {})).json() as any;
+  const original = visible.proposal;
+  visible = await (await request(`${path}/reviews`, { decision: "a", expectedVersion: visible.version, evidenceRefs: [] })).json() as any;
+  assert.equal((await request(`${path}/quality`, { status: "passed", note: "Synthetic privacy and evidence check", expectedVersion: visible.version })).status, 200);
+  for (const experimentRunId of ["identity-third", "identity-second"]) {
+    const rejected = await request(`${path}/proposals`, { provider: "simulator", experimentRunId });
+    assert.equal(rejected.status, 409, await rejected.clone().text());
+    assert.match((await rejected.json() as any).error, /exposed proposal cannot be replaced/);
+  }
+  assert.equal((await request(`${path}/proposals`, { provider: "simulator", experimentRunId: "identity-first" })).status, 200);
+  const unchanged = await (await request(path)).json() as any;
+  assert.deepEqual(unchanged.proposal, original);
+  assert.equal(unchanged.review.decision, "a");
+  assert.equal(unchanged.quality.status, "passed");
+});

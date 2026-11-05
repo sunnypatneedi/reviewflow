@@ -1,3 +1,4 @@
+import { createEvaluationIdentity, type EvaluationConfiguration } from "./evaluation-identity";
 import { readProviderJson, validChoice, validMetadata } from "./provider-contract";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -103,8 +104,8 @@ export function assertNoReferenceLeakage(value: unknown): void {
 
 export function publicProposal(proposal: TraceObject | undefined): TraceObject | null {
   if (!proposal) return null;
-  return Object.fromEntries(["provider", "simulated", "model", "decision", "probabilities", "confidence", "serviceMs", "createdAt"]
-    .filter(key => proposal[key] !== undefined).map(key => [key, proposal[key]]));
+  return { provenance: proposal.provenance ?? "legacy-unknown", ...Object.fromEntries(["provider", "simulated", "model", "decision", "probabilities", "confidence", "serviceMs", "createdAt", "evaluationId", "provenance", "questionVersion", "contextPreparationVersion", "requestedModel", "experimentRunId", "snapshotHash"]
+    .filter(key => proposal[key] !== undefined).map(key => [key, proposal[key]])) };
 }
 
 /** Structured identity metadata only; never purports to anonymize arbitrary text. */
@@ -162,6 +163,18 @@ export function proposalState(comparison: TraceObject) {
     context: comparison.context,
     a: comparison.a?.response, b: comparison.b?.response,
   };
+}
+
+export function traceEvaluationIdentity(projectId: string, comparison: TraceObject, provider: "simulator" | "jev", config: EvaluationConfiguration = {}) {
+  const requestedModel = provider === "simulator" ? "trace-simulator-v1" : "jev-1.13.0";
+  if ((config.requestedModel && config.requestedModel !== requestedModel) ||
+    (config.questionVersion && config.questionVersion !== "preference-v1") ||
+    (config.contextPreparationVersion && config.contextPreparationVersion !== "observed-context-v1")) throw new TraceError("Unsupported preference evaluation configuration");
+  try { return createEvaluationIdentity({ projectId, taskId: comparison.id, workload: "preference",
+    snapshot: { state: proposalState(comparison), task: comparison.task, a: comparison.a, b: comparison.b },
+    questionVersion: "preference-v1", contextPreparationVersion: "observed-context-v1", requestedModel,
+    experimentRunId: config.experimentRunId ?? "default" }); }
+  catch (error) { if (error instanceof TraceError) throw error; throw new TraceError(error instanceof Error ? error.message : "Invalid evaluation identity"); }
 }
 
 export async function traceProposal(comparison: TraceObject, provider: "simulator" | "jev"): Promise<TraceObject> {

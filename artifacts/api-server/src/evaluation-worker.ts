@@ -1,3 +1,4 @@
+import { FactoryError } from "./lib/factory-engine";
 import { randomUUID } from "node:crypto";
 import { assertFactoryAssistance, lockFactory } from "./lib/factories";
 import { reserveJevCall, finishJevCall } from "./lib/jev-budget";
@@ -8,14 +9,18 @@ import {
   jobsTable,
   proposalsTable,
   tasksTable,
+  projectsTable,
 } from "@workspace/db";
 import {
   evaluateTask,
+  MODEL,
   getRetryDelayMs,
   type EvaluationMode,
   type EvaluationResult,
   ProviderError,
 } from "./evaluation";
+
+import { createEvaluationIdentity, evidenceSnapshot, evaluationHash, type EvaluationConfiguration, type EvaluationIdentity } from "./lib/evaluation-identity";
 
 export const DEFAULT_MAX_ATTEMPTS = 3;
 export const DEFAULT_LEASE_MS = 30_000;
@@ -36,46 +41,63 @@ export async function enqueueEvaluationJobs(input: {
   taskIds: string[];
   mode: EvaluationMode;
   executor?: Pick<typeof db, "select" | "update" | "insert">;
-}): Promise<number> {
+  retryExpected?: { jobId: string; evaluationId: string | null };
+} & EvaluationConfiguration): Promise<number> {
   if (!input.taskIds.length) return 0;
-  const executor = input.executor ?? db;
-  const existing = await executor.select().from(jobsTable).where(and(
-    eq(jobsTable.projectId, input.projectId),
-    eq(jobsTable.mode, input.mode),
-    inArray(jobsTable.taskId, input.taskIds),
-  ));
-  const existingByTask = new Map(existing.map((job) => [job.taskId, job]));
-  let queued = 0;
-  for (const job of existing) {
-    if (job.status === "failed") {
-      const requeued = await executor.update(jobsTable).set({
-        status: "queued",
-        attempts: 0,
-        availableAt: new Date(),
-        leaseOwner: null,
-        leaseExpiresAt: null,
-        lastError: null,
-        updatedAt: new Date(),
-      }).where(and(eq(jobsTable.id, job.id), eq(jobsTable.status, "failed")))
-        .returning({ id: jobsTable.id });
-      queued += requeued.length;
+  if (!input.executor) return db.transaction(tx => enqueueEvaluationJobs({ ...input, executor: tx }));
+  const executor = input.executor;
+  const requestedModel = input.mode === "demo" ? "demo-simulator-v1" : MODEL;
+  if ((input.requestedModel && input.requestedModel !== requestedModel)
+    || (input.questionVersion && input.questionVersion !== "evidence-v1")
+    || (input.contextPreparationVersion && input.contextPreparationVersion !== "raw-evidence-v1")) {
+    throw new ProviderError("Unsupported evaluation configuration");
+  }
+  const [project] = await executor.select().from(projectsTable).where(eq(projectsTable.id, input.projectId));
+  if (!project || project.rubricVersion !== "evidence-v1") throw new ProviderError("Project rubric is not supported by this evaluator");
+  // Serialize enqueue with publication so competing configurations cannot attach
+  // a late result to a newer task selection. Stable ordering avoids deadlocks.
+  const tasks = await executor.select().from(tasksTable).where(and(
+    eq(tasksTable.projectId, input.projectId), inArray(tasksTable.id, input.taskIds),
+  )).orderBy(tasksTable.id).for("update");
+  if (input.retryExpected) {
+    const task = tasks.length === 1 ? tasks[0] : undefined;
+    if (!task || task.currentEvaluationId !== input.retryExpected.evaluationId || task.mode !== input.mode
+      || !["pending", "proposed", "in_review"].includes(task.status)) {
+      throw new FactoryError("Evaluation selection changed; superseded jobs cannot be retried");
+    }
+    const [job] = await executor.select().from(jobsTable).where(and(
+      eq(jobsTable.id, input.retryExpected.jobId), eq(jobsTable.projectId, input.projectId),
+      eq(jobsTable.taskId, task.id), eq(jobsTable.mode, input.mode),
+    )).for("update");
+    if (!job || job.evaluationId !== input.retryExpected.evaluationId || job.status !== "failed") {
+      throw new FactoryError("Only the current terminally failed evaluation job can be retried");
     }
   }
-  const pendingInserts = input.taskIds
-    .filter((taskId) => !existingByTask.has(taskId))
-    .map((taskId) => ({
-      id: randomUUID(),
-      projectId: input.projectId,
-      taskId,
-      mode: input.mode,
-      status: "queued",
-      availableAt: new Date(),
-    }));
-  if (!pendingInserts.length) return queued;
-  const rows = await executor.insert(jobsTable).values(pendingInserts).onConflictDoNothing({
-    target: [jobsTable.taskId, jobsTable.mode],
-  }).returning({ id: jobsTable.id });
-  return queued + rows.length;
+  let queued = 0;
+  for (const task of tasks) {
+    if (!["pending", "proposed", "in_review"].includes(task.status)) continue;
+    const { evaluationId, identity } = createEvaluationIdentity({
+      projectId: input.projectId, taskId: task.id, workload: "evidence", snapshot: evidenceSnapshot(task),
+      questionVersion: "evidence-v1", contextPreparationVersion: "raw-evidence-v1", requestedModel,
+      experimentRunId: input.experimentRunId ?? "default",
+    });
+    const rows = await executor.insert(jobsTable).values({
+      id: randomUUID(), projectId: input.projectId, taskId: task.id, mode: input.mode,
+      evaluationId, evaluationIdentity: identity, provenance: "captured", status: "queued", availableAt: new Date(),
+    }).onConflictDoNothing({ target: jobsTable.evaluationId }).returning({ id: jobsTable.id });
+    queued += rows.length;
+    if (!rows.length) {
+      const retried = await executor.update(jobsTable).set({ status: "queued", attempts: 0, availableAt: new Date(),
+        leaseOwner: null, leaseExpiresAt: null, lastError: null, updatedAt: new Date(),
+      }).where(and(eq(jobsTable.evaluationId, evaluationId), eq(jobsTable.status, "failed"))).returning({ id: jobsTable.id });
+      queued += retried.length;
+    }
+    const [proposal] = await executor.select().from(proposalsTable).where(eq(proposalsTable.evaluationId, evaluationId));
+    await executor.update(tasksTable).set({ currentEvaluationId: evaluationId, currentProposalId: proposal?.id ?? null,
+      mode: input.mode, ...(task.currentEvaluationId !== evaluationId ? { version: sql`${tasksTable.version} + 1`, status: proposal ? "proposed" : "pending" } : {}),
+    }).where(eq(tasksTable.id, task.id));
+  }
+  return queued;
 }
 
 export function isLiveInferenceEnabled(
@@ -127,6 +149,9 @@ async function claimJob(
         job.id,
         job.project_id AS "projectId",
         job.task_id AS "taskId",
+        job.evaluation_id AS "evaluationId",
+        job.evaluation_identity AS "evaluationIdentity",
+        job.provenance,
         job.status,
         job.mode,
         job.attempts,
@@ -137,7 +162,13 @@ async function claimJob(
         job.created_at AS "createdAt",
         job.updated_at AS "updatedAt"
     `);
-    return (claimed.rows[0] as Job | undefined) ?? null;
+    const job = (claimed.rows[0] as Job | undefined) ?? null;
+    if (job) await tx.insert(eventsTable).values({
+      id: randomUUID(), projectId: job.projectId, actorId: `worker:${workerId}`,
+      type: "evaluation.attempt.started", entityId: job.taskId,
+      payload: { jobId: job.id, evaluationId: job.evaluationId, attempt: job.attempts, mode: job.mode },
+    });
+    return job;
   });
 }
 
@@ -157,6 +188,12 @@ async function saveSuccess(
 ): Promise<void> {
   await db.transaction(async (tx) => {
     await assertFactoryAssistance(tx, job.projectId, "evidence", job.taskId);
+    // Match enqueue's task -> job lock order. Taking a lock is not publication;
+    // the lease fence below must still succeed before any domain mutation.
+    const locked = await tx.execute(sql`
+      SELECT id FROM rf_tasks WHERE id = ${job.taskId} AND project_id = ${job.projectId} FOR UPDATE
+    `);
+    if (!locked.rows.length) return;
     // Fence the lease before touching any domain row. An expired or reclaimed
     // worker cannot publish a proposal even if its provider call later returns.
     const fenced = await tx.update(jobsTable).set({
@@ -192,24 +229,17 @@ async function saveSuccess(
       return;
     }
 
-    // Lock and verify the state before proposal creation. In particular, a
-    // provider response racing a human final decision must not mutate the task.
-    const locked = await tx.execute(sql`
-      SELECT id
-      FROM rf_tasks
-      WHERE id = ${job.taskId}
-        AND project_id = ${job.projectId}
-        AND status IN ('pending', 'proposed', 'in_review')
-      FOR UPDATE
-    `);
-    if (!locked.rows.length) return;
+    const [currentTask] = await tx.select().from(tasksTable).where(eq(tasksTable.id, job.taskId));
+    const identity = job.evaluationIdentity as EvaluationIdentity;
+    if (!identity || !["pending", "proposed", "in_review"].includes(currentTask.status)) return;
 
     const inserted = await tx.insert(proposalsTable).values({
       id: randomUUID(),
       projectId: job.projectId,
       taskId: job.taskId,
       mode: job.mode,
-      requestedModel: job.mode === "demo" ? "demo-simulator-v1" : "jev-1.13.0",
+      evaluationId: job.evaluationId, evaluationIdentity: job.evaluationIdentity, provenance: job.provenance,
+      requestedModel: identity.requestedModel,
       returnedModel: job.mode === "demo" ? "demo-simulator-v1" : (result.model ?? "unknown"),
       label: result.label,
       labelProbability: String(result.labelProbability),
@@ -223,8 +253,11 @@ async function saveSuccess(
       rawResponse: result.raw ?? result,
     }).onConflictDoNothing().returning({ id: proposalsTable.id });
 
-    if (inserted.length) {
+    if (inserted.length && currentTask.currentEvaluationId === job.evaluationId &&
+      evaluationHash(evidenceSnapshot(currentTask)) === identity.snapshotHash &&
+      ["pending", "proposed", "in_review"].includes(currentTask.status)) {
       await tx.update(tasksTable).set({
+        currentProposalId: inserted[0].id,
         status: "proposed",
         mode: job.mode,
         version: sql`${tasksTable.version} + 1`,
@@ -239,7 +272,7 @@ async function saveSuccess(
         actorId: `worker:${workerId}`,
         type: "proposal.created",
         entityId: job.taskId,
-        payload: { mode: job.mode, jobId: job.id },
+        payload: { mode: job.mode, jobId: job.id, evaluationId: job.evaluationId },
       });
     }
   });
@@ -302,6 +335,10 @@ export class EvaluationWorker {
     try {
       const task = await loadTask(job);
       if (!task) throw new ProviderError("Evaluation task no longer exists");
+      const identity = job.evaluationIdentity as EvaluationIdentity | null;
+      if (!identity || job.provenance !== "captured" || !job.evaluationId) throw new ProviderError("Legacy evaluation has unknown provenance; enqueue a versioned evaluation");
+      if (task.currentEvaluationId !== job.evaluationId || evaluationHash(evidenceSnapshot(task)) !== identity.snapshotHash)
+        throw new ProviderError("Evaluation snapshot was superseded");
       await db.transaction(tx => assertFactoryAssistance(tx, job.projectId, "evidence", job.taskId));
       if (!["pending", "proposed", "in_review"].includes(task.status)) throw new ProviderError("Task no longer needs evaluation");
       const reservation = job.mode === "live" ? await reserveJevCall(job.projectId, "evidence", job.taskId, async tx => {
@@ -314,7 +351,7 @@ export class EvaluationWorker {
           sql`${jobsTable.leaseExpiresAt} > NOW()`,
         )).for("share");
         const [currentTask] = await tx.select().from(tasksTable).where(and(eq(tasksTable.projectId, job.projectId), eq(tasksTable.id, job.taskId))).for("share");
-        if (!currentJob || !currentTask || currentTask.version !== task.version || currentTask.contentHash !== task.contentHash ||
+        if (!currentJob || !currentTask || currentTask.currentEvaluationId !== job.evaluationId || evaluationHash(evidenceSnapshot(currentTask)) !== identity.snapshotHash ||
             !["pending", "proposed", "in_review"].includes(currentTask.status)) throw new ProviderError("Evaluation admission changed");
       }) : null;
       let result;

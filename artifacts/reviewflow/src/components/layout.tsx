@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/observability", label: "Observability", icon: LayoutDashboard },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/factories", label: "Factories & lanes", icon: ListTodo },
+  { href: "/rubrics", label: "Rubric factory", icon: CheckSquare },
   { href: "/traces", label: "Trace2Preference", icon: GitCompareArrows },
   { href: "/review", label: "Review", icon: CheckSquare },
   { href: "/audits", label: "Audits", icon: ShieldCheck },
@@ -90,9 +91,9 @@ function NavLinks({
     <nav className="p-3 space-y-0.5" aria-label="Primary">
       {NAV_ITEMS.filter((item) =>
         item.href === "/observability" ? ["owner", "adjudicator", "demo"].includes(role ?? "") : role === "auditor"
-          ? ["/", "/factories", "/audits", "/team"].includes(item.href)
+          ? ["/", "/factories", "/rubrics", "/audits", "/team"].includes(item.href)
           : role === "exporter"
-            ? ["/", "/releases", "/traces", "/team"].includes(item.href)
+            ? ["/", "/releases", "/traces", "/rubrics", "/team"].includes(item.href)
             : role === "reviewer"
               ? item.href !== "/releases"
               : true,

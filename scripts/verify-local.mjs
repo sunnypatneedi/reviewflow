@@ -20,7 +20,7 @@ export const localVerificationStages = [
   {
     name: "disposable-launcher",
     command: "node",
-    args: ["scripts/demo-smoke.mjs"],
+    args: ["scripts/demo-smoke.mjs", "--browser"],
   },
   {
     name: "durable-local-restart",

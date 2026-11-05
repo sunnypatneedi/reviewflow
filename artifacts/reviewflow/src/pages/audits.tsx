@@ -1,3 +1,4 @@
+import { useTelemetry } from "@/lib/telemetry";
 import { useState } from "react";
 import {
   getGetAuditQueryKey,
@@ -47,6 +48,8 @@ export default function Audits() {
     { query: { queryKey: getGetAuditAdjudicationQueryKey(selectedAuditId ?? ""), enabled: Boolean(selectedAuditId) } },
   );
 
+  const telemetry = useTelemetry({ factory: "audit", itemId: selectedAuditId });
+
   const handleCreate = () => {
     createAudit.mutate({
       data: {
@@ -67,6 +70,7 @@ export default function Audits() {
   const handleDecision = (auditId: string, itemId: string) => {
     const label = labels[itemId];
     if (!label) return;
+    telemetry("submit");
     submitDecision.mutate({
       id: auditId,
       data: {
@@ -76,6 +80,7 @@ export default function Audits() {
       },
     }, {
       onSuccess: () => {
+        telemetry("review");
         queryClient.invalidateQueries({ queryKey: getListAuditsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetAuditQueryKey(auditId) });
       },
@@ -94,6 +99,7 @@ export default function Audits() {
       },
     }, {
       onSuccess: () => {
+        telemetry("review");
         queryClient.invalidateQueries({ queryKey: getListAuditsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetAuditAdjudicationQueryKey(auditId) });
       },

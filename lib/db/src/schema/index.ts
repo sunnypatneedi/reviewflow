@@ -22,3 +22,6 @@ export * from "./traces";
 export * from "./factories";
 export * from "./team";
 export * from "./collaboration";
+
+export * from "./rubrics";
+export * from "./telemetry";

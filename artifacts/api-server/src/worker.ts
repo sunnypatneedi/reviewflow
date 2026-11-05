@@ -1,3 +1,4 @@
+import { startTelemetryConsumer } from "./lib/telemetry";
 import { resolveListenHost } from "../../../scripts/listen-host.mjs";
 import { pool } from "@workspace/db";
 import { createServer } from "node:http";
@@ -5,6 +6,7 @@ import { logger } from "./lib/logger";
 import { EvaluationWorker } from "./evaluation-worker";
 
 const worker = new EvaluationWorker();
+const stopTelemetry = startTelemetryConsumer();
 const port = Number(process.env.WORKER_PORT ?? process.env.PORT ?? 8099);
 const healthServer = createServer((req, res) => {
   const ready = req.url === "/readyz" ? worker.ready() : true;
@@ -35,4 +37,5 @@ healthServer.listen(port, resolveListenHost(process.env), () => {
   });
 });
 await worker.start();
+await stopTelemetry();
 await pool.end();

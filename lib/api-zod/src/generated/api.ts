@@ -83,6 +83,17 @@ export const GetBootstrapResponse = zod.object({
           taskId: zod.string(),
           mode: zod.enum(["demo", "live"]),
           model: zod.string(),
+          evaluation: zod
+            .object({
+              provenance: zod.enum(["captured", "legacy-unknown"]),
+              evaluation_id: zod.string().nullable(),
+              snapshot_hash: zod.string().optional(),
+              question_version: zod.string().optional(),
+              context_preparation_version: zod.string().optional(),
+              requested_model: zod.string().optional(),
+              experiment_run_id: zod.string().optional(),
+            })
+            .nullish(),
           label: zod.enum([
             "supported",
             "contradicted",
@@ -219,6 +230,17 @@ export const ListTasksResponseItem = zod.object({
       taskId: zod.string(),
       mode: zod.enum(["demo", "live"]),
       model: zod.string(),
+      evaluation: zod
+        .object({
+          provenance: zod.enum(["captured", "legacy-unknown"]),
+          evaluation_id: zod.string().nullable(),
+          snapshot_hash: zod.string().optional(),
+          question_version: zod.string().optional(),
+          context_preparation_version: zod.string().optional(),
+          requested_model: zod.string().optional(),
+          experiment_run_id: zod.string().optional(),
+        })
+        .nullish(),
       label: zod.enum(["supported", "contradicted", "insufficient_evidence"]),
       labelProbability: zod
         .number()
@@ -252,6 +274,8 @@ export const ListTasksResponse = zod.array(ListTasksResponseItem);
 
 export const listEvaluationJobsQueryTaskIdsMax = 200;
 
+export const listEvaluationJobsQueryIncludeHistoryDefault = false;
+
 export const ListEvaluationJobsQueryParams = zod.object({
   taskIds: zod
     .array(zod.coerce.string())
@@ -259,10 +283,29 @@ export const ListEvaluationJobsQueryParams = zod.object({
     .max(listEvaluationJobsQueryTaskIdsMax)
     .describe("Task IDs in the selected evaluation batch."),
   mode: zod.enum(["demo", "live"]).optional(),
+  includeHistory: zod.coerce
+    .boolean()
+    .default(listEvaluationJobsQueryIncludeHistoryDefault)
+    .describe(
+      "Include superseded experiment jobs; defaults to current identities only.",
+    ),
 });
 
 export const ListEvaluationJobsResponseItem = zod.object({
   id: zod.string(),
+  evaluationId: zod.string().nullish(),
+  current: zod.boolean().optional(),
+  evaluation: zod
+    .object({
+      provenance: zod.enum(["captured", "legacy-unknown"]),
+      evaluation_id: zod.string().nullable(),
+      snapshot_hash: zod.string().optional(),
+      question_version: zod.string().optional(),
+      context_preparation_version: zod.string().optional(),
+      requested_model: zod.string().optional(),
+      experiment_run_id: zod.string().optional(),
+    })
+    .nullish(),
   taskId: zod.string(),
   mode: zod.enum(["demo", "live"]),
   status: zod.enum(["queued", "running", "succeeded", "failed"]),
@@ -276,6 +319,12 @@ export const ListEvaluationJobsResponse = zod.array(
 );
 
 export const RetryEvaluationJobBody = zod.object({
+  jobId: zod
+    .string()
+    .optional()
+    .describe(
+      "Exact current job ID; superseded runs cannot be retried through this endpoint.",
+    ),
   taskId: zod.string(),
   mode: zod.enum(["demo", "live"]),
   ownerConsent: zod.boolean(),
@@ -296,9 +345,27 @@ export const RetryEvaluationJobResponse = zod.object({
 
 export const evaluateTasksBodyTaskIdsMax = 25;
 
+export const evaluateTasksBodyExperimentRunIdMax = 128;
+
+export const evaluateTasksBodyExperimentRunIdRegExp = new RegExp(
+  "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+);
+
 export const EvaluateTasksBody = zod.object({
   taskIds: zod.array(zod.string()).min(1).max(evaluateTasksBodyTaskIdsMax),
   mode: zod.enum(["demo", "live"]),
+  experimentRunId: zod
+    .string()
+    .min(1)
+    .max(evaluateTasksBodyExperimentRunIdMax)
+    .regex(evaluateTasksBodyExperimentRunIdRegExp)
+    .optional()
+    .describe(
+      "Stable run identity; changing it requests a separate evaluation without deleting history.",
+    ),
+  questionVersion: zod.enum(["evidence-v1"]).optional(),
+  contextPreparationVersion: zod.enum(["raw-evidence-v1"]).optional(),
+  requestedModel: zod.enum(["demo-simulator-v1", "jev-1.13.0"]).optional(),
   ownerConsent: zod.boolean(),
   outboundReviewed: zod
     .boolean()
@@ -359,6 +426,17 @@ export const GetNextReviewResponse = zod
           taskId: zod.string(),
           mode: zod.enum(["demo", "live"]),
           model: zod.string(),
+          evaluation: zod
+            .object({
+              provenance: zod.enum(["captured", "legacy-unknown"]),
+              evaluation_id: zod.string().nullable(),
+              snapshot_hash: zod.string().optional(),
+              question_version: zod.string().optional(),
+              context_preparation_version: zod.string().optional(),
+              requested_model: zod.string().optional(),
+              experiment_run_id: zod.string().optional(),
+            })
+            .nullish(),
           label: zod.enum([
             "supported",
             "contradicted",
@@ -477,6 +555,17 @@ export const SubmitReviewResponse = zod.object({
       taskId: zod.string(),
       mode: zod.enum(["demo", "live"]),
       model: zod.string(),
+      evaluation: zod
+        .object({
+          provenance: zod.enum(["captured", "legacy-unknown"]),
+          evaluation_id: zod.string().nullable(),
+          snapshot_hash: zod.string().optional(),
+          question_version: zod.string().optional(),
+          context_preparation_version: zod.string().optional(),
+          requested_model: zod.string().optional(),
+          experiment_run_id: zod.string().optional(),
+        })
+        .nullish(),
       label: zod.enum(["supported", "contradicted", "insufficient_evidence"]),
       labelProbability: zod
         .number()

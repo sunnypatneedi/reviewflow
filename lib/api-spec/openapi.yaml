@@ -77,6 +77,11 @@ paths:
           name: mode
           required: false
           schema: { type: string, enum: [demo, live] }
+        - in: query
+          name: includeHistory
+          required: false
+          description: Include superseded experiment jobs; defaults to current identities only.
+          schema: { type: boolean, default: false }
       responses:
         "200":
           description: Evaluation jobs scoped to the current project and requested tasks.
@@ -509,6 +514,17 @@ components:
         imported: { type: integer }
         unchanged: { type: integer }
         total: { type: integer }
+    EvaluationProvenance:
+      type: object
+      required: [provenance, evaluation_id]
+      properties:
+        provenance: { type: string, enum: [captured, legacy-unknown] }
+        evaluation_id: { type: [string, "null"] }
+        snapshot_hash: { type: string }
+        question_version: { type: string }
+        context_preparation_version: { type: string }
+        requested_model: { type: string }
+        experiment_run_id: { type: string }
     Proposal:
       type: object
       required: [id, taskId, mode, model, label, labelProbability, probabilities, injectionProbability, complexity, confidence, latencyMs, createdAt]
@@ -517,6 +533,10 @@ components:
         taskId: { type: string }
         mode: { type: string, enum: [demo, live] }
         model: { type: string }
+        evaluation:
+          type: [object, "null"]
+          allOf:
+            - { $ref: "#/components/schemas/EvaluationProvenance" }
         label: { $ref: "#/components/schemas/Label" }
         labelProbability: { type: number, minimum: 0, maximum: 1 }
         probabilities:
@@ -561,6 +581,10 @@ components:
           maxItems: 25
           items: { type: string }
         mode: { type: string, enum: [demo, live] }
+        experimentRunId: { type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$', description: Stable run identity; changing it requests a separate evaluation without deleting history. }
+        questionVersion: { type: string, enum: [evidence-v1] }
+        contextPreparationVersion: { type: string, enum: [raw-evidence-v1] }
+        requestedModel: { type: string, enum: [demo-simulator-v1, jev-1.13.0] }
         ownerConsent: { type: boolean }
         outboundReviewed: { type: boolean, description: Required for live mode; confirms review of actual outbound task text for private data }
     EvaluateResult:
@@ -575,6 +599,7 @@ components:
       type: object
       required: [taskId, mode, ownerConsent]
       properties:
+        jobId: { type: string, description: Exact current job ID; superseded runs cannot be retried through this endpoint. }
         taskId: { type: string }
         mode: { type: string, enum: [demo, live] }
         ownerConsent: { type: boolean }
@@ -584,6 +609,12 @@ components:
       required: [id, taskId, mode, status, attempts, lastError, createdAt, updatedAt]
       properties:
         id: { type: string }
+        evaluationId: { type: [string, "null"] }
+        current: { type: boolean }
+        evaluation:
+          type: [object, "null"]
+          allOf:
+            - { $ref: "#/components/schemas/EvaluationProvenance" }
         taskId: { type: string }
         mode: { type: string, enum: [demo, live] }
         status: { type: string, enum: [queued, running, succeeded, failed] }

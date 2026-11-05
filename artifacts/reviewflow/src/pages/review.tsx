@@ -1,3 +1,4 @@
+import { useTelemetry } from "@/lib/telemetry";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
@@ -173,6 +174,12 @@ export default function Review() {
   });
 
   const proposal = item?.task.proposal ?? null;
+  const telemetry = useTelemetry({
+    factory: "evidence",
+    itemId: item?.task.id,
+    itemVersion: item?.task.version,
+    proposalId: proposal?.id,
+  });
   const proposedLabel = (proposal?.label ?? "supported") as ReviewLabel;
   const effectiveLabel = (selectedLabel || proposedLabel) as ReviewLabel;
 
@@ -215,6 +222,7 @@ export default function Review() {
 
   const handleAction = (action: "accept" | "correct" | "escalate") => {
     if (!item || !proposal) return;
+    telemetry("submit");
     submitReview.mutate(
       {
         data: {
@@ -229,6 +237,7 @@ export default function Review() {
       },
       {
         onSuccess: () => {
+          telemetry("review");
           setReason("");
           setAttempt(null);
           setEvidenceExcerpt(null);
@@ -636,7 +645,9 @@ export default function Review() {
                   <dd className="font-mono text-ink-2">
                     {proposal.latencyMs}ms
                   </dd>
-                  <dt title="ReviewFlow 1–5 scale; native Jev Score (0–4) plus one">Complexity (1–5)</dt>
+                  <dt title="ReviewFlow 1–5 scale; native Jev Score (0–4) plus one">
+                    Complexity (1–5)
+                  </dt>
                   <dd className="font-mono text-ink-2">
                     {proposal.complexity.toFixed(2)}
                   </dd>

@@ -5,6 +5,7 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
+import type { EvaluationProvenance } from "./evaluationProvenance";
 import type { Label } from "./label";
 import type { ProposalMode } from "./proposalMode";
 import type { ProposalProbabilities } from "./proposalProbabilities";
@@ -14,6 +15,8 @@ export interface Proposal {
   taskId: string;
   mode: ProposalMode;
   model: string;
+  /** @nullable */
+  evaluation?: EvaluationProvenance | null;
   label: Label;
   /**
    * @minimum 0

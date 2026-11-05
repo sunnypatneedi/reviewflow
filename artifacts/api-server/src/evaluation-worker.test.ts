@@ -523,3 +523,142 @@ test("worker persists fractional compatibility complexity without rounding", asy
   const [proposal] = await db.select().from(proposalsTable).where(eq(proposalsTable.taskId, task.id));
   assert.ok(Math.abs(proposal.complexity - 2.43) < 0.00001);
 });
+
+test("versioned inference dedupes identical concurrent requests and preserves separate runs", async () => {
+  const task = await createTask();
+  const input = { projectId: task.projectId, taskIds: [task.id], mode: "demo" as const };
+  assert.equal((await Promise.all([enqueueEvaluationJobs(input), enqueueEvaluationJobs(input)])).reduce((a,b) => a+b), 1);
+  const worker = new EvaluationWorker();
+  await worker.runOnce();
+  const [first] = await db.select().from(proposalsTable).where(eq(proposalsTable.taskId, task.id));
+  assert.ok(first.evaluationId);
+  assert.equal(await enqueueEvaluationJobs(input), 0);
+  assert.equal(await enqueueEvaluationJobs({ ...input, experimentRunId: "second" }), 1);
+  const [pending] = await db.select().from(tasksTable).where(eq(tasksTable.id, task.id));
+  assert.equal(pending.currentProposalId, null);
+  assert.equal(pending.status, "pending");
+  await worker.runOnce();
+  const proposals = await db.select().from(proposalsTable).where(eq(proposalsTable.taskId, task.id));
+  assert.equal(proposals.length, 2);
+  assert.deepEqual(proposals.find(p => p.id === first.id), first);
+  await assert.rejects(db.update(proposalsTable).set({ label: "contradicted" }).where(eq(proposalsTable.id, first.id)), (error: any) => /immutable/.test(error.cause?.message ?? error.message));
+  assert.equal(await enqueueEvaluationJobs(input), 0);
+  const [restored] = await db.select().from(tasksTable).where(eq(tasksTable.id, task.id));
+  assert.equal(restored.currentProposalId, first.id);
+});
+
+test("superseded in-flight result remains historical and never attaches to newer selection", async () => {
+  const task = await createTask();
+  const input = { projectId: task.projectId, taskIds: [task.id], mode: "demo" as const };
+  await enqueueEvaluationJobs(input);
+  let finish!: () => void;
+  let started!: () => void;
+  const start = new Promise<void>(resolve => { started = resolve; });
+  const block = new Promise<void>(resolve => { finish = resolve; });
+  const running = new EvaluationWorker({ evaluate: async () => { started(); await block; return simulated(task); } }).runOnce();
+  await start;
+  await enqueueEvaluationJobs({ ...input, experimentRunId: "replacement" });
+  finish(); await running;
+  const [current] = await db.select().from(tasksTable).where(eq(tasksTable.id, task.id));
+  const historical = await db.select().from(proposalsTable).where(eq(proposalsTable.taskId, task.id));
+  assert.equal(historical.length, 1);
+  assert.notEqual(historical[0].evaluationId, current.currentEvaluationId);
+  assert.equal(current.currentProposalId, null);
+  await new EvaluationWorker().runOnce();
+  const [completed] = await db.select().from(tasksTable).where(eq(tasksTable.id, task.id));
+  assert.ok(completed.currentProposalId);
+  assert.notEqual(completed.currentProposalId, historical[0].id);
+});
+
+test("changed input never uses stale cache even if caller retained contentHash", async () => {
+  const task = await createTask();
+  const input = { projectId: task.projectId, taskIds: [task.id], mode: "demo" as const };
+  await enqueueEvaluationJobs(input); await new EvaluationWorker().runOnce();
+  await db.update(tasksTable).set({ evidence: "A different source" }).where(eq(tasksTable.id, task.id));
+  assert.equal(await enqueueEvaluationJobs(input), 1);
+  await new EvaluationWorker().runOnce();
+  const proposals = await db.select().from(proposalsTable).where(eq(proposalsTable.taskId, task.id));
+  assert.equal(proposals.length, 2);
+  assert.notEqual(proposals[0].evaluationId, proposals[1].evaluationId);
+  await assert.rejects(enqueueEvaluationJobs({ ...input, requestedModel: "unimplemented-model" }), /Unsupported/);
+});
+
+test("identity migration preserves legacy proposal/release bytes and labels unknown provenance", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const migration = await readFile(new URL("../../../lib/db/drizzle/0008_evaluation_identity.sql", import.meta.url), "utf8");
+  const client = await pool.connect();
+  const schema = `identity_migration_${randomUUID().replaceAll("-", "")}`;
+  try {
+    await client.query("BEGIN");
+    await client.query(`CREATE SCHEMA ${schema}`);
+    await client.query(`SET LOCAL search_path TO ${schema}, pg_catalog`);
+    await client.query(`
+      CREATE TABLE rf_tasks (id text, project_id text, mode text);
+      CREATE TABLE rf_jobs (id text, project_id text, task_id text, mode text, status text, lease_owner text, lease_expires_at timestamptz, last_error text, updated_at timestamptz);
+      CREATE UNIQUE INDEX rf_jobs_task_mode_unique ON rf_jobs(task_id,mode);
+      CREATE TABLE rf_proposals (id text, project_id text, task_id text, mode text, raw_response jsonb);
+      CREATE UNIQUE INDEX rf_proposals_task_mode_unique ON rf_proposals(task_id,mode);
+      CREATE TABLE rf_trace_records (kind text, payload jsonb);
+      CREATE TABLE rf_releases (jsonl text, digest text);
+      INSERT INTO rf_tasks VALUES ('t','p','demo');
+      INSERT INTO rf_jobs VALUES ('j','p','t','demo','running','old-worker',now(),null,now());
+      INSERT INTO rf_proposals VALUES ('proposal','p','t','demo','{"original":true}');
+      INSERT INTO rf_releases VALUES ('immutable original release', 'original digest');
+    `);
+    await client.query(migration);
+    const proposal = (await client.query("SELECT * FROM rf_proposals")).rows[0];
+    assert.equal(proposal.id, "proposal"); assert.deepEqual(proposal.raw_response, { original: true });
+    assert.equal(proposal.provenance, "legacy-unknown"); assert.equal(proposal.evaluation_id, null);
+    const task = (await client.query("SELECT * FROM rf_tasks")).rows[0];
+    assert.equal(task.current_proposal_id, "proposal"); assert.equal(task.current_evaluation_id, null);
+    assert.deepEqual((await client.query("SELECT * FROM rf_releases")).rows, [{ jsonl: "immutable original release", digest: "original digest" }]);
+    const job = (await client.query("SELECT * FROM rf_jobs")).rows[0];
+    assert.equal(job.status, "failed"); assert.equal(job.lease_owner, null); assert.match(job.last_error, /unknown provenance/);
+  } finally { await client.query("ROLLBACK"); client.release(); }
+});
+
+test("each claimed retry has a durable attempt event even after manual attempt counter reset", async () => {
+  const task = await createTask();
+  const input = { projectId: task.projectId, taskIds: [task.id], mode: "demo" as const };
+  await enqueueEvaluationJobs(input);
+  const worker = new EvaluationWorker({ evaluate: async () => { throw new ProviderError("synthetic failure"); } });
+  await worker.runOnce();
+  await enqueueEvaluationJobs(input);
+  await worker.runOnce();
+  const events = await db.select().from(eventsTable).where(and(eq(eventsTable.projectId, task.projectId), eq(eventsTable.type, "evaluation.attempt.started")));
+  assert.equal(events.length, 2);
+  assert.notEqual(events[0].id, events[1].id);
+  assert.ok(events.every(event => (event.payload as any).attempt === 1));
+  assert.equal(await worker.runOnce(), false);
+  assert.equal((await db.select().from(eventsTable).where(and(eq(eventsTable.projectId, task.projectId), eq(eventsTable.type, "evaluation.attempt.started")))).length, 2);
+});
+
+
+test("retry checks expected current identity after waiting for the task mutation lock", async () => {
+  const task = await createTask();
+  const input = { projectId: task.projectId, taskIds: [task.id], mode: "demo" as const };
+  await enqueueEvaluationJobs(input);
+  const [first] = await db.select().from(jobsTable).where(eq(jobsTable.taskId, task.id));
+  await db.update(jobsTable).set({ status: "failed" }).where(eq(jobsTable.id, first.id));
+  const lock = await pool.connect();
+  let retried: Promise<number> | undefined;
+  try {
+    await lock.query("BEGIN");
+    const pid = (await lock.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+    await lock.query("SELECT id FROM rf_tasks WHERE id = $1 FOR UPDATE", [task.id]);
+    retried = enqueueEvaluationJobs({ ...input, retryExpected: { jobId: first.id, evaluationId: first.evaluationId } });
+    // Attach the rejection handler before releasing the lock.
+    const rejected = assert.rejects(retried, /selection changed/);
+    await waitFor(async () => (await pool.query("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE $1::int = ANY(pg_blocking_pids(pid))) AS blocked", [pid])).rows[0].blocked);
+    await lock.query("UPDATE rf_tasks SET current_evaluation_id = $1 WHERE id = $2", ["newer-experiment", task.id]);
+    await lock.query("COMMIT");
+    await rejected;
+    const [current] = await db.select().from(tasksTable).where(eq(tasksTable.id, task.id));
+    const [job] = await db.select().from(jobsTable).where(eq(jobsTable.id, first.id));
+    assert.equal(current.currentEvaluationId, "newer-experiment");
+    assert.equal(job.status, "failed");
+  } finally {
+    await lock.query("ROLLBACK"); lock.release();
+    await retried?.catch(() => {});
+  }
+});

@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
@@ -320,6 +321,195 @@ try {
       .count(),
     0,
   );
+  // Generic rubric factory: actual UI, distinct synthetic actors and immutable bytes.
+  const rubricAction = async (page, name, path, expected = 201) => {
+    const responsePromise = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/api/reviewflow/rubrics${path}`) &&
+        response.request().method() === "POST",
+    );
+    await page.getByRole("button", { name, exact: true }).click();
+    const response = await responsePromise;
+    const body = await response.json();
+    assert.equal(response.status(), expected, JSON.stringify(body));
+    if (expected === 201)
+      await page.getByRole("status").filter({ hasText: "Saved." }).waitFor();
+    return body;
+  };
+  await owner.goto(base + "/rubrics");
+  await owner
+    .getByRole("heading", { name: "Rubric factory", exact: true })
+    .waitFor();
+  await rubricAction(owner, "Save new revision", "/specs");
+  await rubricAction(owner, "Import items", "/items");
+  await owner
+    .getByRole("heading", { name: "example-1", exact: true })
+    .waitFor();
+  await accessible(owner);
+  const rubricData = await owner.evaluate(async () =>
+    (
+      await fetch("/api/reviewflow/rubrics", {
+        headers: {
+          "x-reviewflow-project": sessionStorage.getItem("reviewflow.project"),
+        },
+      })
+    ).json(),
+  );
+  const rubricItemId = rubricData.items[0].id;
+  await reviewer.goto(base + "/rubrics");
+  await reviewer
+    .getByRole("heading", { name: "example-1", exact: true })
+    .waitFor();
+  await rubricAction(reviewer, "Claim item", `/items/${rubricItemId}/claim`);
+  await reviewer.getByLabel("example-1 Accuracy", { exact: true }).fill("5");
+  await reviewer
+    .getByLabel("example-1 Safe to use", { exact: true })
+    .selectOption("yes");
+  await reviewer
+    .getByLabel("example-1 reason", { exact: true })
+    .fill("Synthetic exercise: the supplied answer is correct.");
+  await reviewer
+    .getByLabel(
+      "I reviewed this content for privacy and suitability for export.",
+      { exact: true },
+    )
+    .check();
+  await rubricAction(reviewer, "Renew claim", `/items/${rubricItemId}/claim`);
+  assert.equal(
+    await reviewer
+      .getByLabel("example-1 Accuracy", { exact: true })
+      .inputValue(),
+    "5",
+  );
+  assert.equal(
+    await reviewer
+      .getByLabel("example-1 Safe to use", { exact: true })
+      .inputValue(),
+    "yes",
+  );
+  assert.equal(
+    await reviewer.getByLabel("example-1 reason", { exact: true }).inputValue(),
+    "Synthetic exercise: the supplied answer is correct.",
+  );
+  assert.equal(
+    await reviewer
+      .getByLabel(
+        "I reviewed this content for privacy and suitability for export.",
+        { exact: true },
+      )
+      .isChecked(),
+    true,
+  );
+  await rubricAction(
+    reviewer,
+    "Finalize human review",
+    `/items/${rubricItemId}/review`,
+  );
+  await owner.goto(base + "/rubrics");
+  await owner.getByLabel(/I reviewed the full release/).check();
+  await rubricAction(owner, "Create immutable release", "/releases", 409);
+  await owner.getByRole("alert").filter({ hasText: /audit/i }).waitFor();
+  await auditor.goto(base + "/rubrics");
+  await auditor
+    .getByRole("heading", { name: "example-1", exact: true })
+    .waitFor();
+  await auditor.getByLabel("example-1 Accuracy", { exact: true }).fill("5");
+  await auditor
+    .getByLabel("example-1 Safe to use", { exact: true })
+    .selectOption("yes");
+  await auditor
+    .getByLabel("example-1 reason", { exact: true })
+    .fill(
+      "Scripted synthetic auditor agrees for workflow testing, not real qualification.",
+    );
+  await auditor.getByLabel(/I am a different human from the item/).check();
+  await rubricAction(
+    auditor,
+    "Submit independent audit",
+    `/items/${rubricItemId}/audit`,
+  );
+  await exporter.goto(base + "/rubrics");
+  await exporter.getByLabel(/I reviewed the full release/).check();
+  const rubricRelease = await rubricAction(
+    exporter,
+    "Create immutable release",
+    "/releases",
+  );
+  const downloadPromise = exporter.waitForEvent("download");
+  await exporter
+    .getByRole("button", { name: "Download JSONL", exact: true })
+    .click();
+  const rubricDownload = await downloadPromise;
+  const rubricBytes = readFileSync(await rubricDownload.path(), "utf8");
+  assert.equal(
+    createHash("sha256").update(rubricBytes).digest("hex"),
+    rubricRelease.sha256,
+  );
+  const rubricRecord = JSON.parse(rubricBytes.trim());
+  assert.equal(Object.hasOwn(rubricRecord, "content"), false);
+  assert.equal(rubricBytes.includes("browser-reviewer"), false);
+  assert.equal(rubricRecord.rubric.revision, 1);
+  await owner.goto(base + "/rubrics");
+  const rubricDefinition = JSON.parse(
+    await owner.getByLabel("Rubric JSON", { exact: true }).inputValue(),
+  );
+  rubricDefinition.name = "Updated rubric, separate revision";
+  await owner
+    .getByLabel("Rubric JSON", { exact: true })
+    .fill(JSON.stringify(rubricDefinition));
+  await rubricAction(owner, "Save new revision", "/specs");
+  const preserved = await exporter.evaluate(
+    async (id) =>
+      (
+        await fetch(`/api/reviewflow/rubrics/releases/${id}/export`, {
+          headers: {
+            "x-reviewflow-project":
+              sessionStorage.getItem("reviewflow.project"),
+          },
+        })
+      ).text(),
+    rubricRelease.id,
+  );
+  assert.equal(preserved, rubricBytes);
+  await accessible(owner);
+  await owner.screenshot({
+    path: resolve(captures, "reviewflow-rubric-factory.png"),
+    fullPage: true,
+  });
+  await owner.setViewportSize({ width: 390, height: 844 });
+  await accessible(owner);
+  assert.equal(
+    await owner.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+    true,
+  );
+  await owner.screenshot({
+    path: resolve(captures, "reviewflow-rubric-factory-mobile.png"),
+    fullPage: true,
+  });
+  await owner.setViewportSize({ width: 1440, height: 1100 });
+  await owner.goto(base + "/observability");
+  await owner
+    .getByRole("heading", { name: "Evidence pipeline", exact: true })
+    .waitFor();
+  const observed = await owner.evaluate(async () =>
+    (
+      await fetch("/api/reviewflow/observability", {
+        headers: {
+          "x-reviewflow-project": sessionStorage.getItem("reviewflow.project"),
+        },
+      })
+    ).json(),
+  );
+  assert.equal(observed.rubric.total, 1);
+  assert.equal(observed.rubric.releases, 1);
+  assert.ok(observed.telemetry.browser.sessions > 0);
+  assert.ok(
+    observed.telemetry.events.some(
+      (event) => event.type === "rubric.release" && event.count === 1,
+    ),
+  );
   await owner.goto(base + "/team");
   await owner.getByLabel("Lifetime call cap (0–100)").fill("2");
   await owner
@@ -400,7 +590,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    "Synthetic multiplayer browser passed: shared project, member roles, assignment, review, blind audit, exporter release, provider preparation, revocation, observability counts/unknowns/access/refetch failure and recovery, desktop/mobile. Live CRDT concurrent merge and reconnect, routing rules, WCAG A/AA checks passed. No real authentication or provider calls.",
+    "Synthetic multiplayer browser passed: generic rubric configure/import/review/audit/release, missing-audit refusal, immutable download after rubric revision, durable browser telemetry, shared project, member roles, assignment, review, blind audit, exporter release, provider preparation, revocation, observability counts/unknowns/access/refetch failure and recovery, desktop/mobile. Live CRDT concurrent merge and reconnect, routing rules, WCAG A/AA checks passed. No real authentication or provider calls.",
   );
 } finally {
   for (const context of contexts) await context.close();

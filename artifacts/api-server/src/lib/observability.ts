@@ -137,6 +137,11 @@ export function aggregateObservability(
       independentAccuracy: null,
       baselineImprovement: null,
       averageTimeToFirstReleaseMs: mean(releaseDurations),
+      p95TimeToFirstReleaseMs: releaseDurations.length
+        ? [...releaseDurations].sort((a, b) => a - b)[
+            Math.ceil(releaseDurations.length * 0.95) - 1
+          ]
+        : null,
       releaseTimingSamples: releaseDurations.length,
     },
     preference: {
@@ -242,7 +247,7 @@ export function aggregateObservability(
       recordedReviewMs:
         "Sum of client-reported activeMs on saved review events, including escalation/rework. Audit/adjudication time is not captured, so total human effort is unavailable.",
       averageTimeToFirstReleaseMs:
-        "Mean task creation to first retained release containing its current content hash; denominator is releaseTimingSamples, not release count.",
+        "Mean and nearest-rank p95 task creation to first retained release containing its current content hash; denominator is releaseTimingSamples, not release count.",
       latency:
         "Successful persisted evaluation proposals only; live is measured, demo is simulated. Failed attempts and routing-advice calls are excluded. Token totals are partial when coverage is incomplete.",
       queue:

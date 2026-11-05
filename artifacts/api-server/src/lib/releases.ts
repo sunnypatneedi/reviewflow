@@ -1,3 +1,4 @@
+import { evaluationProvenance } from "./current-proposal";
 import { createHash, randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { db, projectsTable, tasksTable, proposalsTable, reviewsTable, auditsTable, auditItemsTable, auditDecisionsTable, auditDisputesTable, releasesTable } from "@workspace/db";
@@ -177,17 +178,24 @@ export async function createRelease(projectId: string, name: string, includeSour
     if (policy === "demo-unverified-v1" && (!project.demoSessionId || project.mode !== "demo")) return blocked("unverified policy is restricted to anonymous synthetic demo projects");
     const covering = required.filter(a => a.independent && auditCoversCurrentPopulation(a, tasks, evidence));
     if (policy === "independent-sample-v1" && !covering.length) return blocked("audit policy requires an independent sample bound to the current task and decision population");
+    const usedProposals = tasks.flatMap(t => {
+      const review = finalDecisions.get(t.id)!.review;
+      const proposal = proposals.find(p => p.id === review.proposalId && p.taskId === t.id);
+      return proposal ? [proposal] : [];
+    });
     const lines = tasks.map(t => {
       const final = finalDecisions.get(t.id)!;
       const proposal = proposals.find(p => p.id === final.review.proposalId && p.taskId === t.id);
       if (!proposal && (final.review.action !== "label" || final.review.proposalId !== null)) return blocked("final review proposal missing");
+      const evaluation = proposal ? evaluationProvenance(proposal) : null;
+      if (proposal && !evaluation) return blocked("evaluation provenance is missing or inconsistent");
       return JSON.stringify({ external_id: t.externalId, label: t.finalLabel, risk: t.risk, mode: t.mode,
         ...(includeSourceText ? { question: t.question, evidence: t.evidence, candidate_answer: t.candidateAnswer } : {}),
         provenance: { task_hash: t.contentHash, task_version: t.version, proposal_id: proposal?.id ?? null, review_id: final.review.id,
           review_mode: final.review.proposalId === null ? "human_only" : "model_assisted", factory_policy_revision: final.review.factoryPolicyRevision,
           ...(final.chain.length ? { original_review_id: final.review.id, adjudication_id: final.chain[0].id, adjudication_ids: final.chain.map(d => d.id) } : {}),
           rubric_version: project.rubricVersion, policy_version: project.shadowPolicyVersion, release_audit_policy_version: policy,
-          audit_ids: covering.map(a => a.id), model: proposal?.returnedModel ?? null } });
+          audit_ids: covering.map(a => a.id), model: proposal?.returnedModel ?? null, evaluation } });
     });
     const jsonl = lines.join("\n") + "\n", digest = hash(jsonl);
     const [release] = await tx.insert(releasesTable).values({ id: randomUUID(), projectId, name: name.trim(), mode: project.mode, itemCount: tasks.length,
@@ -195,7 +203,9 @@ export async function createRelease(projectId: string, name: string, includeSour
         policy_version: project.shadowPolicyVersion, release_audit_policy_version: policy, audit_ids: covering.map(a => a.id),
         factory: { name: "evidence", ...factory },
         privacy_reviewed: privacyReviewed,
-        content_digest: digest, model_versions: [...new Set(proposals.map(p => p.returnedModel))] } }).returning();
+        content_digest: digest, model_versions: [...new Set(usedProposals.map(p => p.returnedModel))],
+        evaluation_ids: usedProposals.flatMap(p => p.evaluationId ? [p.evaluationId] : []),
+        legacy_evaluation_count: usedProposals.filter(p => p.evaluationId == null).length } }).returning();
     return release;
   }, { isolationLevel: "repeatable read" });
 }

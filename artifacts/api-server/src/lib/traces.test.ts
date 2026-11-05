@@ -79,7 +79,7 @@ test("shareable records remove structured identities and private provider metada
   assert.equal(JSON.stringify(exported).includes("secret-person"), false);
   assert.equal(exported.events[0].content, "actual unchanged response");
   assert.deepEqual(publicProposal({ provider: "jev", decision: "a", authorization: "secret", raw: { accountId: "private" } }),
-    { provider: "jev", decision: "a" });
+    { provider: "jev", decision: "a", provenance: "legacy-unknown" });
 });
 
 test("simulator is deterministic, explicitly simulated, and does not use reference labels", async () => {

@@ -1,7 +1,7 @@
 # ReviewFlow
 
-ReviewFlow is an **experimental local review application** with two workloads:
-the original evidence-labeling experience and **Trace2Preference**, which turns
+ReviewFlow is an **experimental local review application** with three workloads:
+evidence labeling, a versioned **Rubric factory**, and **Trace2Preference**, which turns
 authorized observable agent-run exports into human-reviewed comparison datasets.
 Demo fixtures and no-key proposals are explicitly simulated—not production
 traces, independent human reviews, or evidence of model quality.
@@ -12,7 +12,7 @@ rather than silently replacing them with a later model result.
 
 ![ReviewFlow workflow overview](screenshots/reviewflow-launch.png)
 
-*Actual synthetic-data overview. See the [local launch candidate and release gates](docs/launch-candidate.md) for exact capability and qualification boundaries.*
+_Actual synthetic-data overview. See the [local launch candidate and release gates](docs/launch-candidate.md) for exact capability and qualification boundaries._
 
 ## What is implemented
 
@@ -26,7 +26,9 @@ rather than silently replacing them with a later model result.
 - Optional Clerk mode with persisted project roles
 - Live CRDT shared notes for evidence review, with role, exposure and quarantine guards
 - An optional Jev adapter and routing-advice API behind server/project approval and call caps
-- A project observability dashboard with defined pipeline/queue metrics and explicit unknowns
+- A generic rubric workflow with immutable revisions, claimed work, independent audits and frozen releases
+- Versioned evaluation identity and retained experiment history
+- A project observability dashboard, local transactional event projection and metadata-only browser delivery
 - An owned durable local workspace, plus a separate disposable trial launcher
 
 The supported first-run path is `APP_MODE=demo`. It needs neither hosted
@@ -70,7 +72,11 @@ owner assignment, blind-exposure tracking and an optional lifetime Jev call cap.
 See the [multiplayer implementation and qualification boundaries](docs/multiplayer-provider.md).
 See [setup](docs/setup.md) and the reusable [Python CLI](docs/trace-python.md).
 
-Owners and adjudicators can open **Observability** to inspect both pipelines,
+**Rubric factory** accepts custom scored/option criteria and immutable imported items.
+Its release gate requires distinct authenticated human auditors; a single-user local
+demo cannot establish independence. See the [rubric workflow](docs/rubric-factory.md).
+
+Owners and adjudicators can open **Observability** to inspect all three pipelines,
 queue/retry/lease state, recorded review effort and release timing. Unsupported
 total cost, full labor, independent accuracy and baseline gains remain N/A.
 Active blind-audit assignments block this aggregate view to protect independence.
@@ -92,6 +98,8 @@ with scripted responders, not real models. No genuine human benchmark exists; se
 
 - [Local pipeline, metrics, algorithms and unified verification](docs/local-system.md)
 - [Durable local install and run](docs/local-workspace.md)
+- [Generic rubric factory](docs/rubric-factory.md)
+- [Local telemetry and measurement boundaries](docs/local-telemetry.md)
 - [Local hardening and remaining production gates](docs/production-readiness.md)
 
 - [Launch candidate, live collaboration, routing API and release gates](docs/launch-candidate.md)

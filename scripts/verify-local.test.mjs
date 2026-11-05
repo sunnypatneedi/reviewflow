@@ -18,6 +18,14 @@ test("local gate includes API, browser and both actual launcher modes", () => {
     ],
   );
 });
+test("the actual disposable application also verifies anonymous browser telemetry", () => {
+  assert.deepEqual(
+    localVerificationStages.find(
+      (stage) => stage.name === "disposable-launcher",
+    ).args,
+    ["scripts/demo-smoke.mjs", "--browser"],
+  );
+});
 test("local gate discards inherited databases and provider credentials", () => {
   const env = verificationEnvironment(
     {

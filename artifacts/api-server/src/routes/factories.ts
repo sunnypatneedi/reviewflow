@@ -1,3 +1,4 @@
+import { currentProposal } from "../lib/current-proposal";
 import type { IRouter, Request, Response } from "express";
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
@@ -149,9 +150,7 @@ export function registerFactoryRoutes(router: IRouter, helpers: Helpers) {
             .where(eq(proposalsTable.projectId, project.id)),
         ]);
         items = tasks.map((task) => {
-          const proposal = proposals.find(
-            (row) => row.taskId === task.id && row.mode === task.mode,
-          );
+          const proposal = currentProposal(task, proposals);
           const control = controlView(task.id);
           return {
             id: task.id,

@@ -78,6 +78,25 @@ export interface ImportResult {
   total: number;
 }
 
+export type EvaluationProvenanceProvenance =
+  (typeof EvaluationProvenanceProvenance)[keyof typeof EvaluationProvenanceProvenance];
+
+export const EvaluationProvenanceProvenance = {
+  captured: "captured",
+  "legacy-unknown": "legacy-unknown",
+} as const;
+
+export interface EvaluationProvenance {
+  provenance: EvaluationProvenanceProvenance;
+  /** @nullable */
+  evaluation_id: string | null;
+  snapshot_hash?: string;
+  question_version?: string;
+  context_preparation_version?: string;
+  requested_model?: string;
+  experiment_run_id?: string;
+}
+
 export type ProposalMode = (typeof ProposalMode)[keyof typeof ProposalMode];
 
 export const ProposalMode = {
@@ -92,6 +111,8 @@ export interface Proposal {
   taskId: string;
   mode: ProposalMode;
   model: string;
+  /** @nullable */
+  evaluation?: EvaluationProvenance | null;
   label: Label;
   /**
    * @minimum 0
@@ -169,6 +190,28 @@ export const EvaluateInputMode = {
   live: "live",
 } as const;
 
+export type EvaluateInputQuestionVersion =
+  (typeof EvaluateInputQuestionVersion)[keyof typeof EvaluateInputQuestionVersion];
+
+export const EvaluateInputQuestionVersion = {
+  "evidence-v1": "evidence-v1",
+} as const;
+
+export type EvaluateInputContextPreparationVersion =
+  (typeof EvaluateInputContextPreparationVersion)[keyof typeof EvaluateInputContextPreparationVersion];
+
+export const EvaluateInputContextPreparationVersion = {
+  "raw-evidence-v1": "raw-evidence-v1",
+} as const;
+
+export type EvaluateInputRequestedModel =
+  (typeof EvaluateInputRequestedModel)[keyof typeof EvaluateInputRequestedModel];
+
+export const EvaluateInputRequestedModel = {
+  "demo-simulator-v1": "demo-simulator-v1",
+  "jev-1130": "jev-1.13.0",
+} as const;
+
 export interface EvaluateInput {
   /**
    * @minItems 1
@@ -176,6 +219,16 @@ export interface EvaluateInput {
    */
   taskIds: string[];
   mode: EvaluateInputMode;
+  /**
+   * Stable run identity; changing it requests a separate evaluation without deleting history.
+   * @minLength 1
+   * @maxLength 128
+   * @pattern ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+   */
+  experimentRunId?: string;
+  questionVersion?: EvaluateInputQuestionVersion;
+  contextPreparationVersion?: EvaluateInputContextPreparationVersion;
+  requestedModel?: EvaluateInputRequestedModel;
   ownerConsent: boolean;
   /** Required for live mode; confirms review of actual outbound task text for private data */
   outboundReviewed?: boolean;
@@ -205,6 +258,8 @@ export const EvaluationRetryInputMode = {
 } as const;
 
 export interface EvaluationRetryInput {
+  /** Exact current job ID; superseded runs cannot be retried through this endpoint. */
+  jobId?: string;
   taskId: string;
   mode: EvaluationRetryInputMode;
   ownerConsent: boolean;
@@ -232,6 +287,11 @@ export const EvaluationJobStatus = {
 
 export interface EvaluationJob {
   id: string;
+  /** @nullable */
+  evaluationId?: string | null;
+  current?: boolean;
+  /** @nullable */
+  evaluation?: EvaluationProvenance | null;
   taskId: string;
   mode: EvaluationJobMode;
   status: EvaluationJobStatus;
@@ -723,6 +783,10 @@ export type ListEvaluationJobsParams = {
    */
   taskIds: string[];
   mode?: ListEvaluationJobsMode;
+  /**
+   * Include superseded experiment jobs; defaults to current identities only.
+   */
+  includeHistory?: boolean;
 };
 
 export type ListEvaluationJobsMode =

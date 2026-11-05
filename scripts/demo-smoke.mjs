@@ -42,6 +42,11 @@ try {
     200,
     "Second launch must not stop original",
   );
+  if (process.argv.includes("--browser")) {
+    const { verifyAnonymousLocalBrowser } =
+      await import("./browser-local-e2e.mjs");
+    await verifyAnonymousLocalBrowser();
+  }
 } finally {
   child.kill("SIGTERM");
   let timer;

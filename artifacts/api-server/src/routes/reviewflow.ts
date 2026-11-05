@@ -1,3 +1,5 @@
+import { registerRubricRoutes } from "./rubrics";
+import { registerTelemetryRoutes } from "./telemetry";
 import { registerObservabilityRoutes } from "./observability";
 import { registerRoutingRoutes } from "./routing";
 import { issueCollaborationTicket } from "../lib/collaboration";
@@ -29,6 +31,9 @@ import {
 } from "@workspace/db";
 import { enqueueEvaluationJobs, MAX_ACTIVE_LIVE_JOBS_PER_PROJECT } from "../evaluation-worker";
 import { MODEL } from "../evaluation";
+import { currentProposal, evaluationProvenance } from "../lib/current-proposal";
+import { parseEvaluationConfiguration } from "../lib/evaluation-request";
+import type { EvaluationConfiguration } from "../lib/evaluation-identity";
 import { assertAuditEvidence, createRelease, readDecisionEvidence, ReleaseBlocked, releaseSamplingFrame, resolvedDecision } from "../lib/releases";
 import type { RuntimeConfig } from "../config/runtime";
 import { registerTraceRoutes } from "./traces";
@@ -95,29 +100,27 @@ type ProjectContext = {
   role: ProjectRole | null;
 };
 
-export async function enqueueLiveJobsWithProjectLock(projectId: string, taskIds: string[], actorId?: string) {
-  return db.transaction(async (tx) => {
-    if (actorId) await assertCurrentRole(tx, projectId, actorId, ["owner"]);
-    // Serialize admission, retry, and project-mode transition for this project.
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${projectId}, 0))`);
-    for (const taskId of [...taskIds].sort()) await assertFactoryAssistance(tx, projectId, "evidence", taskId);
-    const active = await tx.select({ taskId: jobsTable.taskId }).from(jobsTable).where(and(
-      eq(jobsTable.projectId, projectId),
-      eq(jobsTable.mode, "live"),
-      inArray(jobsTable.status, ["queued", "running"]),
-    ));
-    const activeTaskIds = new Set(active.map((job) => job.taskId));
-    const additional = taskIds.filter((taskId) => !activeTaskIds.has(taskId)).length;
-    if (active.length + additional > MAX_ACTIVE_LIVE_JOBS_PER_PROJECT) return null;
-    const queued = await enqueueEvaluationJobs({
-      projectId,
-      taskIds,
-      mode: "live",
-      executor: tx,
+class LiveQueueCapacityError extends Error {}
+export async function enqueueLiveJobsWithProjectLock(projectId: string, taskIds: string[], actorId?: string, configuration: EvaluationConfiguration = {}, retryExpected?: { jobId: string; evaluationId: string | null }) {
+  try {
+    return await db.transaction(async (tx) => {
+      if (actorId) await assertCurrentRole(tx, projectId, actorId, ["owner"]);
+      // Admission is serialized by project, and all inserted runs roll back if
+      // the cap is exceeded. Count identities/jobs, not distinct task IDs.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${projectId}, 0))`);
+      for (const taskId of [...taskIds].sort()) await assertFactoryAssistance(tx, projectId, "evidence", taskId);
+      const queued = await enqueueEvaluationJobs({ projectId, taskIds, mode: "live", executor: tx, ...configuration, retryExpected });
+      const active = await tx.select({ id: jobsTable.id }).from(jobsTable).where(and(
+        eq(jobsTable.projectId, projectId), eq(jobsTable.mode, "live"), inArray(jobsTable.status, ["queued", "running"]),
+      ));
+      if (active.length > MAX_ACTIVE_LIVE_JOBS_PER_PROJECT) throw new LiveQueueCapacityError();
+      await tx.update(projectsTable).set({ mode: "live" }).where(eq(projectsTable.id, projectId));
+      return queued;
     });
-    await tx.update(projectsTable).set({ mode: "live" }).where(eq(projectsTable.id, projectId));
-    return queued;
-  });
+  } catch (error) {
+    if (error instanceof LiveQueueCapacityError) return null;
+    throw error;
+  }
 }
 
 const samples = [
@@ -321,6 +324,7 @@ async function requireProjectAccess(
 function proposalView(row: typeof proposalsTable.$inferSelect) {
   return {
     id: row.id, taskId: row.taskId, mode: row.mode, model: row.returnedModel,
+    evaluation: evaluationProvenance(row),
     label: row.label, labelProbability: Number(row.labelProbability),
     probabilities: row.probabilities as Record<string, number>,
     injectionProbability: Number(row.injectionProbability), complexity: row.complexity,
@@ -332,8 +336,7 @@ function proposalView(row: typeof proposalsTable.$inferSelect) {
 async function taskViews(projectId: string, actorId?: string) {
   const tasks = await db.select().from(tasksTable).where(eq(tasksTable.projectId, projectId)).orderBy(asc(tasksTable.createdAt));
   const proposals = await db.select().from(proposalsTable).where(eq(proposalsTable.projectId, projectId));
-  const modes = new Map(tasks.map(task => [task.id, task.mode]));
-  const byTask = new Map(proposals.filter(p => p.mode === modes.get(p.taskId)).map((p) => [p.taskId, p]));
+  const byTask = new Map(tasks.flatMap(task => { const proposal = currentProposal(task, proposals); return proposal ? [[task.id, proposal] as const] : []; }));
   const blind = actorId ? await blindTaskIds(projectId, actorId) : new Set<string>();
   if (actorId) await recordExposure(projectId, actorId, tasks.filter(task => !blind.has(task.id) && (task.finalLabel || byTask.has(task.id))));
   return tasks.map((task) => ({
@@ -359,7 +362,7 @@ async function metrics(projectId: string) {
     finalized: tasks.filter((t) => t.status === "finalized").length,
     failures: jobs.filter((job) => job.status === "failed").length,
     corrections, correctionDenominator: reviews.filter((r) => ["accept","correct"].includes(r.action)).length,
-    shadowCoverage: tasks.length ? proposals.length / tasks.length : 0,
+    shadowCoverage: tasks.length ? tasks.filter(task => currentProposal(task, proposals)).length / tasks.length : 0,
     averageReviewMs: avg(reviews.map((r) => r.activeMs)),
     averageLatencyMs: avg(proposals.map((p) => p.latencyMs)),
     independentAccuracy: null,
@@ -468,8 +471,19 @@ router.get("/reviewflow/evaluation-jobs", async (req, res): Promise<void> => {
     inArray(jobsTable.taskId, taskIds),
     ...(mode ? [eq(jobsTable.mode, mode)] : []),
   ));
-  res.json(jobs.map((job) => ({
+  const scopedTasks = await db.select().from(tasksTable).where(and(eq(tasksTable.projectId, project.id), inArray(tasksTable.id, taskIds)));
+  const currentJobs = jobs.filter(job => {
+    const task = scopedTasks.find(task => task.id === job.taskId);
+    if (!task || task.mode !== job.mode) return false;
+    return task.currentEvaluationId != null ? job.evaluationId === task.currentEvaluationId : job.evaluationId == null;
+  });
+  // Default polling never interprets a superseded run's failure as current work.
+  const selectedJobs = req.query.includeHistory === "true" ? jobs : currentJobs;
+  res.json(selectedJobs.map((job) => ({
     id: job.id,
+    evaluationId: job.evaluationId,
+    current: currentJobs.some(current => current.id === job.id),
+    evaluation: evaluationProvenance(job),
     taskId: job.taskId,
     mode: job.mode,
     status: job.status,
@@ -498,26 +512,33 @@ router.post("/reviewflow/evaluation-jobs/retry", async (req, res): Promise<void>
   }
   if (!await requireProjectAccess(req, res, context, context.userId || mode === "live" ? ["owner"] : undefined)) return;
 
-  const [job] = await db.select().from(jobsTable).where(and(
-    eq(jobsTable.projectId, project.id),
-    eq(jobsTable.taskId, taskId),
-    eq(jobsTable.mode, mode),
+  if (req.body?.jobId !== undefined && (typeof req.body.jobId !== "string" || !req.body.jobId || req.body.jobId.length > 200)) {
+    res.status(400).json({ error: "jobId must identify one evaluation job" }); return;
+  }
+  const [task] = await db.select().from(tasksTable).where(and(eq(tasksTable.projectId, project.id), eq(tasksTable.id, taskId)));
+  if (!task) { res.status(404).json({ error: "Evaluation task not found" }); return; }
+  const candidates = await db.select().from(jobsTable).where(and(
+    eq(jobsTable.projectId, project.id), eq(jobsTable.taskId, taskId), eq(jobsTable.mode, mode),
+    ...(req.body?.jobId ? [eq(jobsTable.id, req.body.jobId)] : []),
   ));
+  const matches = candidates.filter(job => task.currentEvaluationId != null ? job.evaluationId === task.currentEvaluationId : job.evaluationId == null);
+  const job = matches.length === 1 ? matches[0] : undefined;
   if (!job) {
-    res.status(404).json({ error: "Evaluation job not found" });
-    return;
+    res.status(candidates.length ? 409 : 404).json({ error: "Select the current evaluation job; superseded or ambiguous jobs cannot be retried" }); return;
   }
   if (job.status !== "failed") {
-    res.status(409).json({ error: "Only terminally failed evaluation jobs can be retried" });
-    return;
+    res.status(409).json({ error: "Only terminally failed evaluation jobs can be retried" }); return;
   }
-
+  if (task.mode !== mode || !["pending", "proposed", "in_review"].includes(task.status)) {
+    res.status(409).json({ error: "This task no longer accepts evaluation retries" }); return;
+  }
+  const configuration = parseEvaluationConfiguration(job.evaluationIdentity ?? {}, mode);
   const queued = mode === "live"
-    ? await enqueueLiveJobsWithProjectLock(project.id, [taskId], identity(req))
+    ? await enqueueLiveJobsWithProjectLock(project.id, [taskId], identity(req), configuration, { jobId: job.id, evaluationId: job.evaluationId })
     : await db.transaction(async tx => {
       await assertCurrentRole(tx, project.id, identity(req), ["owner"]);
       await assertFactoryAssistance(tx, project.id, "evidence", taskId);
-      return enqueueEvaluationJobs({ projectId: project.id, taskIds: [taskId], mode, executor: tx });
+      return enqueueEvaluationJobs({ projectId: project.id, taskIds: [taskId], mode, executor: tx, ...configuration, retryExpected: { jobId: job.id, evaluationId: job.evaluationId } });
     });
   if (queued === null) {
     res.status(429).json({ error: `At most ${MAX_ACTIVE_LIVE_JOBS_PER_PROJECT} live evaluations may be active per project` });
@@ -604,14 +625,16 @@ router.post("/reviewflow/evaluate", async (req, res): Promise<void> => {
   if (mode === "live" && ownerConsent !== true) { res.status(403).json({ error: "Live Jev requires explicit owner consent" }); return; }
   if (mode === "live" && req.body?.outboundReviewed !== true) { res.status(403).json({ error: "Confirm that the actual outbound task text was reviewed for private data" }); return; }
   if (!await requireProjectAccess(req, res, context, context.userId || mode === "live" ? ["owner"] : undefined)) return;
+  if (project.rubricVersion !== "evidence-v1") { res.status(409).json({ error: "The selected rubric is not supported by this evaluator" }); return; }
+  const configuration = parseEvaluationConfiguration(req.body, mode);
   const tasks = await db.select().from(tasksTable).where(and(eq(tasksTable.projectId, project.id), inArray(tasksTable.id, taskIds)));
   const scopedTaskIds = tasks.map((task) => task.id);
   const queued = mode === "live"
-    ? await enqueueLiveJobsWithProjectLock(project.id, scopedTaskIds, identity(req))
+    ? await enqueueLiveJobsWithProjectLock(project.id, scopedTaskIds, identity(req), configuration)
     : await db.transaction(async tx => {
       await assertCurrentRole(tx, project.id, identity(req), ["owner"]);
       for (const taskId of [...scopedTaskIds].sort()) await assertFactoryAssistance(tx, project.id, "evidence", taskId);
-      return enqueueEvaluationJobs({ projectId: project.id, taskIds: scopedTaskIds, mode, executor: tx });
+      return enqueueEvaluationJobs({ projectId: project.id, taskIds: scopedTaskIds, mode, executor: tx, ...configuration });
     });
   if (queued === null) {
     res.status(429).json({ error: `At most ${MAX_ACTIVE_LIVE_JOBS_PER_PROJECT} live evaluations may be active per project` });
@@ -641,11 +664,10 @@ router.post("/reviewflow/reviews", async (req, res): Promise<void> => {
   const { project } = context;
   const { taskId, version, action, correctedLabel, reason, evidenceExcerpt, activeMs } = req.body ?? {};
   const [task] = await db.select().from(tasksTable).where(and(eq(tasksTable.id, taskId),eq(tasksTable.projectId,project.id)));
-  const [proposal] = await db.select().from(proposalsTable).where(and(
-    eq(proposalsTable.taskId, taskId),
-    eq(proposalsTable.projectId, project.id),
-    eq(proposalsTable.mode, task?.mode ?? project.mode),
+  const proposals = await db.select().from(proposalsTable).where(and(
+    eq(proposalsTable.taskId, taskId), eq(proposalsTable.projectId, project.id),
   ));
+  const proposal = task ? currentProposal(task, proposals) : undefined;
   if (!task) { res.status(404).json({ error:"Review item not found" }); return; }
   if (task.version !== version) { res.status(409).json({ error:"This task changed in another session. Reload before submitting." }); return; }
   if (!["accept","correct","escalate","label"].includes(action)) { res.status(400).json({ error:"Invalid action" }); return; }
@@ -1077,6 +1099,8 @@ router.post("/reviewflow/tasks/:taskId/collaboration-ticket", async (req, res) =
   res.set("Cache-Control", "no-store").json(await issueCollaborationTicket({ projectId: context.project.id, actorId: identity(req), taskId: task.id, contentHash: task.contentHash }, origin));
 });
 
+registerRubricRoutes(router, { ensureProject, requireProjectAccess, identity });
+registerTelemetryRoutes(router, { ensureProject, requireProjectAccess, identity });
 registerObservabilityRoutes(router, { ensureProject, requireProjectAccess, identity });
 registerRoutingRoutes(router, { ensureProject, requireProjectAccess, identity });
 registerTraceRoutes(router, { ensureProject, requireProjectAccess, identity });

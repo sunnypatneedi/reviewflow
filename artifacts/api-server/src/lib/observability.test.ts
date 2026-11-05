@@ -22,6 +22,7 @@ test("empty is zero volume, unknown measurement; no invented costs or baseline",
   assert.equal(result.pipeline.recordedReviewMs, 0);
   assert.equal(result.pipeline.correctionRate, null);
   assert.equal(result.pipeline.averageTimeToFirstReleaseMs, null);
+  assert.equal(result.pipeline.p95TimeToFirstReleaseMs, null);
   assert.equal(result.pipeline.totalHumanEffortMs, null);
   assert.equal(result.pipeline.costPerAcceptedItem, null);
   assert.equal(result.pipeline.independentAccuracy, null);
@@ -170,4 +171,29 @@ test("preference checks are not independent audits; released snapshots deduplica
   assert.equal(result.preference.releases, 2);
   assert.equal(result.preference.humanOnly, 1);
   assert.ok(!JSON.stringify(result).includes("private-id"));
+});
+
+test("p95 uses nearest rank over matched task-to-first-release observations only", () => {
+  const rows = empty();
+  rows.tasks = Array.from({ length: 20 }, (_, i) => ({
+    id: `task${i}`,
+    status: "finalized",
+    contentHash: `hash${i}`,
+    createdAt: past,
+  }));
+  rows.releases = rows.tasks.map((t, i) => ({
+    hashes: [t.contentHash],
+    createdAt: new Date(past.getTime() + (i + 1) * 100),
+  }));
+  rows.tasks.push({
+    id: "unreleased",
+    status: "queued",
+    contentHash: "unreleased",
+    createdAt: past,
+  });
+  rows.releases.push({ hashes: ["hash0"], createdAt: future });
+  const p = aggregateObservability(rows, now).pipeline;
+  assert.equal(p.releaseTimingSamples, 20);
+  assert.equal(p.p95TimeToFirstReleaseMs, 1900);
+  assert.equal(p.averageTimeToFirstReleaseMs, 1050);
 });

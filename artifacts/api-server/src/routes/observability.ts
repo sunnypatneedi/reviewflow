@@ -1,3 +1,4 @@
+import { drainTelemetry, telemetrySnapshot } from "../lib/telemetry";
 import type { IRouter, Request, Response } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import {
@@ -199,7 +200,23 @@ export function registerObservabilityRoutes(router: IRouter, helpers: Helpers) {
           };
           if (Object.values(rows).some((rows) => rows.length > LIMIT))
             throw new Error("snapshot limit");
-          return aggregateObservability(rows);
+          await drainTelemetry(project, tx);
+          const rubric = await tx.execute(sql`SELECT count(*)::int AS total,
+            count(*) FILTER(WHERE state->>'status'='reviewed')::int AS reviewed,
+            count(*) FILTER(WHERE state->>'status'='escalated')::int AS escalated,
+            count(*) FILTER(WHERE state->>'quarantined'='true')::int AS quarantined
+            FROM rf_rubric_items WHERE project_id=${project}`);
+          const rubricReleases = await tx.execute(
+            sql`SELECT count(*)::int AS count FROM rf_rubric_records WHERE project_id=${project} AND kind='release'`,
+          );
+          return {
+            ...aggregateObservability(rows),
+            rubric: {
+              ...rubric.rows[0],
+              releases: rubricReleases.rows[0].count,
+            },
+            telemetry: await telemetrySnapshot(project, tx),
+          };
         },
         { isolationLevel: "repeatable read" },
       );

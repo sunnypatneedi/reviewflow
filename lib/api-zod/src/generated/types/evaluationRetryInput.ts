@@ -8,6 +8,8 @@
 import type { EvaluationRetryInputMode } from './evaluationRetryInputMode';
 
 export interface EvaluationRetryInput {
+  /** Exact current job ID; superseded runs cannot be retried through this endpoint. */
+  jobId?: string;
   taskId: string;
   mode: EvaluationRetryInputMode;
   ownerConsent: boolean;

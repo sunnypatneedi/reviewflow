@@ -28,6 +28,8 @@ export default function Tasks() {
   const [importJson, setImportJson] = useState("");
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [evalMode, setEvalMode] = useState<'demo'|'live'>('demo');
+  const [experimentRunId, setExperimentRunId] = useState("default");
+  const validRun = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(experimentRunId);
   const [consent, setConsent] = useState(false);
   const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
   const taskIds = useMemo(() => tasks?.map((task) => task.id) ?? [], [tasks]);
@@ -79,7 +81,8 @@ export default function Tasks() {
         taskIds: Array.from(selectedTasks),
         mode: evalMode,
         ownerConsent: consent,
-        outboundReviewed: consent
+        outboundReviewed: consent,
+        experimentRunId
       }
     }, {
       onSuccess: () => {
@@ -99,7 +102,7 @@ export default function Tasks() {
     }
     setRetryingJobId(job.id);
     retryEvaluationJob.mutate({
-      data: { taskId: job.taskId, mode: job.mode, ownerConsent: consent, outboundReviewed: consent },
+      data: { jobId: job.id, taskId: job.taskId, mode: job.mode, ownerConsent: consent, outboundReviewed: consent },
     }, {
       onSettled: () => setRetryingJobId(null),
       onSuccess: () => {
@@ -120,7 +123,7 @@ export default function Tasks() {
     return (
       <div key={job.id} className="flex items-center gap-1.5 text-[10px]">
         <span className={`px-1.5 py-0.5 rounded uppercase font-semibold tracking-wider ${statusClass}`}>
-          {job.mode} · {job.status}
+          {job.mode} · {job.status}{job.evaluation?.experiment_run_id ? ` · ${job.evaluation.experiment_run_id}` : ""}
         </span>
         {job.status === "failed" && (
           <Button
@@ -232,6 +235,7 @@ export default function Tasks() {
           <div className="bg-card border border-border p-4 rounded-md space-y-4 shadow-sm">
             <h3 className="font-semibold text-sm">Import Tasks (JSONL)</h3>
             <Textarea 
+              aria-label="Task JSONL import"
               className="font-mono text-xs min-h-[150px] resize-none" 
               placeholder={`{"externalId": "123", "question": "...", "evidence": "...", "candidateAnswer": "...", "risk": "low"}\n{"externalId": "124"...}`}
               value={importJson}
@@ -252,8 +256,8 @@ export default function Tasks() {
             </h3>
             
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Evaluation Mode</label>
-              <select 
+              <label htmlFor="evaluation-mode" className="text-xs font-medium text-muted-foreground">Evaluation Mode</label>
+              <select id="evaluation-mode"
                 className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" 
                 value={evalMode} 
                 onChange={e => setEvalMode(e.target.value as any)}
@@ -261,6 +265,12 @@ export default function Tasks() {
                 <option value="demo">Demo (Simulated)</option>
                 <option value="live">Live (Real API)</option>
               </select>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="experiment-run" className="text-xs font-medium text-muted-foreground">Experiment run ID</label>
+              <input id="experiment-run" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={experimentRunId} maxLength={128} onChange={e => setExperimentRunId(e.target.value)} aria-describedby="experiment-run-help" aria-invalid={!validRun} />
+              <p id="experiment-run-help" className="text-xs text-muted-foreground">The same input and run reuse the saved result. A new run keeps separate history; it never replaces a human decision.</p>
             </div>
 
             {evalMode === 'live' && (
@@ -275,7 +285,7 @@ export default function Tasks() {
             <Button 
               className="w-full" 
               onClick={handleEvaluate} 
-              disabled={selectedTasks.size === 0 || (evalMode === 'live' && !consent) || evaluateTasks.isPending}
+              disabled={!validRun || selectedTasks.size === 0 || (evalMode === 'live' && !consent) || evaluateTasks.isPending}
             >
               {evaluateTasks.isPending ? "Evaluating..." : "Run Evaluation"}
             </Button>

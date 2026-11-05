@@ -1,3 +1,4 @@
+import { currentProposal } from "../lib/current-proposal";
 import type { IRouter, Request, Response } from "express";
 import { and, eq } from "drizzle-orm";
 import { db, projectsTable, proposalsTable, tasksTable } from "@workspace/db";
@@ -74,7 +75,7 @@ export function registerRoutingRoutes(router: IRouter, helpers: Helpers) {
         latest.contentHash !== task.contentHash
       )
         throw new FactoryError("Task changed during routing. Reload.");
-      const [proposal] = await tx
+      const proposals = await tx
         .select()
         .from(proposalsTable)
         .where(
@@ -83,6 +84,7 @@ export function registerRoutingRoutes(router: IRouter, helpers: Helpers) {
             eq(proposalsTable.mode, latest.mode),
           ),
         );
+      const proposal = currentProposal(latest, proposals);
       const input = {
         quarantined: control.quarantined,
         finalized: latest.status === "finalized",

@@ -1,3 +1,4 @@
+import { useTelemetry, createTelemetry } from "@/lib/telemetry";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { GitCompareArrows, Upload, ShieldCheck, Download, Eye, ArrowLeftRight } from "lucide-react";
@@ -127,7 +128,7 @@ export default function Traces() {
       </div>
       <section className={`${panel} p-5 space-y-4`}>
         <div><h2 className="font-semibold">Reproducible dataset releases</h2><p className="text-xs text-muted-foreground mt-1">Immutable snapshots. Complete records preserve nonbinary outcomes and exclusion reasons; preference exports include only eligible finalized A/B preferences. Related scenario variants stay in one split. Review trace text for private content before sharing.</p></div>
-        <div className="flex gap-3 flex-wrap"><Input aria-label="Trace release name" data-testid="input-trace-release-name" placeholder="Release name" className="max-w-sm" value={name} onChange={event => setName(event.target.value)} /><Button disabled={!name.trim() || pending} data-testid="create-trace-release" onClick={() => run(async () => { await traceRequest("/releases", { name: name.trim() }); setName(""); }, "Immutable release created.")}>Create release</Button></div>
+        <div className="flex gap-3 flex-wrap"><Input aria-label="Trace release name" data-testid="input-trace-release-name" placeholder="Release name" className="max-w-sm" value={name} onChange={event => setName(event.target.value)} /><Button disabled={!name.trim() || pending} data-testid="create-trace-release" onClick={() => run(async () => { const release = await traceRequest<Release>("/releases", { name: name.trim() }); const delivery = createTelemetry({ factory: "preference", itemId: release.id }); delivery.emit("release"); delivery.emit("session_closed"); void delivery.flush(); setName(""); }, "Immutable release created.")}>Create release</Button></div>
         {releases.isLoading && <p className="text-sm">Loading releases…</p>}
         {releases.data?.length === 0 && <p className="text-sm text-muted-foreground">No trace dataset releases yet.</p>}
         {releases.data?.map(release => <div key={release.id} data-testid={`trace-release-${release.id}`} className="border-t pt-4 flex flex-wrap gap-3 items-center justify-between"><div className="min-w-0"><p className="font-medium text-sm">{release.name}</p><p className="text-xs text-muted-foreground break-all">Snapshot {release.id}</p><p className="text-xs text-muted-foreground break-all max-w-lg">SHA-256: {release.digest}</p><p className="text-xs">{release.trainingCount} training included · {release.itemCount - release.trainingCount} training excluded · {release.itemCount} complete records</p></div><div className="flex flex-wrap gap-2">
@@ -185,6 +186,7 @@ function TraceReview({ comparison: c, run, pending }: { comparison: Comparison; 
   const [qualityStatus, setQualityStatus] = useState<"passed" | "pending" | "failed">("pending");
   const [qualityVersion, setQualityVersion] = useState(c.version);
   const [auditing, setAuditing] = useState(false);
+  const telemetry = useTelemetry({ factory: "preference", itemId: c.id, itemVersion: c.version, proposalId: null });
   const effort = useActiveEffort(c.id);
   const auditEffort = useActiveEffort(`${c.id}:quality`);
   const waiting = useRef(0);
@@ -192,11 +194,13 @@ function TraceReview({ comparison: c, run, pending }: { comparison: Comparison; 
   effort.paused.current = pending || auditing;
   auditEffort.paused.current = pending || !auditing;
   const assistedRequest = async (suffix: string, body: unknown) => {
+    telemetry("submit");
     const started = performance.now();
     const counter = auditing ? auditWaiting : waiting;
     try { return await traceRequest(`${path}${suffix}`, body); }
     finally { counter.current += performance.now() - started; }
   };
+  useEffect(() => { if (c.revealed && c.proposal) telemetry("proposal_shown"); }, [c.id, c.version, c.revealed, c.proposal]);
   const path = `/comparisons/${encodeURIComponent(c.id)}`;
   useEffect(() => { if (!decision) setReviewVersion(c.version); }, [c.version, decision]);
   useEffect(() => { if (!qualityNote) setQualityVersion(c.version); }, [c.version, qualityNote]);
@@ -231,7 +235,9 @@ function TraceReview({ comparison: c, run, pending }: { comparison: Comparison; 
       <label className="block text-xs font-medium">Evidence references (one observable event/reference ID per line)<textarea data-testid="input-trace-evidence-refs" value={refs} onChange={event => setRefs(event.target.value)} className="mt-2 w-full border rounded-md p-3 bg-background font-mono text-xs" rows={2} /></label>
       <p className="text-xs text-muted-foreground">Active effort measures focused interaction with a 30-second idle cutoff and excludes requests in flight. Opening the quality check switches timing to audit effort. Waiting records completed assistance requests, not save latency or background refreshes; provider service latency is measured separately. These are interface measurements, not verified human-effort claims.</p>
       <Button data-testid="save-trace-review" disabled={!decision || pending || Boolean(c.pendingAnnotation) || reviewVersion !== c.version} onClick={() => run(async () => {
+        telemetry("submit");
         await traceRequest(`${path}/reviews`, { decision, expectedVersion: reviewVersion, evidenceRefs: refs.split("\n").map(value => value.trim()).filter(Boolean), effort: { activeMs: c.review ? null : Math.round(effort.total.current), correctionMs: c.review ? Math.round(effort.total.current) : null, waitingMs: Math.round(waiting.current), auditMs: null } });
+        telemetry("review");
         setDecision(""); effort.total.current = 0; waiting.current = 0;
       }, "Human decision saved against this comparison version.")}>{pending ? "Saving…" : c.review ? "Save correction" : "Record human preference"}</Button>
     </div>

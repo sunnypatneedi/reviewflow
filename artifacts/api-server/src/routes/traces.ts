@@ -8,7 +8,7 @@ import { reserveJevCall, finishJevCall } from "../lib/jev-budget";
 import { assertFactoryRelease, assertFactoryWork, lockFactory } from "../lib/factories";
 import { FactoryError } from "../lib/factory-engine";
 import {
-  TraceError, assertVersion, assertNoReferenceLeakage, comparisonView, measuredEffort, publicProposal, shareableEvidence, stableJson, traceHash, traceProposal,
+  TraceError, assertVersion, assertNoReferenceLeakage, comparisonView, measuredEffort, publicProposal, shareableEvidence, stableJson, traceHash, traceProposal, traceEvaluationIdentity,
   tracePython, validateReview, type TraceObject,
 } from "../lib/traces";
 
@@ -189,18 +189,46 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
         || req.app.locals.runtimeConfig?.appMode !== "clerk" || !context.userId || context.project.mode !== "live") throw new TraceError("Paid trace evaluation is disabled; it requires explicit server opt-in and an authorized live project", 403);
       if (req.body?.consent !== true || req.body?.outboundReviewed !== true) throw new TraceError("Explicit outbound-data consent and confirmation that the actual trace text was reviewed for private data are required", 403);
     }
+    const assertProposalReplacement = (value: TraceObject, evaluationId: string) => {
+      // Existing human reviews and annotation kits do not pin evaluation IDs.
+      // Preserve their evidence once exposed, including across async requests.
+      if (value.proposal && value.proposal.evaluationId !== evaluationId &&
+        ((value.reveals?.length ?? 0) > 0 || value.review?.assisted ||
+          value.history?.some((review: TraceObject) => review.assisted) ||
+          value.pendingAnnotation?.reviewMode === "model_assisted")) {
+        throw new TraceError("An exposed proposal cannot be replaced: preserve the evaluation used by human reviews and annotation kits", 409);
+      }
+    };
     const requestId = randomUUID();
     const snapshot = await locked(context.project.id, async tx => {
       await assertFactoryWork(tx, { projectId: context.project.id, factory: "preference", itemId: String(req.params.id), actorId: actor, claimToken: req.body?.claimToken, assistance: true });
       const value = await find(tx, context.project.id, "comparison", String(req.params.id));
-      if (value.proposal) throw new TraceError("A proposal already exists for this comparison", 409);
+      const evaluation = traceEvaluationIdentity(context.project.id, value, provider, req.body ?? {});
+      assertProposalReplacement(value, evaluation.evaluationId);
+      const [cached] = await tx.select().from(traceRecordsTable).where(where(context.project.id, "evaluation", evaluation.evaluationId));
+      if (cached) {
+        if (value.proposalRequest?.expiresAt > Date.now()) throw new TraceError("A proposal request is already running", 409);
+        const proposal = publicProposal(cached.payload as TraceObject)!;
+        if (value.proposal?.evaluationId !== evaluation.evaluationId) {
+          value.proposal = proposal; value.version++;
+          await save(tx, context.project.id, "comparison", value.id, value);
+        }
+        return { ...value, cachedEvaluation: true };
+      }
+      // Legacy proposals remain readable but never count as a versioned cache hit.
+      if (value.proposal && !value.proposal.evaluationId) {
+        const key = `legacy:${value.id}`;
+        await tx.insert(traceRecordsTable).values({ id: randomUUID(), projectId: context.project.id, kind: "evaluation", key,
+          payload: { ...value.proposal, provenance: "legacy-unknown", comparisonId: value.id } }).onConflictDoNothing();
+      }
       if (value.proposalRequest?.expiresAt > Date.now()) throw new TraceError("A proposal request is already running; retry after its bounded lease expires", 409);
       const importedRuns = await rows(tx, context.project.id, "run");
       for (const run of importedRuns.filter(run => [value.a?.runId, value.b?.runId].includes(run.id))) assertNoReferenceLeakage(run);
-      value.proposalRequest = { requestId, provider, expiresAt: Date.now() + 30_000 };
+      value.proposalRequest = { requestId, provider, ...evaluation, expiresAt: Date.now() + 30_000 };
       await save(tx, context.project.id, "comparison", value.id, value);
       return value;
     });
+    if (snapshot.cachedEvaluation) { res.json({ available: true, provider, cached: true }); return; }
     // Never hold the project lock during external I/O. Failure commits nothing.
     try {
       const reservation = provider === "jev" ? await reserveJevCall(context.project.id, "preference", snapshot.id, async tx => {
@@ -210,16 +238,27 @@ export function registerTraceRoutes(router: IRouter, helpers: Helpers) {
         await assertFactoryWork(tx, { projectId: context.project.id, factory: "preference", itemId: snapshot.id, actorId: actor, claimToken: req.body?.claimToken, assistance: true });
         const current = await find(tx, context.project.id, "comparison", snapshot.id);
         assertVersion(current, snapshot.version);
-        if (current.proposal || current.proposalRequest?.requestId !== requestId || current.proposalRequest?.expiresAt <= Date.now()) throw new TraceError("Proposal admission changed or expired", 409);
+        if (current.proposalRequest?.requestId !== requestId || current.proposalRequest?.expiresAt <= Date.now()) throw new TraceError("Proposal admission changed or expired", 409);
       }) : null;
-      let proposal;
+      let proposal: TraceObject;
       try { proposal = await traceProposal(snapshot, provider); if (reservation) await finishJevCall(reservation, "succeeded"); }
       catch (error) { if (reservation) await finishJevCall(reservation, "failed"); throw error; }
       await locked(context.project.id, async tx => {
         await assertFactoryWork(tx, { projectId: context.project.id, factory: "preference", itemId: snapshot.id, actorId: actor, claimToken: req.body?.claimToken, assistance: true });
         const value = await find(tx, context.project.id, "comparison", snapshot.id);
         assertVersion(value, snapshot.version);
-        if (value.proposal || value.proposalRequest?.requestId !== requestId) throw new TraceError("Another proposal request superseded this result. No result was overwritten.", 409);
+        if (value.proposalRequest?.requestId !== requestId || value.proposalRequest?.expiresAt <= Date.now() ||
+          traceEvaluationIdentity(context.project.id, value, provider, req.body ?? {}).evaluationId !== snapshot.proposalRequest.evaluationId) throw new TraceError("Another proposal request superseded this result. No result was overwritten.", 409);
+        const { evaluationId, identity } = snapshot.proposalRequest;
+        assertProposalReplacement(value, evaluationId);
+        proposal = { ...proposal, evaluationId, provenance: "captured", questionVersion: identity.questionVersion,
+          contextPreparationVersion: identity.contextPreparationVersion, requestedModel: identity.requestedModel,
+          experimentRunId: identity.experimentRunId, snapshotHash: identity.snapshotHash };
+        await tx.insert(traceRecordsTable).values({ id: randomUUID(), projectId: context.project.id, kind: "evaluation", key: evaluationId,
+          payload: { ...proposal, evaluationIdentity: identity, comparisonId: value.id } }).onConflictDoNothing();
+        // Initial blind assistance does not invalidate an independent human
+        // review. Replacing a visible proposal must invalidate stale views.
+        if (value.proposal) value.version++;
         value.proposal = proposal;
         value.proposalRequest = null;
         await save(tx, context.project.id, "comparison", value.id, value);

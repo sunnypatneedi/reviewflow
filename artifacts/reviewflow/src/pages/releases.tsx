@@ -1,3 +1,4 @@
+import { createTelemetry } from "@/lib/telemetry";
 import { useState } from "react";
 import { useListReleases, useCreateRelease, getListReleasesQueryKey } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/queryClient";
@@ -21,7 +22,9 @@ export default function Releases() {
     createRelease.mutate({
       data: { name, includeSourceText, privacyReviewed }
     }, {
-      onSuccess: () => {
+      onSuccess: (release) => {
+        const telemetry = createTelemetry({ factory: "evidence", itemId: release.id });
+        telemetry.emit("release"); telemetry.emit("session_closed"); void telemetry.flush();
         setName("");
         setIncludeSourceText(false);
         setPrivacyReviewed(false);

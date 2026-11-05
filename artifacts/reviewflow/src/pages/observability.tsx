@@ -8,7 +8,17 @@ import {
 } from "@/lib/observability";
 import type { aggregateObservability } from "../../../api-server/src/lib/observability";
 
-type Snapshot = ReturnType<typeof aggregateObservability>;
+import type { telemetrySnapshot } from "../../../api-server/src/lib/telemetry";
+type Snapshot = ReturnType<typeof aggregateObservability> & {
+  rubric: {
+    total: number;
+    reviewed: number;
+    escalated: number;
+    quarantined: number;
+    releases: number;
+  };
+  telemetry: Awaited<ReturnType<typeof telemetrySnapshot>>;
+};
 async function readSnapshot(): Promise<Snapshot> {
   const response = await fetch("/api/reviewflow/observability", {
     credentials: "same-origin",
@@ -116,6 +126,66 @@ export default function Observability() {
               traces to begin; unknown measurements remain N/A.
             </p>
           )}
+          <section className="space-y-4" aria-label="Generic rubric pipeline">
+            <h2 className="text-xl font-semibold">Generic rubric pipeline</h2>
+            <Metrics
+              items={[
+                ["Rubric items", number(data.rubric.total)],
+                ["Reviewed now", number(data.rubric.reviewed)],
+                ["Escalated now", number(data.rubric.escalated)],
+                ["Quarantined now", number(data.rubric.quarantined)],
+                ["Rubric releases", number(data.rubric.releases)],
+              ]}
+            />
+            <p className="text-sm text-muted-foreground">
+              Current retained item states; reviewed does not prove independent
+              quality or release eligibility. Releases are immutable snapshots,
+              not distinct item counts.
+            </p>
+          </section>
+          <section className="space-y-4" aria-label="Local telemetry delivery">
+            <h2 className="text-xl font-semibold">Local telemetry delivery</h2>
+            <Metrics
+              items={[
+                [
+                  "Instrumented lifetime attempt starts",
+                  number(data.telemetry.lifetimeAttemptStarts),
+                ],
+                [
+                  "Pending server events",
+                  number(data.telemetry.delivery.pending),
+                ],
+                [
+                  "Delivered server events",
+                  number(data.telemetry.delivery.delivered),
+                ],
+                [
+                  "Missing browser sequences",
+                  number(data.telemetry.browser.missingSequences),
+                ],
+                [
+                  "Browser-reported dropped",
+                  number(data.telemetry.browser.reportedDropped),
+                ],
+                [
+                  "Unclosed browser sessions",
+                  number(data.telemetry.browser.unclosedSessions),
+                ],
+                [
+                  "Observed foreground presence",
+                  duration(data.telemetry.browser.observedForegroundMs),
+                ],
+                [
+                  "p95 observed item to release",
+                  duration(p.p95TimeToFirstReleaseMs),
+                ],
+                ["Release timing denominator", number(p.releaseTimingSamples)],
+              ]}
+            />
+            <p className="text-sm text-muted-foreground">
+              {data.telemetry.coverage}
+            </p>
+          </section>
           <section className="space-y-4" aria-labelledby="evidence-heading">
             <h2 id="evidence-heading" className="text-xl font-semibold">
               Evidence pipeline

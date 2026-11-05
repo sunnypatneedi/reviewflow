@@ -59,6 +59,8 @@ export const tasksTable = pgTable("rf_tasks", {
   status: text("status").notNull().default("pending"),
   version: integer("version").notNull().default(1),
   mode: text("mode").notNull().default("demo"),
+  currentEvaluationId: text("current_evaluation_id"),
+  currentProposalId: text("current_proposal_id"),
   finalLabel: text("final_label"),
   finalAdjudicationId: text("final_adjudication_id"),
   referenceLabel: text("reference_label"),
@@ -72,6 +74,9 @@ export const jobsTable = pgTable("rf_jobs", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   taskId: text("task_id").notNull(),
+  evaluationId: text("evaluation_id"),
+  evaluationIdentity: jsonb("evaluation_identity"),
+  provenance: text("provenance").notNull().default("legacy-unknown"),
   status: text("status").notNull().default("queued"),
   mode: text("mode").notNull().default("demo"),
   attempts: integer("attempts").notNull().default(0),
@@ -81,7 +86,7 @@ export const jobsTable = pgTable("rf_jobs", {
   lastError: text("last_error"),
   ...timestamps,
 }, (table) => [
-  uniqueIndex("rf_jobs_task_mode_unique").on(table.taskId, table.mode),
+  uniqueIndex("rf_jobs_evaluation_unique").on(table.evaluationId),
   index("rf_jobs_claim_index").on(table.status, table.availableAt, table.leaseExpiresAt),
 ]);
 
@@ -89,6 +94,9 @@ export const proposalsTable = pgTable("rf_proposals", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   taskId: text("task_id").notNull(),
+  evaluationId: text("evaluation_id"),
+  evaluationIdentity: jsonb("evaluation_identity"),
+  provenance: text("provenance").notNull().default("legacy-unknown"),
   mode: text("mode").notNull(),
   requestedModel: text("requested_model").notNull(),
   returnedModel: text("returned_model").notNull(),
@@ -104,7 +112,7 @@ export const proposalsTable = pgTable("rf_proposals", {
   rawResponse: jsonb("raw_response").notNull(),
   ...timestamps,
 }, (table) => [
-  uniqueIndex("rf_proposals_task_mode_unique").on(table.taskId, table.mode),
+  uniqueIndex("rf_proposals_evaluation_unique").on(table.evaluationId),
 ]);
 
 export const reviewsTable = pgTable("rf_reviews", {

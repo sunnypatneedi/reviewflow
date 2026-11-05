@@ -5,7 +5,10 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
+import type { EvaluateInputContextPreparationVersion } from './evaluateInputContextPreparationVersion';
 import type { EvaluateInputMode } from './evaluateInputMode';
+import type { EvaluateInputQuestionVersion } from './evaluateInputQuestionVersion';
+import type { EvaluateInputRequestedModel } from './evaluateInputRequestedModel';
 
 export interface EvaluateInput {
   /**
@@ -14,6 +17,16 @@ export interface EvaluateInput {
      */
   taskIds: string[];
   mode: EvaluateInputMode;
+  /**
+     * Stable run identity; changing it requests a separate evaluation without deleting history.
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+     */
+  experimentRunId?: string;
+  questionVersion?: EvaluateInputQuestionVersion;
+  contextPreparationVersion?: EvaluateInputContextPreparationVersion;
+  requestedModel?: EvaluateInputRequestedModel;
   ownerConsent: boolean;
   /** Required for live mode; confirms review of actual outbound task text for private data */
   outboundReviewed?: boolean;

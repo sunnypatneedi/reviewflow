@@ -7,9 +7,15 @@
  */
 import type { EvaluationJobMode } from './evaluationJobMode';
 import type { EvaluationJobStatus } from './evaluationJobStatus';
+import type { EvaluationProvenance } from './evaluationProvenance';
 
 export interface EvaluationJob {
   id: string;
+  /** @nullable */
+  evaluationId?: string | null;
+  current?: boolean;
+  /** @nullable */
+  evaluation?: EvaluationProvenance | null;
   taskId: string;
   mode: EvaluationJobMode;
   status: EvaluationJobStatus;

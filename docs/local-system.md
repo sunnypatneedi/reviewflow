@@ -12,7 +12,9 @@ claims, quarantine and role checks. The path is configure → import → assign 
 review → adjudicate when required → quality/audit → frozen release. Evidence has
 independent blind audit and adjudication gates. Preference has context eligibility,
 explicit human preference and quality attestations; its quality check is **not**
-an independent human audit. A third generic rubric factory is not implemented.
+an independent human audit. The generic rubric factory supports immutable rubric
+revisions, scored/option criteria, human decisions, independent audit and
+adjudication gates, and digest-checked releases. See [rubric workflow](rubric-factory.md).
 
 - React/TypeScript provides the local browser UI. Express handles API and WebSocket
   traffic. PostgreSQL is the single authoritative store. A separate worker claims
@@ -39,17 +41,24 @@ an independent human audit. A third generic rubric factory is not implemented.
   adapter or live-provider performance claim is included.
 
 This modular monolith avoids an unnecessary queue service, event bus or cluster
-orchestrator for a local app. State changes and their audit events are transactional;
-there is **no external transactional-outbox consumer or complete browser telemetry
-delivery system**. An event bus would need its own delivery/deduplication tests.
-Evaluation reuse still keys on task + mode, not a complete versioned experiment
-identity spanning question/context preparation/model/run. Do not use it as a
-general cross-model experiment cache or claim all previously discussed experiments
-are implemented.
+orchestrator for a local app. State changes and audit events are transactional.
+A PostgreSQL outbox projects metadata locally with idempotent delivery and recovery;
+there is no external telemetry destination. A bounded IndexedDB browser queue
+retries stable event IDs and exposes partial-delivery indicators. See
+[telemetry boundaries](local-telemetry.md).
+
+Evidence and preference evaluation identity now binds project, item and immutable
+snapshot, question version, context preparation version, requested model, and
+experiment run. Exact identity can reuse persisted results. Changing an experiment
+run creates a distinct evaluation; old history is retained. Public APIs accept
+only implemented question/context/model versions, not arbitrary model labels.
+Legacy evaluations remain marked as unknown provenance. This is not a general
+model marketplace or evidence of comparative model quality.
 
 ## Observability with honest denominators
 
-`/observability` is a project-scoped, read-only snapshot. Owners/adjudicators without
+`/observability` is a project-scoped aggregate snapshot. Refreshing it may drain a
+bounded local telemetry-projection batch; it does not change review decisions. Owners/adjudicators without
 active blind assignments can inspect it. Responses contain aggregate values, not
 source text, labels, provider responses, account IDs or claim tokens. Reads use a
 consistent transaction, per-statement timeout and explicit row cap; exceeding the
@@ -58,13 +67,15 @@ cap fails instead of silently sampling.
 Evidence counts distinguish current tasks/assignments, review events, included
 declared-independent audit decisions, disputes and distinct released content.
 Preference counts distinguish finalized decisions, quality attestations and
-distinct released comparison IDs. These stages have different units; they are not
+distinct released comparison IDs. Rubric counts separate imported, reviewed,
+audited, quarantined and released items. These stages have different units; they are not
 a conversion funnel or independently proven accuracy.
 
 The dashboard shows queue states, delayed work, retries and expired/missing leases,
 plus separate live-measured and demo-simulated proposal latency and recorded tokens.
 Retry counters describe current job attempt cycles; manual requeue resets them.
-They are not lifetime invocation or billing counters.
+A separate retained event count reports instrumented attempt starts, but cannot
+recover attempts before instrumentation or external billing.
 It is not a historical alerting/uptime system. Database reachability at snapshot time
 does not prove worker or provider health. Local launch readiness checks the actual
 owned API and worker separately.
@@ -74,8 +85,10 @@ adjudication, rework outside submitted review events, full preference effort and
 all compute/tool/infrastructure/human costs are not comprehensively captured.
 Total labor, cost per accepted item, independent quality and baseline improvement
 therefore remain N/A. Cohort labels are recorded assistance provenance, not a causal
-experiment. Complete p95 item-to-release, language/risk slice quality and human
-reference studies remain work to qualify, not values to infer from the simulator.
+experiment. Time-to-first-release p50/p95 covers matched current-content tasks
+that have a retained release and excludes unreleased items; it is not an all-task
+SLA. Language/risk slice quality and human reference studies remain unqualified,
+not values to infer from the simulator.
 
 ## One local verification gate
 
