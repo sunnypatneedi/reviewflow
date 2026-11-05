@@ -85,20 +85,27 @@ export async function stopChildren(
             return true;
           } catch (error) {
             if (error.code === "ESRCH") return false;
+            error.message = `Owned process group ${pid} signal ${signal} failed (${error.code}); leader exit=${child.exitCode}, signal=${child.signalCode}: ${error.message}`;
             throw error;
           }
         };
-        if (!signalGroup(0)) return;
         const directAlive = () =>
           child.exitCode === null && child.signalCode === null;
         const deadline = Date.now() + graceMs;
         if (directAlive()) child.kill("SIGTERM");
-        // Give the service itself time to close its workers cleanly. Do not confuse
-        // the parent's exit with the disappearance of its entire process group.
+        // Give the service time to close workers and let Node reap its leader.
+        // macOS can return EPERM for kill(-pgid, 0) while that leader is a zombie
+        // but its exit event has not run. Do not probe that intermediate state;
+        // genuine group-signal permission errors must still propagate.
+        // A reaped leader alone does not prove that its descendants are gone.
         let descendantsNotified = false;
         while (Date.now() < deadline) {
+          if (directAlive()) {
+            await sleep(Math.min(25, Math.max(1, deadline - Date.now())));
+            continue;
+          }
           if (!signalGroup(0)) return;
-          if (!directAlive() && !descendantsNotified) {
+          if (!descendantsNotified) {
             if (!signalGroup("SIGTERM")) return;
             descendantsNotified = true;
           }
@@ -109,7 +116,7 @@ export async function stopChildren(
         // Cleanup must remain bounded even if the OS delays reaping a descendant.
         const killDeadline = Date.now() + killWaitMs;
         while (Date.now() < killDeadline) {
-          if (!signalGroup(0)) return;
+          if (!directAlive() && !signalGroup(0)) return;
           await sleep(Math.min(25, Math.max(1, killDeadline - Date.now())));
         }
       })();

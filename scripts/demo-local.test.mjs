@@ -211,3 +211,36 @@ test("spawn error and absent PIDs are safe to clean up", async () => {
     killWaitMs: 10,
   });
 });
+
+
+test("cleanup waits for the direct child to be reaped before probing its group", async () => {
+  const originalKill = process.kill;
+  const pid = 999999;
+  let signaled = false;
+  const child = { pid, exitCode: null, signalCode: null, kill(signal) {
+    assert.equal(signal, "SIGTERM");
+    signaled = true;
+    setTimeout(() => { child.exitCode = 0; }, 10);
+    return true;
+  } };
+  process.kill = (target, signal) => {
+    assert.equal(target, -pid);
+    assert.ok(signaled);
+    if (child.exitCode === null) {
+      throw Object.assign(new Error("Unreaped zombie group probe"), { code: "EPERM" });
+    }
+    throw Object.assign(new Error("Owned group is gone"), { code: "ESRCH" });
+  };
+  try { await stopChildren([child], { graceMs: 100, killWaitMs: 100 }); }
+  finally { process.kill = originalKill; }
+});
+
+test("cleanup still rejects genuine group permission errors", async () => {
+  const originalKill = process.kill;
+  const child = { pid: 999998, exitCode: 0, signalCode: null };
+  process.kill = () => { throw Object.assign(new Error("Permission denied"), { code: "EPERM" }); };
+  try {
+    await assert.rejects(stopChildren([child], { graceMs: 100 }),
+      error => error.code === "EPERM" && /Owned process group/.test(error.message));
+  } finally { process.kill = originalKill; }
+});

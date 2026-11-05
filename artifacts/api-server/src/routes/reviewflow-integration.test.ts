@@ -85,7 +85,7 @@ test("anonymous telemetry uses cookie routing, production CSRF, and stable ident
     factory: "evidence", itemId: null, itemVersion: null, proposalId: null, visibleMs: 100, dropped: 0 };
   const body = { scope: context.scope, events: [event] };
   const withoutCsrf = await fetch(`${baseUrl}/api/reviewflow/telemetry`, {
-    method: "POST", headers: { cookie: session.cookie, "content-type": "application/json" }, body: JSON.stringify(body),
+    method: "POST", headers: { origin: "http://127.0.0.1:5173", cookie: session.cookie, "content-type": "application/json" }, body: JSON.stringify(body),
   });
   assert.equal(withoutCsrf.status, 403);
   for (let i = 0; i < 2; i++) {

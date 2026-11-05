@@ -24,6 +24,7 @@ async function launch() {
   );
   app = child;
   let output = "";
+  child.diagnosticOutput = () => output;
   const exited = new Promise((accept, reject) => {
     child.once("error", reject);
     child.once("exit", (code, signal) => accept({ code, signal }));
@@ -73,7 +74,7 @@ async function stop() {
         );
       }),
     ]);
-    assert.equal(result.code, 0);
+    assert.equal(result.code, 0, `Managed application shutdown failed (code=${result.code}, signal=${result.signal}):\n${child.diagnosticOutput()}`);
     app = undefined;
   } finally {
     clearTimeout(timer);
@@ -237,6 +238,9 @@ try {
   console.log(
     "Durable workspace smoke passed: actual app cookie, tasks and release bytes survive restart; signal shutdown frees all ports;  initialization, records/session restart preservation, duplicate launch refusal, failure cleanup and subsequent recovery.",
   );
+} catch (error) {
+  console.error("Durable workspace smoke failed before final cleanup:", error);
+  throw error;
 } finally {
   await stop();
   // Only remove this invocation's mkdtemp test tree, and only with PostgreSQL stopped.
