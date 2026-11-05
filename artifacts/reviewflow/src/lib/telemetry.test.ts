@@ -61,7 +61,8 @@ test("local default gets server scope, retries stable IDs, and never rebinds old
     posts.push(body);
     assert.equal(
       (options?.headers as Record<string, string>)["x-reviewflow-project"],
-      "local-project",
+      undefined,
+      "Default project must keep cookie-based routing, not shared-project selection",
     );
     return fail
       ? new Response("{}", { status: 409 })

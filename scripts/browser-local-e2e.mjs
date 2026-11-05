@@ -15,6 +15,14 @@ export async function verifyAnonymousLocalBrowser(
   const context = await browser.newContext();
   const page = await context.newPage();
   const errors = [];
+  const telemetryResponses = [];
+  page.on("response", (response) => {
+    if (response.url().includes("/api/reviewflow/telemetry"))
+      telemetryResponses.push({
+        url: response.url(),
+        status: response.status(),
+      });
+  });
   page.on("pageerror", (error) => errors.push(error.message));
   await page.route("**/*", (route) =>
     route
@@ -52,14 +60,24 @@ export async function verifyAnonymousLocalBrowser(
         throw new Error(`Local evaluation failed: ${response.status}`);
       return task.id;
     });
-    await page.waitForFunction(
-      async (id) =>
-        (await (await fetch("/api/reviewflow/tasks")).json()).some(
-          (task) => task.id === id && task.proposal,
-        ),
-      target,
-      { timeout: 20000 },
-    );
+    // waitForFunction treats an async predicate's Promise as truthy before
+    // its value resolves. Explicitly await each API read until work is ready.
+    const evaluationDeadline = Date.now() + 20000;
+    while (
+      !(await page.evaluate(async (id) => {
+        const tasks = await (await fetch("/api/reviewflow/tasks")).json();
+        return tasks.some(
+          (task) =>
+            task.id === id && task.status === "proposed" && task.proposal,
+        );
+      }, target))
+    ) {
+      if (Date.now() > evaluationDeadline)
+        throw new Error(
+          "Anonymous evaluation did not produce a reviewable proposal",
+        );
+      await page.waitForTimeout(100);
+    }
     const pattern = "**/api/reviewflow/telemetry";
     await page.route(pattern, (route) =>
       route.fulfill({
@@ -70,38 +88,44 @@ export async function verifyAnonymousLocalBrowser(
     );
     await page.goto(base + "/review");
     const pending = () =>
-      page.evaluate(
-        () =>
-          new Promise((resolve, reject) => {
-            const open = indexedDB.open("reviewflow-local-telemetry-v1", 1);
-            open.onerror = () => reject(open.error);
-            open.onsuccess = () => {
-              const database = open.result;
-              if (!database.objectStoreNames.contains("events")) {
-                database.close();
-                resolve(0);
-                return;
-              }
-              const request = database
-                .transaction("events")
-                .objectStore("events")
-                .count();
-              request.onsuccess = () => {
-                const count = request.result;
-                database.close();
-                resolve(count);
-              };
-              request.onerror = () => {
-                database.close();
-                reject(request.error);
-              };
+      page.evaluate(async () => {
+        // Observing persistence must not create an empty v1 database before
+        // the application's onupgradeneeded handler creates its event store.
+        const name = "reviewflow-local-telemetry-v1";
+        if (!(await indexedDB.databases()).some((db) => db.name === name))
+          return 0;
+        return new Promise((resolve, reject) => {
+          const open = indexedDB.open(name, 1);
+          open.onerror = () => reject(open.error);
+          open.onsuccess = () => {
+            const database = open.result;
+            if (!database.objectStoreNames.contains("events")) {
+              database.close();
+              resolve(0);
+              return;
+            }
+            const request = database
+              .transaction("events")
+              .objectStore("events")
+              .count();
+            request.onsuccess = () => {
+              const count = request.result;
+              database.close();
+              resolve(count);
             };
-          }),
-      );
+            request.onerror = () => {
+              database.close();
+              reject(request.error);
+            };
+          };
+        });
+      });
     let end = Date.now() + 10000;
     while ((await pending()) === 0) {
       if (Date.now() > end)
-        throw new Error("Anonymous local events did not reach IndexedDB");
+        throw new Error(
+          `Anonymous local events did not reach IndexedDB: ${JSON.stringify({ telemetryResponses, errors, page: await page.locator("body").innerText(), databases: await page.evaluate(() => indexedDB.databases()) })}`,
+        );
       await page.waitForTimeout(100);
     }
     await page.reload();

@@ -75,6 +75,34 @@ after(async () => {
   await pool.end();
 });
 
+test("anonymous telemetry uses cookie routing, production CSRF, and stable identity scope", async () => {
+  const session = await createSession();
+  const response = await request("/reviewflow/telemetry/context", { session });
+  assert.equal(response.status, 200);
+  const context = await response.json() as { projectId: string; scope: string };
+  assert.equal(context.projectId, session.projectId);
+  const event = { id: randomUUID(), session: randomUUID(), sequence: 1, kind: "foreground",
+    factory: "evidence", itemId: null, itemVersion: null, proposalId: null, visibleMs: 100, dropped: 0 };
+  const body = { scope: context.scope, events: [event] };
+  const withoutCsrf = await fetch(`${baseUrl}/api/reviewflow/telemetry`, {
+    method: "POST", headers: { cookie: session.cookie, "content-type": "application/json" }, body: JSON.stringify(body),
+  });
+  assert.equal(withoutCsrf.status, 403);
+  for (let i = 0; i < 2; i++) {
+    const accepted = await request("/reviewflow/telemetry", { session, method: "POST", body });
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(await accepted.json(), { accepted: [event.id] });
+  }
+  const { telemetrySnapshot } = await import("../lib/telemetry");
+  assert.equal((await telemetrySnapshot(session.projectId)).browser.observedForegroundMs, 100);
+  const anotherSession = await createSession();
+  assert.equal((await request("/reviewflow/telemetry", { session: anotherSession, method: "POST", body })).status, 409);
+  const selected = await fetch(`${baseUrl}/api/reviewflow/telemetry/context`, {
+    headers: { cookie: session.cookie, "x-reviewflow-project": session.projectId },
+  });
+  assert.equal(selected.status, 401, "anonymous sessions must never invent shared-project selection");
+});
+
 test("concurrent identical imports are idempotent and conflicting batches roll back", async () => {
   const session = await createSession();
   const shared = {

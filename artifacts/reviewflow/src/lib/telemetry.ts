@@ -114,7 +114,9 @@ export function createTelemetry(context: Context) {
     )
       throw new Error("Invalid telemetry context");
     scope = context.scope;
-    headers["x-reviewflow-project"] = context.projectId;
+    // Keep the original routing mode. Anonymous and personal projects use
+    // their session cookie; an explicit project header selects shared-project
+    // authentication. The opaque scope still rejects identity/project changes.
     for (const event of queue)
       await storeEvent({ ...event, scope: context.scope }).catch(() => {});
   };
