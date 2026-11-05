@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response as ExpressResponse } from "express";
 import { getAuth } from "@clerk/express";
+import { SubmitReviewBody } from "@workspace/api-zod";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import {
   buildSamplingFrame,
@@ -656,9 +657,14 @@ router.get("/reviewflow/review/next", async (req, res): Promise<void> => {
 });
 
 router.post("/reviewflow/reviews", async (req, res): Promise<void> => {
+  const parsed = SubmitReviewBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid review submission", details: parsed.error.issues });
+    return;
+  }
   const context = await ensureProject(req);
   const { project } = context;
-  const { taskId, version, action, correctedLabel, reason, evidenceExcerpt, activeMs } = req.body ?? {};
+  const { taskId, version, action, correctedLabel, reason, evidenceExcerpt, activeMs } = parsed.data;
   const [task] = await db.select().from(tasksTable).where(and(eq(tasksTable.id, taskId),eq(tasksTable.projectId,project.id)));
   const [proposal] = await db.select().from(proposalsTable).where(and(
     eq(proposalsTable.taskId, taskId),
@@ -667,7 +673,7 @@ router.post("/reviewflow/reviews", async (req, res): Promise<void> => {
   if (!task || !proposal) { res.status(404).json({ error:"Review item not found" }); return; }
   if (task.version !== version) { res.status(409).json({ error:"This task changed in another session. Reload before submitting." }); return; }
   if (!["accept","correct","escalate"].includes(action)) { res.status(400).json({ error:"Invalid action" }); return; }
-  if (action === "correct" && (!LABELS.includes(correctedLabel) || !reason?.trim())) { res.status(400).json({ error:"Corrections require a label and reason" }); return; }
+  if (action === "correct" && (!correctedLabel || !reason?.trim())) { res.status(400).json({ error:"Corrections require a label and reason" }); return; }
   if (action === "escalate" && !reason?.trim()) { res.status(400).json({ error:"Escalations require a reason" }); return; }
   if (task.status === "finalized") { res.status(409).json({ error:"This task already has a final decision" }); return; }
   if (task.status === "escalated" && action === "escalate") { res.status(409).json({ error:"This task is already escalated" }); return; }

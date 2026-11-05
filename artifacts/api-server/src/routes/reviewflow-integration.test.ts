@@ -27,17 +27,17 @@ type Session = { cookie: string; projectId: string };
 
 async function request(
   path: string,
-  options: { session?: Session; method?: string; body?: unknown } = {},
+  options: { session?: Session; method?: string; body?: unknown; rawBody?: string } = {},
 ): Promise<Response> {
   return fetch(`${baseUrl}/api${path}`, {
     method: options.method ?? "GET",
     headers: {
       origin: "http://127.0.0.1:5173",
       "x-reviewflow-csrf": "1",
-      ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+      ...(options.body === undefined && options.rawBody === undefined ? {} : { "content-type": "application/json" }),
       ...(options.session ? { cookie: options.session.cookie } : {}),
     },
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: options.rawBody ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
   });
 }
 
@@ -272,6 +272,76 @@ test("concurrent reviews commit exactly one decision and protect final state and
     body,
   });
   assert.equal(crossProject.status, 404);
+});
+
+test("review durations are validated before writes and valid boundaries preserve analytics", async () => {
+  const session = await createSession();
+  const tasks = (await db.select().from(tasksTable)
+    .where(eq(tasksTable.projectId, session.projectId))).slice(0, 3);
+  assert.equal(tasks.length, 3);
+  await db.insert(proposalsTable).values(tasks.map((task) => ({
+    id: randomUUID(),
+    projectId: session.projectId,
+    taskId: task.id,
+    mode: "demo",
+    requestedModel: "demo-simulator-v1",
+    returnedModel: "demo-simulator-v1",
+    label: "supported",
+    labelProbability: "0.9",
+    probabilities: { supported: 0.9, contradicted: 0.05, insufficient_evidence: 0.05 },
+    injectionProbability: "0.01",
+    complexity: 1,
+    confidence: "0.9",
+    latencyMs: 1,
+    rawResponse: {},
+  })));
+  await db.update(tasksTable).set({ status: "proposed" })
+    .where(eq(tasksTable.projectId, session.projectId));
+  const body = { taskId: tasks[0].id, version: tasks[0].version, action: "accept" };
+  const originalMetrics = await (await request("/reviewflow/metrics", { session })).json();
+  const originalEvents = await db.select().from(eventsTable)
+    .where(eq(eventsTable.projectId, session.projectId));
+  const [originalTask] = await db.select().from(tasksTable).where(eq(tasksTable.id, tasks[0].id));
+
+  // Use raw JSON for overflow exponents: JSON.stringify would replace Infinity
+  // and NaN with null, missing the non-finite-number path in the HTTP parser.
+  const invalidValues = [
+    undefined, "-999999", "-1", "0.5", "7200001", "1e15", "1e309", "-1e309",
+    "null", '"100"', '""', "true", "false", "[]", "{}",
+  ];
+  for (const value of invalidValues) {
+    const rawBody = `${JSON.stringify(body).slice(0, -1)}${value === undefined ? "" : `,"activeMs":${value}`}}`;
+    const response = await request("/reviewflow/reviews", { session, method: "POST", rawBody });
+    assert.equal(response.status, 400, `activeMs=${value} must be rejected`);
+    assert.match(response.headers.get("content-type") ?? "", /application\/json/);
+    assert.ok((await response.json() as { error: string }).error);
+  }
+  const [unchangedTask] = await db.select().from(tasksTable).where(eq(tasksTable.id, tasks[0].id));
+  assert.deepEqual(unchangedTask, originalTask);
+  assert.deepEqual(await db.select().from(reviewsTable)
+    .where(eq(reviewsTable.projectId, session.projectId)), []);
+  assert.deepEqual(await db.select().from(eventsTable)
+    .where(eq(eventsTable.projectId, session.projectId)), originalEvents);
+  assert.deepEqual(await (await request("/reviewflow/metrics", { session })).json(), originalMetrics);
+  const next = await request("/reviewflow/review/next", { session });
+  assert.equal(next.status, 200);
+  assert.ok((await next.json() as { task: unknown }).task);
+
+  const validValues = [0, 1, 7_200_000];
+  for (const [index, activeMs] of validValues.entries()) {
+    const response = await request("/reviewflow/reviews", {
+      session,
+      method: "POST",
+      body: { ...body, taskId: tasks[index].id, version: tasks[index].version, activeMs },
+    });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json() as { status: string }).status, "finalized");
+  }
+  const stored = await db.select().from(reviewsTable)
+    .where(eq(reviewsTable.projectId, session.projectId));
+  assert.deepEqual(stored.map((review) => review.activeMs).sort((a, b) => a - b), validValues);
+  const metrics = await (await request("/reviewflow/metrics", { session })).json() as { averageReviewMs: number };
+  assert.equal(metrics.averageReviewMs, validValues.reduce((sum, value) => sum + value, 0) / validValues.length);
 });
 
 test("concurrent audit decisions and adjudications each produce one committed event", async () => {
