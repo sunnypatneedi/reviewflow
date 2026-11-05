@@ -246,7 +246,7 @@ export function aggregateObservability(
       latency:
         "Successful persisted evaluation proposals only; live is measured, demo is simulated. Failed attempts and routing-advice calls are excluded. Token totals are partial when coverage is incomplete.",
       queue:
-        "All retained evaluation jobs in all modes. Oldest age is since job creation, including retries. Expired leases signal reclaimable work, not proof of worker failure.",
+        "All retained evaluation jobs in all modes. Retry counts describe each job's current attempt cycle. Manual requeue resets attempts; these are not lifetime attempts or billed calls. Oldest age is since job creation, including retries. Expired leases signal reclaimable work, not proof of worker failure.",
       unavailable:
         "N/A: no complete effort instrumentation, pricing/currency records, validated independent quality estimate or comparable baseline. No benchmark claim.",
     },

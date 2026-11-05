@@ -63,42 +63,81 @@ export function startOwned(
   );
   return ownership;
 }
-export async function stopChildren(children) {
+// Call only with detached children created by this supervisor. Their PID is
+// also the owned process-group ID, which remains valid while descendants live.
+const cleanupByChild = new WeakMap();
+export async function stopChildren(
+  children,
+  { graceMs = 4000, killWaitMs = 1000 } = {},
+) {
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   await Promise.all(
-    children.map(async (child) => {
-      if (child.exitCode !== null || child.signalCode !== null) return;
-      const exited = new Promise((resolve) => child.once("exit", resolve));
-      try {
-        child.kill("SIGTERM");
-      } catch {}
-      let timer;
-      await Promise.race([
-        exited,
-        new Promise((resolve) => {
-          timer = setTimeout(() => {
-            try {
-              process.kill(-child.pid, "SIGKILL");
-            } catch {}
-            resolve();
-          }, 4000);
-        }),
-      ]);
-      clearTimeout(timer);
-      await exited;
+    children.map((child) => {
+      if (cleanupByChild.has(child)) return cleanupByChild.get(child);
+      const cleanup = (async () => {
+        const pid = child.pid;
+        // spawn errors have no PID. Never turn an absent PID into a group signal.
+        if (!Number.isSafeInteger(pid) || pid <= 1 || pid === process.pid)
+          return;
+        const signalGroup = (signal) => {
+          try {
+            process.kill(-pid, signal);
+            return true;
+          } catch (error) {
+            if (error.code === "ESRCH") return false;
+            throw error;
+          }
+        };
+        if (!signalGroup(0)) return;
+        const directAlive = () =>
+          child.exitCode === null && child.signalCode === null;
+        const deadline = Date.now() + graceMs;
+        if (directAlive()) child.kill("SIGTERM");
+        // Give the service itself time to close its workers cleanly. Do not confuse
+        // the parent's exit with the disappearance of its entire process group.
+        let descendantsNotified = false;
+        while (Date.now() < deadline) {
+          if (!signalGroup(0)) return;
+          if (!directAlive() && !descendantsNotified) {
+            if (!signalGroup("SIGTERM")) return;
+            descendantsNotified = true;
+          }
+          await sleep(Math.min(25, Math.max(1, deadline - Date.now())));
+        }
+        if (!signalGroup("SIGKILL")) return;
+        // Reaping is asynchronous and orphan zombies may briefly retain the group.
+        // Cleanup must remain bounded even if the OS delays reaping a descendant.
+        const killDeadline = Date.now() + killWaitMs;
+        while (Date.now() < killDeadline) {
+          if (!signalGroup(0)) return;
+          await sleep(Math.min(25, Math.max(1, killDeadline - Date.now())));
+        }
+      })();
+      cleanupByChild.set(child, cleanup);
+      return cleanup;
     }),
   );
 }
+
 async function command(args, env, children, fail) {
   const child = spawn("pnpm", args, { env, stdio: "inherit", detached: true });
   children.push(child);
-  await new Promise((resolve, reject) => {
-    child.once("error", reject);
-    child.once("exit", (code) =>
-      code === 0
-        ? resolve()
-        : reject(new Error(`pnpm ${args.join(" ")} failed (${code})`)),
-    );
-  });
+  try {
+    await new Promise((resolve, reject) => {
+      child.once("error", reject);
+      child.once("exit", (code) =>
+        code === 0
+          ? resolve()
+          : reject(new Error(`pnpm ${args.join(" ")} failed (${code})`)),
+      );
+    });
+  } finally {
+    // Reap a build command's descendants immediately, rather than retaining its
+    // old process-group ID throughout a potentially long-lived app session.
+    await stopChildren([child]);
+    const index = children.indexOf(child);
+    if (index !== -1) children.splice(index, 1);
+  }
 }
 async function main() {
   // Validate the actual cluster owned by our wrapper, not just a naming convention.

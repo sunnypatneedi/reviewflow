@@ -115,3 +115,99 @@ test("early child exit fails ownership readiness", async () => {
   await stopChildren(children);
   assert.match(failure.message, /exited/);
 });
+
+// These processes are synthetic, detached, and created exclusively by this test.
+async function descendantFixture({
+  parentExits = false,
+  ignoreTerm = false,
+} = {}) {
+  const { spawn } = await import("node:child_process");
+  const script = `
+    const { spawn } = require('node:child_process');
+    const grandchild = spawn(process.execPath, ['-e', ${JSON.stringify(`
+      ${ignoreTerm ? "process.on('SIGTERM', () => {});" : ""}
+      process.send({ ready: true });
+      setInterval(() => {}, 1000);
+    `)}], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
+    grandchild.once('message', () => {
+      process.send({ pid: grandchild.pid }, () => {
+        ${parentExits ? "process.exit(0);" : "process.on('SIGTERM', () => process.exit(0)); setInterval(() => {}, 1000);"}
+      });
+    });
+  `;
+  const parent = spawn(process.execPath, ["-e", script], {
+    detached: true,
+    stdio: ["ignore", "ignore", "ignore", "ipc"],
+  });
+  const exit = new Promise((resolve) => parent.once("exit", resolve));
+  const grandchild = await new Promise((resolve, reject) => {
+    parent.once("error", reject);
+    parent.once("message", (message) => resolve(message.pid));
+  });
+  if (parentExits) await exit;
+  return { parent, grandchild };
+}
+function processExists(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (error.code === "ESRCH") return false;
+    throw error;
+  }
+}
+async function assertGone(pid) {
+  const end = Date.now() + 2000;
+  while (processExists(pid) && Date.now() < end)
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.equal(
+    processExists(pid),
+    false,
+    `Synthetic descendant ${pid} survived cleanup`,
+  );
+}
+for (const parentExits of [false, true]) {
+  test(`cleanup removes owned grandchild when parent ${parentExits ? "already exited" : "exits during shutdown"}`, async () => {
+    const { parent, grandchild } = await descendantFixture({ parentExits });
+    assert.equal(processExists(grandchild), true);
+    try {
+      await stopChildren([parent], { graceMs: 250, killWaitMs: 500 });
+      await assertGone(grandchild);
+    } finally {
+      try {
+        process.kill(-parent.pid, "SIGKILL");
+      } catch {}
+    }
+  });
+}
+test("cleanup escalates TERM-ignoring descendants within a bounded interval", async () => {
+  const { parent, grandchild } = await descendantFixture({
+    parentExits: true,
+    ignoreTerm: true,
+  });
+  try {
+    const start = Date.now();
+    await stopChildren([parent], { graceMs: 150, killWaitMs: 500 });
+    assert.ok(
+      Date.now() - start < 1500,
+      "cleanup exceeded its bounded grace period",
+    );
+    await assertGone(grandchild);
+  } finally {
+    try {
+      process.kill(-parent.pid, "SIGKILL");
+    } catch {}
+  }
+});
+test("spawn error and absent PIDs are safe to clean up", async () => {
+  const { spawn } = await import("node:child_process");
+  const child = spawn("/definitely-absent-reviewflow-test-command", [], {
+    detached: true,
+  });
+  await new Promise((resolve) => child.once("error", resolve));
+  assert.equal(child.pid, undefined);
+  await stopChildren([child, { pid: 0 }, { pid: -1 }, { pid: process.pid }], {
+    graceMs: 10,
+    killWaitMs: 10,
+  });
+});

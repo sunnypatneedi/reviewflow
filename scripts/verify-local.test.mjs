@@ -27,7 +27,10 @@ test("local gate discards inherited databases and provider credentials", () => {
       REVIEWFLOW_TEST_PGPORT: "5432",
       CLERK_SECRET_KEY: "secret",
       JEV_API_KEY: "secret",
+      TYPESAFE_API_KEY: "synthetic-credential-must-not-reach-tests",
       OPENAI_API_KEY: "secret",
+      UNKNOWN_PROVIDER_TOKEN: "synthetic-credential-must-not-reach-tests",
+      NODE_OPTIONS: "--require=/untrusted-module",
       VITE_CLERK_PUBLISHABLE_KEY: "other",
       SESSION_SECRET: "secret",
       REVIEWFLOW_CHROMIUM_PATH: "/browser",
@@ -40,7 +43,10 @@ test("local gate discards inherited databases and provider credentials", () => {
   assert.equal(env.REVIEWFLOW_TEST_PGPORT, undefined);
   assert.equal(env.CLERK_SECRET_KEY, undefined);
   assert.equal(env.JEV_API_KEY, undefined);
+  assert.equal(env.TYPESAFE_API_KEY, undefined);
   assert.equal(env.OPENAI_API_KEY, undefined);
+  assert.equal(env.UNKNOWN_PROVIDER_TOKEN, undefined);
+  assert.equal(env.NODE_OPTIONS, undefined);
   assert.equal(env.VITE_CLERK_PUBLISHABLE_KEY, undefined);
   assert.equal(env.SESSION_SECRET, undefined);
   assert.equal(env.REVIEWFLOW_CHROMIUM_PATH, "/browser");

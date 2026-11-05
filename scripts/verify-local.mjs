@@ -30,14 +30,26 @@ export const localVerificationStages = [
 ];
 
 export function verificationEnvironment(source, folder) {
-  const env = { ...source };
-  for (const name of Object.keys(env)) {
-    if (
-      /^(?:DATABASE_URL|REVIEWFLOW_(?:MIGRATION|DISPOSABLE|ISOLATED|TEST_|E2E_|BASE_URL|PUBLIC_LISTEN|HOST)|CLERK_|VITE_CLERK_|JEV_|OPENAI_|SESSION_SECRET|LIVE_INFERENCE_ENABLED|APP_MODE|NODE_ENV|TRUSTED_ORIGINS|PORT$|WORKER_PORT$)/.test(
-        name,
-      )
-    )
-      delete env[name];
+  // Allowlist rather than guessing every provider's credential prefix. In
+  // particular, the real Jev adapter uses TYPESAFE_API_KEY, not JEV_API_KEY.
+  const env = {};
+  for (const name of [
+    "PATH",
+    "HOME",
+    "TMPDIR",
+    "TMP",
+    "TEMP",
+    "LANG",
+    "LC_ALL",
+    "TERM",
+    "SYSTEMROOT",
+    "CI",
+    "NO_COLOR",
+    "FORCE_COLOR",
+    "REVIEWFLOW_CHROMIUM_PATH",
+    "PLAYWRIGHT_BROWSERS_PATH",
+  ]) {
+    if (typeof source[name] === "string") env[name] = source[name];
   }
   return {
     ...env,

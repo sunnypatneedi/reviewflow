@@ -63,6 +63,8 @@ a conversion funnel or independently proven accuracy.
 
 The dashboard shows queue states, delayed work, retries and expired/missing leases,
 plus separate live-measured and demo-simulated proposal latency and recorded tokens.
+Retry counters describe current job attempt cycles; manual requeue resets them.
+They are not lifetime invocation or billing counters.
 It is not a historical alerting/uptime system. Database reachability at snapshot time
 does not prove worker or provider health. Local launch readiness checks the actual
 owned API and worker separately.

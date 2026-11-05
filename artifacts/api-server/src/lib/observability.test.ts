@@ -30,6 +30,31 @@ test("empty is zero volume, unknown measurement; no invented costs or baseline",
   assert.equal(result.operations.live.inputTokens, null);
   assert.equal(result.operations.queue.oldestActiveAgeMs, null);
 });
+test("manual requeue resets the observed retry cycle, not a lifetime billing ledger", () => {
+  const rows = empty();
+  rows.jobs = [
+    {
+      status: "failed",
+      attempts: 3,
+      createdAt: past,
+      availableAt: past,
+      leaseExpiresAt: null,
+    },
+  ];
+  assert.equal(
+    aggregateObservability(rows, now).operations.queue.retryAttempts,
+    2,
+  );
+  rows.jobs[0] = { ...rows.jobs[0], status: "queued", attempts: 0 };
+  const result = aggregateObservability(rows, now);
+  assert.equal(result.operations.queue.retryAttempts, 0);
+  assert.equal(result.operations.queue.retriedJobs, 0);
+  assert.match(result.definitions.queue, /Manual requeue resets attempts/);
+  assert.match(
+    result.definitions.queue,
+    /not lifetime attempts or billed calls/,
+  );
+});
 test("stage, release and correction denominators have explicit deduplication", () => {
   const rows = empty();
   rows.tasks = [

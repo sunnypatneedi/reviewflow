@@ -268,8 +268,14 @@ export default function Observability() {
                   items={[
                     ["Ready to claim", number(ops.queue.ready)],
                     ["Delayed", number(ops.queue.delayed)],
-                    ["Retried jobs", number(ops.queue.retriedJobs)],
-                    ["Retry attempts", number(ops.queue.retryAttempts)],
+                    [
+                      "Jobs retried in current cycle",
+                      number(ops.queue.retriedJobs),
+                    ],
+                    [
+                      "Current-cycle retry attempts",
+                      number(ops.queue.retryAttempts),
+                    ],
                     ["Missing leases", number(ops.queue.missingLeases)],
                     ["Unknown job status", number(ops.queue.unknown)],
                   ]}
