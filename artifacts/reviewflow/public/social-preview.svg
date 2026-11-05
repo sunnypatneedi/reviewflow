@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#F8FAFC"/>
+  <rect width="16" height="630" fill="#1E3A8A"/>
+  <rect x="80" y="72" width="64" height="64" rx="16" fill="#1E3A8A"/>
+  <path d="m97 104 10 10 21-23" fill="none" stroke="#FFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <g font-family="DejaVu Sans, sans-serif">
+    <text x="164" y="118" font-size="38" font-weight="bold" fill="#0F172A">ReviewFlow</text>
+    <text x="80" y="254" font-size="54" font-weight="bold" fill="#0F172A">Evidence-grounded</text>
+    <text x="80" y="324" font-size="54" font-weight="bold" fill="#0F172A">review.</text>
+    <text x="80" y="388" font-size="25" fill="#475569">An experimental human-in-the-loop workflow</text>
+    <text x="80" y="427" font-size="25" fill="#475569">for synthetic evidence-grounding tasks.</text>
+    <rect x="80" y="500" width="1040" height="66" rx="12" fill="#1E3A8A"/>
+    <g font-size="23" fill="#FFF" text-anchor="middle">
+      <text x="250" y="542">AI proposals</text>
+      <text x="600" y="542">Human review</text>
+      <text x="950" y="542">Immutable releases</text>
+    </g>
+  </g>
+  <g fill="none" stroke="#BFDBFE" stroke-width="3">
+    <path d="M430 533h40m-9-9 9 9-9 9"/>
+    <path d="M770 533h40m-9-9 9 9-9 9"/>
+  </g>
+  <g transform="translate(896 200)">
+    <rect x="0" y="0" width="200" height="230" rx="20" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="2"/>
+    <rect x="28" y="35" width="100" height="12" rx="6" fill="#1E3A8A"/>
+    <g fill="#CBD5E1">
+      <rect x="28" y="70" width="144" height="9" rx="4"/>
+      <rect x="28" y="94" width="120" height="9" rx="4"/>
+      <rect x="28" y="118" width="136" height="9" rx="4"/>
+    </g>
+    <circle cx="145" cy="182" r="29" fill="#1E3A8A"/>
+    <path d="m131 182 10 10 19-21" fill="none" stroke="#FFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
