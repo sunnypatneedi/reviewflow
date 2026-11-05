@@ -8,7 +8,7 @@
     "db:migrate": "pnpm --filter @workspace/db run migrate",
     "demo:isolated": "sh scripts/demo-isolated.sh",
     "dev:proxy": "node scripts/same-origin-proxy.mjs",
-    "test": "pnpm --filter @workspace/api-server run test",
+    "test": "pnpm --filter @workspace/api-server run test && pnpm --filter @workspace/reviewflow run test",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "verify:isolated": "sh scripts/verify-isolated.sh",

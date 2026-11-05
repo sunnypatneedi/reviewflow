@@ -404,9 +404,14 @@ test("concurrent live admission is bounded atomically and rejection does not swi
     eq(jobsTable.status, "queued"),
   ));
   assert.equal(active.length, 25);
+  // Which of the two racers was rejected is nondeterministic; only an
+  // over-capacity *new* task is guaranteed to return null without flipping mode.
+  const activeTaskIds = new Set(active.map((job) => job.taskId));
+  const rejectedRacer = [taskRows[24], taskRows[25]].find((task) => !activeTaskIds.has(task.id));
+  assert.ok(rejectedRacer);
 
   await db.update(projectsTable).set({ mode: "demo" }).where(eq(projectsTable.id, project.id));
-  assert.equal(await enqueueLiveJobsWithProjectLock(project.id, [taskRows[25].id]), null);
+  assert.equal(await enqueueLiveJobsWithProjectLock(project.id, [rejectedRacer.id]), null);
   const [unchangedProject] = await db.select().from(projectsTable).where(eq(projectsTable.id, project.id));
   assert.equal(unchangedProject.mode, "demo");
 });
