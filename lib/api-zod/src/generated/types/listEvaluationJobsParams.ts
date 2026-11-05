@@ -8,11 +8,11 @@
 import type { ListEvaluationJobsMode } from './listEvaluationJobsMode';
 
 export type ListEvaluationJobsParams = {
-/**
- * Task IDs in the selected evaluation batch.
- * @minItems 1
- * @maxItems 200
- */
-taskIds: string[];
-mode?: ListEvaluationJobsMode;
+  /**
+   * Task IDs in the selected evaluation batch.
+   * @minItems 1
+   * @maxItems 200
+   */
+  taskIds: string[];
+  mode?: ListEvaluationJobsMode;
 };

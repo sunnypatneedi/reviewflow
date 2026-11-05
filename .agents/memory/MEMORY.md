@@ -1,3 +1,4 @@
 - [Raw SQL claim rows](raw-sql-claim-aliases.md) — Drizzle raw SQL results need explicit quoted camelCase aliases before use as typed rows.
 - [ReviewFlow request identity](reviewflow-request-identity.md) — initialize the demo identity on the request before route handlers reuse it.
 - [Alpha source release](alpha-release-boundary.md) — sanitized public root, private working history, and disposable-only verification.
+- [Codegen version inference](codegen-version-inference.md) — Orval cannot infer consumer versions from sibling workspace dependencies.

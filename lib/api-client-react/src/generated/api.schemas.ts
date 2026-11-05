@@ -195,6 +195,49 @@ export interface EvaluateResult {
 }
 
 export type EvaluationRetryInputMode = typeof EvaluationRetryInputMode[keyof typeof EvaluationRetryInputMode];
+
+
+export const EvaluationRetryInputMode = {
+  demo: 'demo',
+  live: 'live',
+} as const;
+
+export interface EvaluationRetryInput {
+  taskId: string;
+  mode: EvaluationRetryInputMode;
+  ownerConsent: boolean;
+}
+
+export type EvaluationJobMode = typeof EvaluationJobMode[keyof typeof EvaluationJobMode];
+
+
+export const EvaluationJobMode = {
+  demo: 'demo',
+  live: 'live',
+} as const;
+
+export type EvaluationJobStatus = typeof EvaluationJobStatus[keyof typeof EvaluationJobStatus];
+
+
+export const EvaluationJobStatus = {
+  queued: 'queued',
+  running: 'running',
+  succeeded: 'succeeded',
+  failed: 'failed',
+} as const;
+
+export interface EvaluationJob {
+  id: string;
+  taskId: string;
+  mode: EvaluationJobMode;
+  status: EvaluationJobStatus;
+  attempts: number;
+  /** @nullable */
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ReviewItem {
   task: Task;
   routingReasons: string[];
@@ -317,35 +360,62 @@ export interface AuditInput {
   independent: boolean;
   required: boolean;
 }
-export type BootstrapMode = typeof BootstrapMode[keyof typeof BootstrapMode];
 
-
-export const BootstrapMode = {
-  demo: 'demo',
-  live: 'live',
-} as const;
-
-export interface Bootstrap {
-  projectName: string;
-  mode: BootstrapMode;
-  liveCredentialConfigured: boolean;
-  providerModel: string;
-  shadowPolicyVersion: string;
-  metrics: Metrics;
-  tasks: Task[];
-  releases: Release[];
+export interface AuditDecisionInput {
+  auditItemId: string;
+  label: Label;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  reason?: string | null;
 }
 
-export type ListEvaluationJobsParams = {
-/**
- * Task IDs in the selected evaluation batch.
- * @minItems 1
- * @maxItems 200
- */
-taskIds: string[];
-mode?: ListEvaluationJobsMode;
-};
+export interface AuditDecisionResult {
+  id: string;
+  auditId: string;
+  auditItemId: string;
+  taskId: string;
+  label: Label;
+  selfCheck: boolean;
+  included: boolean;
+  /** @nullable */
+  disputeId?: string | null;
+  status: string;
+}
 
+export interface AuditTaskDecision {
+  label: Label;
+  /** @nullable */
+  reason?: string | null;
+  selfCheck: boolean;
+  included: boolean;
+}
+
+export interface AuditItem {
+  id: string;
+  ordinal: number;
+  taskId: string;
+  externalId: string;
+  question: string;
+  evidence: string;
+  candidateAnswer: string;
+  risk: Risk;
+  /** @nullable */
+  decision: AuditTaskDecision | null;
+}
+
+export interface AuditDisputeSummary {
+  id: string;
+  auditItemId: string;
+  taskId: string;
+  status: string;
+}
+
+export type AuditDetail = Audit & {
+  items: AuditItem[];
+  disputes: AuditDisputeSummary[];
+};
 
 export interface AuditAdjudicationDispute {
   id: string;
@@ -358,14 +428,6 @@ export interface AuditAdjudicationDispute {
   evidence: string;
   candidateAnswer: string;
   resolvedLabel: Label;
-}
-
-export interface AuditTaskDecision {
-  label: Label;
-  /** @nullable */
-  reason?: string | null;
-  selfCheck: boolean;
-  included: boolean;
 }
 
 export type AuditAdjudicationDetail = Audit & {
@@ -393,96 +455,40 @@ export interface AuditDispute {
   adjudicatorId: string;
 }
 
-export interface AuditDecisionResult {
-  id: string;
-  auditId: string;
-  auditItemId: string;
-  taskId: string;
-  label: Label;
-  selfCheck: boolean;
-  included: boolean;
-  /** @nullable */
-  disputeId?: string | null;
-  status: string;
+export type BootstrapMode = typeof BootstrapMode[keyof typeof BootstrapMode];
+
+
+export const BootstrapMode = {
+  demo: 'demo',
+  live: 'live',
+} as const;
+
+export interface Bootstrap {
+  projectName: string;
+  mode: BootstrapMode;
+  liveCredentialConfigured: boolean;
+  providerModel: string;
+  shadowPolicyVersion: string;
+  metrics: Metrics;
+  tasks: Task[];
+  releases: Release[];
 }
 
-export interface AuditDecisionInput {
-  auditItemId: string;
-  label: Label;
+export type ListEvaluationJobsParams = {
   /**
-     * @maxLength 2000
-     * @nullable
-     */
-  reason?: string | null;
-}
-
-export interface AuditDisputeSummary {
-  id: string;
-  auditItemId: string;
-  taskId: string;
-  status: string;
-}
-
-export type AuditDetail = Audit & {
-  items: AuditItem[];
-  disputes: AuditDisputeSummary[];
+   * Task IDs in the selected evaluation batch.
+   * @minItems 1
+   * @maxItems 200
+   */
+  taskIds: string[];
+  mode?: ListEvaluationJobsMode;
 };
 
-export interface AuditItem {
-  id: string;
-  ordinal: number;
-  taskId: string;
-  externalId: string;
-  question: string;
-  evidence: string;
-  candidateAnswer: string;
-  risk: Risk;
-  /** @nullable */
-  decision: AuditTaskDecision | null;
-}
+export type ListEvaluationJobsMode = typeof ListEvaluationJobsMode[keyof typeof ListEvaluationJobsMode];
 
-export const EvaluationRetryInputMode = {
-  demo: 'demo',
-  live: 'live',
-} as const;
-
-export const EvaluationJobStatus = {
-  queued: 'queued',
-  running: 'running',
-  succeeded: 'succeeded',
-  failed: 'failed',
-} as const;
-
-export const EvaluationJobMode = {
-  demo: 'demo',
-  live: 'live',
-} as const;
-
-export type EvaluationJobStatus = typeof EvaluationJobStatus[keyof typeof EvaluationJobStatus];
 
 export const ListEvaluationJobsMode = {
   demo: 'demo',
   live: 'live',
 } as const;
 
-export interface EvaluationJob {
-  id: string;
-  taskId: string;
-  mode: EvaluationJobMode;
-  status: EvaluationJobStatus;
-  attempts: number;
-  /** @nullable */
-  lastError: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type EvaluationJobMode = typeof EvaluationJobMode[keyof typeof EvaluationJobMode];
-
-export interface EvaluationRetryInput {
-  taskId: string;
-  mode: EvaluationRetryInputMode;
-  ownerConsent: boolean;
-}
-
-export type ListEvaluationJobsMode = typeof ListEvaluationJobsMode[keyof typeof ListEvaluationJobsMode];

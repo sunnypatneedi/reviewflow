@@ -41,7 +41,7 @@ packages:
   - scripts
 
 catalog:
-  '@tailwindcss/vite': ^4.1.14
+  '@tailwindcss/vite': ^4.3.4
   '@tanstack/react-query': ^5.90.21
   '@types/node': ^25.3.3
   '@types/react': ^19.2.0
@@ -59,9 +59,9 @@ catalog:
   tailwind-merge: ^3.3.1
   tailwindcss: ^4.1.14
   tsx: ^4.21.0
-  vite: ^7.3.2
+  vite: ^7.3.7
   wouter: ^3.3.5
-  zod: ^3.25.76
+  zod: ^4.6.7
 
 autoInstallPeers: false
 
@@ -157,3 +157,5 @@ overrides:
   esbuild: "0.28.2"
   # orval pins js-yaml to an exact version older than the CVE fix (>=4.3.2)
   js-yaml: '4.3.2'
+  # Typography's latest release still pins the vulnerable 6.0.10 parser.
+  '@tailwindcss/typography>postcss-selector-parser': '^6.1.5'
