@@ -6,10 +6,10 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type ListEvaluationJobsMode = typeof ListEvaluationJobsMode[keyof typeof ListEvaluationJobsMode];
-
+export type ListEvaluationJobsMode =
+  (typeof ListEvaluationJobsMode)[keyof typeof ListEvaluationJobsMode];
 
 export const ListEvaluationJobsMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;

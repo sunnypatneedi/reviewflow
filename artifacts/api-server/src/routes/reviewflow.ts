@@ -6,6 +6,7 @@ import { issueCollaborationTicket } from "../lib/collaboration";
 import { createHash, randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response as ExpressResponse } from "express";
 import { getAuth } from "@clerk/express";
+import { SubmitReviewBody } from "@workspace/api-zod";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import {
   blindAuditTask,
@@ -660,9 +661,14 @@ router.get("/reviewflow/review/next", async (req, res): Promise<void> => {
 });
 
 router.post("/reviewflow/reviews", async (req, res): Promise<void> => {
+  const parsed = SubmitReviewBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid review submission", details: parsed.error.issues });
+    return;
+  }
   const context = await ensureProject(req);
   const { project } = context;
-  const { taskId, version, action, correctedLabel, reason, evidenceExcerpt, activeMs } = req.body ?? {};
+  const { taskId, version, action, correctedLabel, reason, evidenceExcerpt, activeMs } = parsed.data;
   const [task] = await db.select().from(tasksTable).where(and(eq(tasksTable.id, taskId),eq(tasksTable.projectId,project.id)));
   const proposals = await db.select().from(proposalsTable).where(and(
     eq(proposalsTable.taskId, taskId), eq(proposalsTable.projectId, project.id),
@@ -674,7 +680,7 @@ router.post("/reviewflow/reviews", async (req, res): Promise<void> => {
   if (reason != null && (typeof reason !== "string" || reason.length > 2000)) { res.status(400).json({ error:"Reason must be text of at most 2000 characters" }); return; }
   if (evidenceExcerpt != null && typeof evidenceExcerpt !== "string") { res.status(400).json({ error:"Evidence excerpt must be text" }); return; }
   if (!Number.isSafeInteger(activeMs) || activeMs < 0 || activeMs > 7 * 86400_000) { res.status(400).json({ error:"Invalid active review time" }); return; }
-  if (["correct", "label"].includes(action) && (!LABELS.includes(correctedLabel) || !reason?.trim())) { res.status(400).json({ error:"Human labels and corrections require a label and reason" }); return; }
+  if (["correct", "label"].includes(action) && (typeof correctedLabel !== "string" || !LABELS.includes(correctedLabel) || !reason?.trim())) { res.status(400).json({ error:"Human labels and corrections require a label and reason" }); return; }
   if (["accept", "correct"].includes(action) && !proposal) { res.status(409).json({ error:"No proposal exists to accept or correct. Record a human label instead." }); return; }
   if (action === "escalate" && !reason?.trim()) { res.status(400).json({ error:"Escalations require a reason" }); return; }
   if (task.status === "finalized") { res.status(409).json({ error:"This task already has a final decision" }); return; }

@@ -6,10 +6,10 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type EvaluateResultMode = typeof EvaluateResultMode[keyof typeof EvaluateResultMode];
-
+export type EvaluateResultMode =
+  (typeof EvaluateResultMode)[keyof typeof EvaluateResultMode];
 
 export const EvaluateResultMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;

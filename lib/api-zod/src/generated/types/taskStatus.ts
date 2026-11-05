@@ -6,13 +6,12 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type TaskStatus = typeof TaskStatus[keyof typeof TaskStatus];
-
+export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
 
 export const TaskStatus = {
-  pending: 'pending',
-  proposed: 'proposed',
-  in_review: 'in_review',
-  escalated: 'escalated',
-  finalized: 'finalized',
+  pending: "pending",
+  proposed: "proposed",
+  in_review: "in_review",
+  escalated: "escalated",
+  finalized: "finalized",
 } as const;

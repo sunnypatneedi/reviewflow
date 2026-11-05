@@ -5,11 +5,11 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { Proposal } from './proposal';
-import type { Risk } from './risk';
-import type { TaskFinalLabel } from './taskFinalLabel';
-import type { TaskMode } from './taskMode';
-import type { TaskStatus } from './taskStatus';
+import type { Proposal } from "./proposal";
+import type { Risk } from "./risk";
+import type { TaskFinalLabel } from "./taskFinalLabel";
+import type { TaskMode } from "./taskMode";
+import type { TaskStatus } from "./taskStatus";
 
 export interface Task {
   id: string;

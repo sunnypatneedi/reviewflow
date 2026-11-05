@@ -6,8 +6,8 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type FactoryPolicySchemaVersion = typeof FactoryPolicySchemaVersion[keyof typeof FactoryPolicySchemaVersion];
-
+export type FactoryPolicySchemaVersion =
+  (typeof FactoryPolicySchemaVersion)[keyof typeof FactoryPolicySchemaVersion];
 
 export const FactoryPolicySchemaVersion = {
   NUMBER_1: 1,

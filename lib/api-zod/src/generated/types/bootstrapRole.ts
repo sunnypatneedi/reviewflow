@@ -6,14 +6,13 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type BootstrapRole = typeof BootstrapRole[keyof typeof BootstrapRole];
-
+export type BootstrapRole = (typeof BootstrapRole)[keyof typeof BootstrapRole];
 
 export const BootstrapRole = {
-  owner: 'owner',
-  reviewer: 'reviewer',
-  adjudicator: 'adjudicator',
-  auditor: 'auditor',
-  exporter: 'exporter',
-  demo: 'demo',
+  owner: "owner",
+  reviewer: "reviewer",
+  adjudicator: "adjudicator",
+  auditor: "auditor",
+  exporter: "exporter",
+  demo: "demo",
 } as const;

@@ -8,14 +8,14 @@
 
 export interface AuditInput {
   /**
-     * @minimum 1
-     * @maximum 200
-     */
+   * @minimum 1
+   * @maximum 200
+   */
   sampleSize: number;
   /**
-     * @maxLength 120
-     * @nullable
-     */
+   * @maxLength 120
+   * @nullable
+   */
   seed?: string | null;
   independent: boolean;
   required: boolean;

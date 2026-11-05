@@ -5,24 +5,24 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { EvaluateInputContextPreparationVersion } from './evaluateInputContextPreparationVersion';
-import type { EvaluateInputMode } from './evaluateInputMode';
-import type { EvaluateInputQuestionVersion } from './evaluateInputQuestionVersion';
-import type { EvaluateInputRequestedModel } from './evaluateInputRequestedModel';
+import type { EvaluateInputContextPreparationVersion } from "./evaluateInputContextPreparationVersion";
+import type { EvaluateInputMode } from "./evaluateInputMode";
+import type { EvaluateInputQuestionVersion } from "./evaluateInputQuestionVersion";
+import type { EvaluateInputRequestedModel } from "./evaluateInputRequestedModel";
 
 export interface EvaluateInput {
   /**
-     * @minItems 1
-     * @maxItems 25
-     */
+   * @minItems 1
+   * @maxItems 25
+   */
   taskIds: string[];
   mode: EvaluateInputMode;
   /**
-     * Stable run identity; changing it requests a separate evaluation without deleting history.
-     * @minLength 1
-     * @maxLength 128
-     * @pattern ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
-     */
+   * Stable run identity; changing it requests a separate evaluation without deleting history.
+   * @minLength 1
+   * @maxLength 128
+   * @pattern ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+   */
   experimentRunId?: string;
   questionVersion?: EvaluateInputQuestionVersion;
   contextPreparationVersion?: EvaluateInputContextPreparationVersion;

@@ -27,17 +27,17 @@ type Session = { cookie: string; projectId: string };
 
 async function request(
   path: string,
-  options: { session?: Session; method?: string; body?: unknown } = {},
+  options: { session?: Session; method?: string; body?: unknown; rawBody?: string } = {},
 ): Promise<Response> {
   return fetch(`${baseUrl}/api${path}`, {
     method: options.method ?? "GET",
     headers: {
       origin: "http://127.0.0.1:5173",
       "x-reviewflow-csrf": "1",
-      ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+      ...(options.body === undefined && options.rawBody === undefined ? {} : { "content-type": "application/json" }),
       ...(options.session ? { cookie: options.session.cookie } : {}),
     },
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: options.rawBody ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
   });
 }
 
@@ -223,6 +223,108 @@ test("HTTP admission errors map Retry-After and existing cookies work at throttl
   }
 });
 
+test("cookie-discarding plain GET floods cannot grow projects or seed tasks past admission limits", async () => {
+  const originalConfig = app.locals.runtimeConfig;
+  const createdProjectIds: string[] = [];
+  const trackProject = (response: Response) => {
+    const cookie = response.headers.get("set-cookie")?.split(";", 1)[0];
+    assert.ok(cookie);
+    const signedValue = decodeURIComponent(cookie.slice(cookie.indexOf("=") + 1));
+    const demoId = /^s:([^.]+)\./.exec(signedValue)?.[1];
+    assert.ok(demoId);
+    createdProjectIds.push(`demo:${demoId}`);
+    return cookie;
+  };
+  const snapshot = async () => ({
+    projects: (await db.select({ id: projectsTable.id }).from(projectsTable)).length,
+    tasks: (await db.select({ id: tasksTable.id }).from(tasksTable)).length,
+  });
+  const initial = await snapshot();
+  const anonymousProjects = await db.select({ id: projectsTable.id })
+    .from(projectsTable).where(isNotNull(projectsTable.demoSessionId));
+  try {
+    app.locals.runtimeConfig = {
+      ...originalConfig,
+      demoProjectCap: anonymousProjects.length + 2,
+      demoProjectCreationWindowMax: anonymousProjects.length + 1,
+      demoProjectCreationWindowSeconds: 3600,
+    };
+    // Deliberately omit Origin, CSRF, and Cookie headers, exactly as in the
+    // reported attack. Native fetch does not retain Set-Cookie between calls.
+    const first = await fetch(`${baseUrl}/api/reviewflow/bootstrap`);
+    assert.equal(first.status, 200);
+    const cookie = trackProject(first);
+    assert.equal((await first.json() as { tasks: unknown[] }).tasks.length, 20);
+    const afterFirst = await snapshot();
+    assert.deepEqual(afterFirst, { projects: initial.projects + 1, tasks: initial.tasks + 20 });
+
+    const flood = async (status: number, code: string) => {
+      const responses = await Promise.all(Array.from({ length: 12 }, (_, i) =>
+        fetch(`${baseUrl}/api/reviewflow/${i % 2 ? "tasks" : "bootstrap"}`, {
+          // Invalid signatures must not bypass admission either.
+          headers: i % 3 ? {} : { cookie: "reviewflow_demo=s:forged.invalid" },
+        })));
+      for (const response of responses) {
+        assert.equal(response.status, status);
+        assert.equal(response.headers.get("set-cookie"), null);
+        assert.equal((await response.json() as { code: string }).code, code);
+        if (status === 429) assert.equal(response.headers.get("retry-after"), "3600");
+      }
+    };
+    await flood(429, "DEMO_CREATION_THROTTLED");
+    assert.deepEqual(await snapshot(), afterFirst);
+
+    // Raise only the window allowance: admit one last project, then verify
+    // the lifetime cap independently prevents continued cookie churn.
+    app.locals.runtimeConfig = {
+      ...app.locals.runtimeConfig,
+      demoProjectCreationWindowMax: anonymousProjects.length + 100,
+    };
+    const last = await fetch(`${baseUrl}/api/reviewflow/tasks`);
+    assert.equal(last.status, 200);
+    trackProject(last);
+    assert.equal((await last.json() as unknown[]).length, 20);
+    await flood(503, "DEMO_PROJECT_CAP_REACHED");
+    assert.deepEqual(await snapshot(), { projects: initial.projects + 2, tasks: initial.tasks + 40 });
+
+    const existing = await fetch(`${baseUrl}/api/reviewflow/bootstrap`, { headers: { cookie } });
+    assert.equal(existing.status, 200);
+    assert.equal((await existing.json() as { tasks: unknown[] }).tasks.length, 20);
+    assert.deepEqual(await snapshot(), { projects: initial.projects + 2, tasks: initial.tasks + 40 });
+  } finally {
+    app.locals.runtimeConfig = originalConfig;
+    // Remove only this test's fixtures so they do not consume the default
+    // creation allowance used by unrelated tests later in this file.
+    for (const projectId of createdProjectIds) {
+      await db.delete(tasksTable).where(eq(tasksTable.projectId, projectId));
+      await db.delete(projectsTable).where(eq(projectsTable.id, projectId));
+    }
+  }
+});
+
+test("concurrent first requests for one demo identity seed exactly once", async () => {
+  const { ensureDemoProject } = await import("./reviewflow");
+  const projects = await db.select({ id: projectsTable.id })
+    .from(projectsTable).where(isNotNull(projectsTable.demoSessionId));
+  const config = {
+    demoProjectCap: projects.length + 1,
+    demoProjectCreationWindowMax: projects.length + 1,
+    demoProjectCreationWindowSeconds: 3600,
+  };
+  const demoId = randomUUID();
+  const projectId = `demo:${demoId}`;
+  try {
+    const results = await Promise.all(Array.from({ length: 6 }, () => ensureDemoProject(demoId, config)));
+    assert.ok(results.every((project) => project.id === projectId));
+    const tasks = await db.select({ id: tasksTable.id })
+      .from(tasksTable).where(eq(tasksTable.projectId, projectId));
+    assert.equal(tasks.length, 20);
+  } finally {
+    await db.delete(tasksTable).where(eq(tasksTable.projectId, projectId));
+    await db.delete(projectsTable).where(eq(projectsTable.id, projectId));
+  }
+});
+
 test("concurrent reviews commit exactly one decision and protect final state and project scope", async () => {
   const session = await createSession();
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, session.projectId));
@@ -273,6 +375,76 @@ test("concurrent reviews commit exactly one decision and protect final state and
     body,
   });
   assert.equal(crossProject.status, 404);
+});
+
+test("review durations are validated before writes and valid boundaries preserve analytics", async () => {
+  const session = await createSession();
+  const tasks = (await db.select().from(tasksTable)
+    .where(eq(tasksTable.projectId, session.projectId))).slice(0, 3);
+  assert.equal(tasks.length, 3);
+  await db.insert(proposalsTable).values(tasks.map((task) => ({
+    id: randomUUID(),
+    projectId: session.projectId,
+    taskId: task.id,
+    mode: "demo",
+    requestedModel: "demo-simulator-v1",
+    returnedModel: "demo-simulator-v1",
+    label: "supported",
+    labelProbability: "0.9",
+    probabilities: { supported: 0.9, contradicted: 0.05, insufficient_evidence: 0.05 },
+    injectionProbability: "0.01",
+    complexity: 1,
+    confidence: "0.9",
+    latencyMs: 1,
+    rawResponse: {},
+  })));
+  await db.update(tasksTable).set({ status: "proposed" })
+    .where(eq(tasksTable.projectId, session.projectId));
+  const body = { taskId: tasks[0].id, version: tasks[0].version, action: "accept" };
+  const originalMetrics = await (await request("/reviewflow/metrics", { session })).json();
+  const originalEvents = await db.select().from(eventsTable)
+    .where(eq(eventsTable.projectId, session.projectId));
+  const [originalTask] = await db.select().from(tasksTable).where(eq(tasksTable.id, tasks[0].id));
+
+  // Use raw JSON for overflow exponents: JSON.stringify would replace Infinity
+  // and NaN with null, missing the non-finite-number path in the HTTP parser.
+  const invalidValues = [
+    undefined, "-999999", "-1", "0.5", "7200001", "1e15", "1e309", "-1e309",
+    "null", '"100"', '""', "true", "false", "[]", "{}",
+  ];
+  for (const value of invalidValues) {
+    const rawBody = `${JSON.stringify(body).slice(0, -1)}${value === undefined ? "" : `,"activeMs":${value}`}}`;
+    const response = await request("/reviewflow/reviews", { session, method: "POST", rawBody });
+    assert.equal(response.status, 400, `activeMs=${value} must be rejected`);
+    assert.match(response.headers.get("content-type") ?? "", /application\/json/);
+    assert.ok((await response.json() as { error: string }).error);
+  }
+  const [unchangedTask] = await db.select().from(tasksTable).where(eq(tasksTable.id, tasks[0].id));
+  assert.deepEqual(unchangedTask, originalTask);
+  assert.deepEqual(await db.select().from(reviewsTable)
+    .where(eq(reviewsTable.projectId, session.projectId)), []);
+  assert.deepEqual(await db.select().from(eventsTable)
+    .where(eq(eventsTable.projectId, session.projectId)), originalEvents);
+  assert.deepEqual(await (await request("/reviewflow/metrics", { session })).json(), originalMetrics);
+  const next = await request("/reviewflow/review/next", { session });
+  assert.equal(next.status, 200);
+  assert.ok((await next.json() as { task: unknown }).task);
+
+  const validValues = [0, 1, 7_200_000];
+  for (const [index, activeMs] of validValues.entries()) {
+    const response = await request("/reviewflow/reviews", {
+      session,
+      method: "POST",
+      body: { ...body, taskId: tasks[index].id, version: tasks[index].version, activeMs },
+    });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json() as { status: string }).status, "finalized");
+  }
+  const stored = await db.select().from(reviewsTable)
+    .where(eq(reviewsTable.projectId, session.projectId));
+  assert.deepEqual(stored.map((review) => review.activeMs).sort((a, b) => a - b), validValues);
+  const metrics = await (await request("/reviewflow/metrics", { session })).json() as { averageReviewMs: number };
+  assert.equal(metrics.averageReviewMs, validValues.reduce((sum, value) => sum + value, 0) / validValues.length);
 });
 
 test("concurrent audit decisions and adjudications each produce one committed event", async () => {

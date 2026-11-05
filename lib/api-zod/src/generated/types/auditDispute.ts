@@ -5,7 +5,7 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { Label } from './label';
+import type { Label } from "./label";
 
 export interface AuditDispute {
   id: string;

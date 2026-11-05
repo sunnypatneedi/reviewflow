@@ -5,33 +5,33 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { ReviewInputAction } from './reviewInputAction';
-import type { ReviewInputCorrectedLabel } from './reviewInputCorrectedLabel';
+import type { ReviewInputAction } from "./reviewInputAction";
+import type { ReviewInputCorrectedLabel } from "./reviewInputCorrectedLabel";
 
 export interface ReviewInput {
   taskId: string;
   version: number;
   action: ReviewInputAction;
   /**
-     * Current fencing token when an active claim exists or claims are required
-     * @nullable
-     */
+   * Current fencing token when an active claim exists or claims are required
+   * @nullable
+   */
   claimToken?: string | null;
   /** @nullable */
   correctedLabel?: ReviewInputCorrectedLabel;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   reason?: string | null;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   evidenceExcerpt?: string | null;
   /**
-     * @minimum 0
-     * @maximum 604800000
-     */
+   * @minimum 0
+   * @maximum 604800000
+   */
   activeMs: number;
 }

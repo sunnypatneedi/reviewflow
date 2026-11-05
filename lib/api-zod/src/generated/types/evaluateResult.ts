@@ -5,7 +5,7 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { EvaluateResultMode } from './evaluateResultMode';
+import type { EvaluateResultMode } from "./evaluateResultMode";
 
 export interface EvaluateResult {
   processed: number;

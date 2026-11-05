@@ -6,10 +6,10 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type FactoryPolicyHighRiskLane = typeof FactoryPolicyHighRiskLane[keyof typeof FactoryPolicyHighRiskLane];
-
+export type FactoryPolicyHighRiskLane =
+  (typeof FactoryPolicyHighRiskLane)[keyof typeof FactoryPolicyHighRiskLane];
 
 export const FactoryPolicyHighRiskLane = {
-  human_review: 'human_review',
-  escalation: 'escalation',
+  human_review: "human_review",
+  escalation: "escalation",
 } as const;

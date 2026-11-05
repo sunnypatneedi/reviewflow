@@ -9,11 +9,11 @@
 /**
  * @nullable
  */
-export type TaskFinalLabel = typeof TaskFinalLabel[keyof typeof TaskFinalLabel] | null;
-
+export type TaskFinalLabel =
+  (typeof TaskFinalLabel)[keyof typeof TaskFinalLabel] | null;
 
 export const TaskFinalLabel = {
-  supported: 'supported',
-  contradicted: 'contradicted',
-  insufficient_evidence: 'insufficient_evidence',
+  supported: "supported",
+  contradicted: "contradicted",
+  insufficient_evidence: "insufficient_evidence",
 } as const;

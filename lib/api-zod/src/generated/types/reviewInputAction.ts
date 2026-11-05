@@ -6,12 +6,12 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type ReviewInputAction = typeof ReviewInputAction[keyof typeof ReviewInputAction];
-
+export type ReviewInputAction =
+  (typeof ReviewInputAction)[keyof typeof ReviewInputAction];
 
 export const ReviewInputAction = {
-  accept: 'accept',
-  correct: 'correct',
-  escalate: 'escalate',
-  label: 'label',
+  accept: "accept",
+  correct: "correct",
+  escalate: "escalate",
+  label: "label",
 } as const;

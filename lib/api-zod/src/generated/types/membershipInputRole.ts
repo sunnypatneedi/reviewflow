@@ -6,14 +6,14 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type MembershipInputRole = typeof MembershipInputRole[keyof typeof MembershipInputRole];
-
+export type MembershipInputRole =
+  (typeof MembershipInputRole)[keyof typeof MembershipInputRole];
 
 export const MembershipInputRole = {
-  owner: 'owner',
-  reviewer: 'reviewer',
-  adjudicator: 'adjudicator',
-  auditor: 'auditor',
-  exporter: 'exporter',
-  revoked: 'revoked',
+  owner: "owner",
+  reviewer: "reviewer",
+  adjudicator: "adjudicator",
+  auditor: "auditor",
+  exporter: "exporter",
+  revoked: "revoked",
 } as const;

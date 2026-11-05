@@ -6,11 +6,10 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type Label = typeof Label[keyof typeof Label];
-
+export type Label = (typeof Label)[keyof typeof Label];
 
 export const Label = {
-  supported: 'supported',
-  contradicted: 'contradicted',
-  insufficient_evidence: 'insufficient_evidence',
+  supported: "supported",
+  contradicted: "contradicted",
+  insufficient_evidence: "insufficient_evidence",
 } as const;

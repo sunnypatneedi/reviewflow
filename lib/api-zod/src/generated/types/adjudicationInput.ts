@@ -5,13 +5,13 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { Label } from './label';
+import type { Label } from "./label";
 
 export interface AdjudicationInput {
   resolvedLabel: Label;
   /**
-     * @maxLength 2000
-     * @nullable
-     */
+   * @maxLength 2000
+   * @nullable
+   */
   reason?: string | null;
 }

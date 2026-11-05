@@ -5,10 +5,10 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { FactoryQueueCounts } from './factoryQueueCounts';
-import type { FactoryQueueFactory } from './factoryQueueFactory';
-import type { FactoryQueueItemsItem } from './factoryQueueItemsItem';
-import type { FactoryQueuePolicy } from './factoryQueuePolicy';
+import type { FactoryQueueCounts } from "./factoryQueueCounts";
+import type { FactoryQueueFactory } from "./factoryQueueFactory";
+import type { FactoryQueueItemsItem } from "./factoryQueueItemsItem";
+import type { FactoryQueuePolicy } from "./factoryQueuePolicy";
 
 export interface FactoryQueue {
   factory: FactoryQueueFactory;

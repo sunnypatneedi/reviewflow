@@ -6,12 +6,12 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type EvaluationJobStatus = typeof EvaluationJobStatus[keyof typeof EvaluationJobStatus];
-
+export type EvaluationJobStatus =
+  (typeof EvaluationJobStatus)[keyof typeof EvaluationJobStatus];
 
 export const EvaluationJobStatus = {
-  queued: 'queued',
-  running: 'running',
-  succeeded: 'succeeded',
-  failed: 'failed',
+  queued: "queued",
+  running: "running",
+  succeeded: "succeeded",
+  failed: "failed",
 } as const;

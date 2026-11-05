@@ -8,9 +8,9 @@
 
 export interface ReleaseInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   name: string;
   includeSourceText: boolean;
   /** Explicit confirmation of actual source-text privacy review; required when includeSourceText is true */

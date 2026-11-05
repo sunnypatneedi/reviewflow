@@ -6,9 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type EvaluateInputQuestionVersion = typeof EvaluateInputQuestionVersion[keyof typeof EvaluateInputQuestionVersion];
-
+export type EvaluateInputQuestionVersion =
+  (typeof EvaluateInputQuestionVersion)[keyof typeof EvaluateInputQuestionVersion];
 
 export const EvaluateInputQuestionVersion = {
-  'evidence-v1': 'evidence-v1',
+  "evidence-v1": "evidence-v1",
 } as const;

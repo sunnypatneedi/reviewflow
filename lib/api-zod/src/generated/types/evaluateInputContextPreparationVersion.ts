@@ -6,9 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type EvaluateInputContextPreparationVersion = typeof EvaluateInputContextPreparationVersion[keyof typeof EvaluateInputContextPreparationVersion];
-
+export type EvaluateInputContextPreparationVersion =
+  (typeof EvaluateInputContextPreparationVersion)[keyof typeof EvaluateInputContextPreparationVersion];
 
 export const EvaluateInputContextPreparationVersion = {
-  'raw-evidence-v1': 'raw-evidence-v1',
+  "raw-evidence-v1": "raw-evidence-v1",
 } as const;

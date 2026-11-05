@@ -11,8 +11,8 @@ export interface FactoryQuarantineInput {
   expectedRevision: number;
   quarantined: boolean;
   /**
-     * @minLength 1
-     * @maxLength 2000
-     */
+   * @minLength 1
+   * @maxLength 2000
+   */
   reason: string;
 }

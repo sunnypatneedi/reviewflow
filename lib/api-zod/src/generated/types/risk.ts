@@ -6,11 +6,10 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type Risk = typeof Risk[keyof typeof Risk];
-
+export type Risk = (typeof Risk)[keyof typeof Risk];
 
 export const Risk = {
-  low: 'low',
-  medium: 'medium',
-  high: 'high',
+  low: "low",
+  medium: "medium",
+  high: "high",
 } as const;

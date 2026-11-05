@@ -5,8 +5,8 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { Audit } from './audit';
-import type { AuditAdjudicationDispute } from './auditAdjudicationDispute';
+import type { Audit } from "./audit";
+import type { AuditAdjudicationDispute } from "./auditAdjudicationDispute";
 
 export type AuditAdjudicationDetail = Audit & {
   disputes: AuditAdjudicationDispute[];

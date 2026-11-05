@@ -10,14 +10,14 @@ export interface FactoryClaimInput {
   /** @minimum 1 */
   expectedVersion: number;
   /**
-     * Current control revision required for explicit owner reassignment
-     * @minimum 0
-     */
+   * Current control revision required for explicit owner reassignment
+   * @minimum 0
+   */
   expectedRevision?: number;
   /**
-     * @minimum 1
-     * @maximum 15
-     */
+   * @minimum 1
+   * @maximum 15
+   */
   minutes?: number;
   /** @nullable */
   claimToken?: string | null;

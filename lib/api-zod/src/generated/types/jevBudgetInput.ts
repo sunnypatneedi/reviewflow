@@ -11,9 +11,9 @@ export interface JevBudgetInput {
   expectedRevision: number;
   enabled: boolean;
   /**
-     * @minimum 0
-     * @maximum 100
-     */
+   * @minimum 0
+   * @maximum 100
+   */
   maxCalls: number;
   ownerConsent?: boolean;
 }

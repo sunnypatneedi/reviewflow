@@ -9,11 +9,12 @@
 /**
  * @nullable
  */
-export type ReviewInputCorrectedLabel = typeof ReviewInputCorrectedLabel[keyof typeof ReviewInputCorrectedLabel] | null;
-
+export type ReviewInputCorrectedLabel =
+  | (typeof ReviewInputCorrectedLabel)[keyof typeof ReviewInputCorrectedLabel]
+  | null;
 
 export const ReviewInputCorrectedLabel = {
-  supported: 'supported',
-  contradicted: 'contradicted',
-  insufficient_evidence: 'insufficient_evidence',
+  supported: "supported",
+  contradicted: "contradicted",
+  insufficient_evidence: "insufficient_evidence",
 } as const;

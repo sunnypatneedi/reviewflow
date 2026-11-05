@@ -6,10 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type BootstrapMode = typeof BootstrapMode[keyof typeof BootstrapMode];
-
+export type BootstrapMode = (typeof BootstrapMode)[keyof typeof BootstrapMode];
 
 export const BootstrapMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;

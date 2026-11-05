@@ -5,12 +5,12 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { TaskInput } from './taskInput';
+import type { TaskInput } from "./taskInput";
 
 export interface TaskImportInput {
   /**
-     * @minItems 1
-     * @maxItems 200
-     */
+   * @minItems 1
+   * @maxItems 200
+   */
   tasks: TaskInput[];
 }

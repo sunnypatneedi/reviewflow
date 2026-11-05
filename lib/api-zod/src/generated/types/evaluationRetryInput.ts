@@ -5,7 +5,7 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { EvaluationRetryInputMode } from './evaluationRetryInputMode';
+import type { EvaluationRetryInputMode } from "./evaluationRetryInputMode";
 
 export interface EvaluationRetryInput {
   /** Exact current job ID; superseded runs cannot be retried through this endpoint. */

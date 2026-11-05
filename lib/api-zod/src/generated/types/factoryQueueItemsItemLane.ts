@@ -6,14 +6,14 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type FactoryQueueItemsItemLane = typeof FactoryQueueItemsItemLane[keyof typeof FactoryQueueItemsItemLane];
-
+export type FactoryQueueItemsItemLane =
+  (typeof FactoryQueueItemsItemLane)[keyof typeof FactoryQueueItemsItemLane];
 
 export const FactoryQueueItemsItemLane = {
-  human_review: 'human_review',
-  assistance: 'assistance',
-  escalation: 'escalation',
-  blind_audit: 'blind_audit',
-  quarantine: 'quarantine',
-  complete: 'complete',
+  human_review: "human_review",
+  assistance: "assistance",
+  escalation: "escalation",
+  blind_audit: "blind_audit",
+  quarantine: "quarantine",
+  complete: "complete",
 } as const;

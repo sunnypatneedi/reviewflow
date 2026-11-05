@@ -6,10 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type TaskMode = typeof TaskMode[keyof typeof TaskMode];
-
+export type TaskMode = (typeof TaskMode)[keyof typeof TaskMode];
 
 export const TaskMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;

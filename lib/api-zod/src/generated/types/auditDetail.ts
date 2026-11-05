@@ -5,9 +5,9 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { Audit } from './audit';
-import type { AuditDisputeSummary } from './auditDisputeSummary';
-import type { AuditItem } from './auditItem';
+import type { Audit } from "./audit";
+import type { AuditDisputeSummary } from "./auditDisputeSummary";
+import type { AuditItem } from "./auditItem";
 
 export type AuditDetail = Audit & {
   items: AuditItem[];

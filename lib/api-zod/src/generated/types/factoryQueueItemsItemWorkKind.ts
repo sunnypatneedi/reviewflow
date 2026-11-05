@@ -6,11 +6,11 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type FactoryQueueItemsItemWorkKind = typeof FactoryQueueItemsItemWorkKind[keyof typeof FactoryQueueItemsItemWorkKind];
-
+export type FactoryQueueItemsItemWorkKind =
+  (typeof FactoryQueueItemsItemWorkKind)[keyof typeof FactoryQueueItemsItemWorkKind];
 
 export const FactoryQueueItemsItemWorkKind = {
-  task: 'task',
-  comparison: 'comparison',
-  audit: 'audit',
+  task: "task",
+  comparison: "comparison",
+  audit: "audit",
 } as const;

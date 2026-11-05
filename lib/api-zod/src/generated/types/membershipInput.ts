@@ -5,13 +5,13 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { MembershipInputRole } from './membershipInputRole';
+import type { MembershipInputRole } from "./membershipInputRole";
 
 export interface MembershipInput {
   /**
-     * @minLength 1
-     * @maxLength 200
-     */
+   * @minLength 1
+   * @maxLength 200
+   */
   userId: string;
   role: MembershipInputRole;
   /** @minimum -1 */

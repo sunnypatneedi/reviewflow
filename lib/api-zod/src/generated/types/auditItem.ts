@@ -5,8 +5,8 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { AuditTaskDecision } from './auditTaskDecision';
-import type { Risk } from './risk';
+import type { AuditTaskDecision } from "./auditTaskDecision";
+import type { Risk } from "./risk";
 
 export interface AuditItem {
   id: string;

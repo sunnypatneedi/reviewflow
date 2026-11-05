@@ -6,10 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type ReleaseMode = typeof ReleaseMode[keyof typeof ReleaseMode];
-
+export type ReleaseMode = (typeof ReleaseMode)[keyof typeof ReleaseMode];
 
 export const ReleaseMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;

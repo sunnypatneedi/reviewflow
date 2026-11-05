@@ -6,14 +6,14 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type ProjectContextRole = typeof ProjectContextRole[keyof typeof ProjectContextRole];
-
+export type ProjectContextRole =
+  (typeof ProjectContextRole)[keyof typeof ProjectContextRole];
 
 export const ProjectContextRole = {
-  owner: 'owner',
-  reviewer: 'reviewer',
-  adjudicator: 'adjudicator',
-  auditor: 'auditor',
-  exporter: 'exporter',
-  demo: 'demo',
+  owner: "owner",
+  reviewer: "reviewer",
+  adjudicator: "adjudicator",
+  auditor: "auditor",
+  exporter: "exporter",
+  demo: "demo",
 } as const;

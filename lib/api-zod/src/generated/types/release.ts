@@ -5,7 +5,7 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { ReleaseMode } from './releaseMode';
+import type { ReleaseMode } from "./releaseMode";
 
 export interface Release {
   id: string;

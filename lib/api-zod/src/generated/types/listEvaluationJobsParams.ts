@@ -5,18 +5,16 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { ListEvaluationJobsMode } from './listEvaluationJobsMode';
+import type { ListEvaluationJobsMode } from "./listEvaluationJobsMode";
 
 export type ListEvaluationJobsParams = {
-/**
- * Task IDs in the selected evaluation batch.
- * @minItems 1
- * @maxItems 200
- */
-taskIds: string[];
-mode?: ListEvaluationJobsMode;
-/**
- * Include superseded experiment jobs; defaults to current identities only.
- */
-includeHistory?: boolean;
+  /**
+   * Task IDs in the selected evaluation batch.
+   * @minItems 1
+   * @maxItems 200
+   */
+  taskIds: string[];
+  mode?: ListEvaluationJobsMode;
+  /** Include superseded experiment jobs; defaults to current identities only. */
+  includeHistory?: boolean;
 };

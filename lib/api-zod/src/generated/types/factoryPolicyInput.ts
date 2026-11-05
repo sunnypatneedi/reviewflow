@@ -5,7 +5,7 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { FactoryPolicy } from './factoryPolicy';
+import type { FactoryPolicy } from "./factoryPolicy";
 
 export interface FactoryPolicyInput {
   /** @minimum 0 */

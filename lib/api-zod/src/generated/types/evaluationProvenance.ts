@@ -5,7 +5,7 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { EvaluationProvenanceProvenance } from './evaluationProvenanceProvenance';
+import type { EvaluationProvenanceProvenance } from "./evaluationProvenanceProvenance";
 
 export interface EvaluationProvenance {
   provenance: EvaluationProvenanceProvenance;

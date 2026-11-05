@@ -5,9 +5,9 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { EvaluationJobMode } from './evaluationJobMode';
-import type { EvaluationJobStatus } from './evaluationJobStatus';
-import type { EvaluationProvenance } from './evaluationProvenance';
+import type { EvaluationJobMode } from "./evaluationJobMode";
+import type { EvaluationJobStatus } from "./evaluationJobStatus";
+import type { EvaluationProvenance } from "./evaluationProvenance";
 
 export interface EvaluationJob {
   id: string;

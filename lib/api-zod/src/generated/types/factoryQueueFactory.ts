@@ -6,10 +6,10 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type FactoryQueueFactory = typeof FactoryQueueFactory[keyof typeof FactoryQueueFactory];
-
+export type FactoryQueueFactory =
+  (typeof FactoryQueueFactory)[keyof typeof FactoryQueueFactory];
 
 export const FactoryQueueFactory = {
-  evidence: 'evidence',
-  preference: 'preference',
+  evidence: "evidence",
+  preference: "preference",
 } as const;

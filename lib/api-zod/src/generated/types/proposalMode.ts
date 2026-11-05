@@ -6,10 +6,9 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type ProposalMode = typeof ProposalMode[keyof typeof ProposalMode];
-
+export type ProposalMode = (typeof ProposalMode)[keyof typeof ProposalMode];
 
 export const ProposalMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;

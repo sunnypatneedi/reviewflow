@@ -8,8 +8,8 @@
 
 export interface ProjectInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   name: string;
 }

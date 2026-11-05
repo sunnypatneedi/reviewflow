@@ -5,33 +5,33 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { Risk } from './risk';
+import type { Risk } from "./risk";
 
 export interface TaskInput {
   /**
-     * @minLength 1
-     * @maxLength 120
-     */
+   * @minLength 1
+   * @maxLength 120
+   */
   externalId: string;
   /**
-     * @minLength 1
-     * @maxLength 5000
-     */
+   * @minLength 1
+   * @maxLength 5000
+   */
   question: string;
   /**
-     * @minLength 1
-     * @maxLength 30000
-     */
+   * @minLength 1
+   * @maxLength 30000
+   */
   evidence: string;
   /**
-     * @minLength 1
-     * @maxLength 10000
-     */
+   * @minLength 1
+   * @maxLength 10000
+   */
   candidateAnswer: string;
   /**
-     * @maxLength 120
-     * @nullable
-     */
+   * @maxLength 120
+   * @nullable
+   */
   scenarioFamilyId?: string | null;
   risk: Risk;
 }

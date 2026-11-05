@@ -6,10 +6,10 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type EvaluateInputMode = typeof EvaluateInputMode[keyof typeof EvaluateInputMode];
-
+export type EvaluateInputMode =
+  (typeof EvaluateInputMode)[keyof typeof EvaluateInputMode];
 
 export const EvaluateInputMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;

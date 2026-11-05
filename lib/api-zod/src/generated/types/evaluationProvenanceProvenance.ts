@@ -6,10 +6,10 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type EvaluationProvenanceProvenance = typeof EvaluationProvenanceProvenance[keyof typeof EvaluationProvenanceProvenance];
-
+export type EvaluationProvenanceProvenance =
+  (typeof EvaluationProvenanceProvenance)[keyof typeof EvaluationProvenanceProvenance];
 
 export const EvaluationProvenanceProvenance = {
-  captured: 'captured',
-  'legacy-unknown': 'legacy-unknown',
+  captured: "captured",
+  "legacy-unknown": "legacy-unknown",
 } as const;

@@ -783,9 +783,7 @@ export type ListEvaluationJobsParams = {
    */
   taskIds: string[];
   mode?: ListEvaluationJobsMode;
-  /**
-   * Include superseded experiment jobs; defaults to current identities only.
-   */
+  /** Include superseded experiment jobs; defaults to current identities only. */
   includeHistory?: boolean;
 };
 

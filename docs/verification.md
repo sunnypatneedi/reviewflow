@@ -174,7 +174,12 @@ Capacity and throttling errors are explicit and visible in the overview.
 
 Regression coverage includes concurrent admission, atomic seed creation,
 database-backed limits, HTTP 429/503 mapping, Retry-After, and existing-session
-access. The accompanying release receipt records the updated candidate's full
+access. Plain GET flood regressions omit Origin and CSRF headers, discard
+response cookies, and include forged cookies on both bootstrap and task-list
+requests. They check that throttled/capped requests add no project or task rows,
+existing sessions still work at capacity, and simultaneous requests for the
+same new identity seed exactly 20 tasks once.
+The accompanying release receipt records the updated candidate's full
 verification results. No available separate black-box pentest report establishes
 independent clearance.
 These safeguards do not make an anonymously hosted demo production-ready;

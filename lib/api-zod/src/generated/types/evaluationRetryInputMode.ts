@@ -6,10 +6,10 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type EvaluationRetryInputMode = typeof EvaluationRetryInputMode[keyof typeof EvaluationRetryInputMode];
-
+export type EvaluationRetryInputMode =
+  (typeof EvaluationRetryInputMode)[keyof typeof EvaluationRetryInputMode];
 
 export const EvaluationRetryInputMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;

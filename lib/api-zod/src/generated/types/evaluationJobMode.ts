@@ -6,10 +6,10 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type EvaluationJobMode = typeof EvaluationJobMode[keyof typeof EvaluationJobMode];
-
+export type EvaluationJobMode =
+  (typeof EvaluationJobMode)[keyof typeof EvaluationJobMode];
 
 export const EvaluationJobMode = {
-  demo: 'demo',
-  live: 'live',
+  demo: "demo",
+  live: "live",
 } as const;

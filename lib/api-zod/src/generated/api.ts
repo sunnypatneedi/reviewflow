@@ -38,14 +38,14 @@ export const GetBootstrapResponse = zod.object({
   providerModel: zod.string(),
   shadowPolicyVersion: zod.string(),
   metrics: zod.object({
-    total: zod.number().int(),
-    pending: zod.number().int(),
-    proposed: zod.number().int(),
-    escalated: zod.number().int(),
-    finalized: zod.number().int(),
-    failures: zod.number().int(),
-    corrections: zod.number().int(),
-    correctionDenominator: zod.number().int(),
+    total: zod.int(),
+    pending: zod.int(),
+    proposed: zod.int(),
+    escalated: zod.int(),
+    finalized: zod.int(),
+    failures: zod.int(),
+    corrections: zod.int(),
+    correctionDenominator: zod.int(),
     shadowCoverage: zod.number(),
     averageReviewMs: zod.number().nullable(),
     averageLatencyMs: zod.number().nullable(),
@@ -67,7 +67,7 @@ export const GetBootstrapResponse = zod.object({
         "escalated",
         "finalized",
       ]),
-      version: zod.number().int(),
+      version: zod.int(),
       mode: zod.enum(["demo", "live"]),
       finalLabel: zod
         .union([
@@ -123,9 +123,9 @@ export const GetBootstrapResponse = zod.object({
             .number()
             .min(getBootstrapResponseTasksItemProposalOneConfidenceMin)
             .max(getBootstrapResponseTasksItemProposalOneConfidenceMax),
-          latencyMs: zod.number().int(),
-          inputTokens: zod.number().int().nullish(),
-          outputTokens: zod.number().int().nullish(),
+          latencyMs: zod.int(),
+          inputTokens: zod.int().nullish(),
+          outputTokens: zod.int().nullish(),
           createdAt: zod.coerce.date(),
         })
         .nullish(),
@@ -136,7 +136,7 @@ export const GetBootstrapResponse = zod.object({
     zod.object({
       id: zod.string(),
       name: zod.string(),
-      itemCount: zod.number().int(),
+      itemCount: zod.int(),
       mode: zod.enum(["demo", "live"]),
       digest: zod.string(),
       includeSourceText: zod.boolean(),
@@ -183,9 +183,9 @@ export const ImportTasksBody = zod.object({
 });
 
 export const ImportTasksResponse = zod.object({
-  imported: zod.number().int(),
-  unchanged: zod.number().int(),
-  total: zod.number().int(),
+  imported: zod.int(),
+  unchanged: zod.int(),
+  total: zod.int(),
 });
 
 export const listTasksResponseProposalOneLabelProbabilityMin = 0;
@@ -214,7 +214,7 @@ export const ListTasksResponseItem = zod.object({
     "escalated",
     "finalized",
   ]),
-  version: zod.number().int(),
+  version: zod.int(),
   mode: zod.enum(["demo", "live"]),
   finalLabel: zod
     .union([
@@ -262,9 +262,9 @@ export const ListTasksResponseItem = zod.object({
         .number()
         .min(listTasksResponseProposalOneConfidenceMin)
         .max(listTasksResponseProposalOneConfidenceMax),
-      latencyMs: zod.number().int(),
-      inputTokens: zod.number().int().nullish(),
-      outputTokens: zod.number().int().nullish(),
+      latencyMs: zod.int(),
+      inputTokens: zod.int().nullish(),
+      outputTokens: zod.int().nullish(),
       createdAt: zod.coerce.date(),
     })
     .nullish(),
@@ -309,7 +309,7 @@ export const ListEvaluationJobsResponseItem = zod.object({
   taskId: zod.string(),
   mode: zod.enum(["demo", "live"]),
   status: zod.enum(["queued", "running", "succeeded", "failed"]),
-  attempts: zod.number().int(),
+  attempts: zod.int(),
   lastError: zod.string().nullable(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -337,9 +337,9 @@ export const RetryEvaluationJobBody = zod.object({
 });
 
 export const RetryEvaluationJobResponse = zod.object({
-  processed: zod.number().int(),
-  failed: zod.number().int(),
-  queued: zod.number().int(),
+  processed: zod.int(),
+  failed: zod.int(),
+  queued: zod.int(),
   mode: zod.enum(["demo", "live"]),
 });
 
@@ -376,9 +376,9 @@ export const EvaluateTasksBody = zod.object({
 });
 
 export const EvaluateTasksResponse = zod.object({
-  processed: zod.number().int(),
-  failed: zod.number().int(),
-  queued: zod.number().int(),
+  processed: zod.int(),
+  failed: zod.int(),
+  queued: zod.int(),
   mode: zod.enum(["demo", "live"]),
 });
 
@@ -410,7 +410,7 @@ export const GetNextReviewResponse = zod
         "escalated",
         "finalized",
       ]),
-      version: zod.number().int(),
+      version: zod.int(),
       mode: zod.enum(["demo", "live"]),
       finalLabel: zod
         .union([
@@ -464,9 +464,9 @@ export const GetNextReviewResponse = zod
             .number()
             .min(getNextReviewResponseOneTaskProposalOneConfidenceMin)
             .max(getNextReviewResponseOneTaskProposalOneConfidenceMax),
-          latencyMs: zod.number().int(),
-          inputTokens: zod.number().int().nullish(),
-          outputTokens: zod.number().int().nullish(),
+          latencyMs: zod.int(),
+          inputTokens: zod.int().nullish(),
+          outputTokens: zod.int().nullish(),
           createdAt: zod.coerce.date(),
         })
         .nullish(),
@@ -485,7 +485,7 @@ export const submitReviewBodyActiveMsMax = 604800000;
 
 export const SubmitReviewBody = zod.object({
   taskId: zod.string(),
-  version: zod.number().int(),
+  version: zod.int(),
   action: zod.enum(["accept", "correct", "escalate", "label"]),
   claimToken: zod
     .string()
@@ -507,7 +507,6 @@ export const SubmitReviewBody = zod.object({
     .max(submitReviewBodyEvidenceExcerptMax)
     .nullish(),
   activeMs: zod
-    .number()
     .int()
     .min(submitReviewBodyActiveMsMin)
     .max(submitReviewBodyActiveMsMax),
@@ -539,7 +538,7 @@ export const SubmitReviewResponse = zod.object({
     "escalated",
     "finalized",
   ]),
-  version: zod.number().int(),
+  version: zod.int(),
   mode: zod.enum(["demo", "live"]),
   finalLabel: zod
     .union([
@@ -587,9 +586,9 @@ export const SubmitReviewResponse = zod.object({
         .number()
         .min(submitReviewResponseProposalOneConfidenceMin)
         .max(submitReviewResponseProposalOneConfidenceMax),
-      latencyMs: zod.number().int(),
-      inputTokens: zod.number().int().nullish(),
-      outputTokens: zod.number().int().nullish(),
+      latencyMs: zod.int(),
+      inputTokens: zod.int().nullish(),
+      outputTokens: zod.int().nullish(),
       createdAt: zod.coerce.date(),
     })
     .nullish(),
@@ -597,14 +596,14 @@ export const SubmitReviewResponse = zod.object({
 });
 
 export const GetMetricsResponse = zod.object({
-  total: zod.number().int(),
-  pending: zod.number().int(),
-  proposed: zod.number().int(),
-  escalated: zod.number().int(),
-  finalized: zod.number().int(),
-  failures: zod.number().int(),
-  corrections: zod.number().int(),
-  correctionDenominator: zod.number().int(),
+  total: zod.int(),
+  pending: zod.int(),
+  proposed: zod.int(),
+  escalated: zod.int(),
+  finalized: zod.int(),
+  failures: zod.int(),
+  corrections: zod.int(),
+  correctionDenominator: zod.int(),
   shadowCoverage: zod.number(),
   averageReviewMs: zod.number().nullable(),
   averageLatencyMs: zod.number().nullable(),
@@ -614,7 +613,7 @@ export const GetMetricsResponse = zod.object({
 export const ListReleasesResponseItem = zod.object({
   id: zod.string(),
   name: zod.string(),
-  itemCount: zod.number().int(),
+  itemCount: zod.int(),
   mode: zod.enum(["demo", "live"]),
   digest: zod.string(),
   includeSourceText: zod.boolean(),
@@ -638,7 +637,7 @@ export const CreateReleaseBody = zod.object({
 export const CreateReleaseResponse = zod.object({
   id: zod.string(),
   name: zod.string(),
-  itemCount: zod.number().int(),
+  itemCount: zod.int(),
   mode: zod.enum(["demo", "live"]),
   digest: zod.string(),
   includeSourceText: zod.boolean(),
@@ -654,14 +653,14 @@ export const DownloadReleaseResponse = zod.unknown();
 export const ListAuditsResponseItem = zod.object({
   id: zod.string(),
   status: zod.string(),
-  sampleSize: zod.number().int(),
+  sampleSize: zod.int(),
   seed: zod.string(),
   samplingFrameHash: zod.string(),
   independent: zod.boolean(),
   required: zod.boolean(),
-  completedItems: zod.number().int(),
-  effectiveSampleSize: zod.number().int(),
-  openDisputes: zod.number().int(),
+  completedItems: zod.int(),
+  effectiveSampleSize: zod.int(),
+  openDisputes: zod.int(),
   createdAt: zod.coerce.date(),
 });
 export const ListAuditsResponse = zod.array(ListAuditsResponseItem);
@@ -671,7 +670,7 @@ export const createAuditBodySampleSizeMax = 200;
 export const createAuditBodySeedMax = 120;
 
 export const CreateAuditBody = zod.object({
-  sampleSize: zod.number().int().min(1).max(createAuditBodySampleSizeMax),
+  sampleSize: zod.int().min(1).max(createAuditBodySampleSizeMax),
   seed: zod.string().max(createAuditBodySeedMax).nullish(),
   independent: zod.boolean(),
   required: zod.boolean(),
@@ -680,14 +679,14 @@ export const CreateAuditBody = zod.object({
 export const CreateAuditResponse = zod.object({
   id: zod.string(),
   status: zod.string(),
-  sampleSize: zod.number().int(),
+  sampleSize: zod.int(),
   seed: zod.string(),
   samplingFrameHash: zod.string(),
   independent: zod.boolean(),
   required: zod.boolean(),
-  completedItems: zod.number().int(),
-  effectiveSampleSize: zod.number().int(),
-  openDisputes: zod.number().int(),
+  completedItems: zod.int(),
+  effectiveSampleSize: zod.int(),
+  openDisputes: zod.int(),
   createdAt: zod.coerce.date(),
 });
 
@@ -699,14 +698,14 @@ export const GetAuditResponse = zod
   .object({
     id: zod.string(),
     status: zod.string(),
-    sampleSize: zod.number().int(),
+    sampleSize: zod.int(),
     seed: zod.string(),
     samplingFrameHash: zod.string(),
     independent: zod.boolean(),
     required: zod.boolean(),
-    completedItems: zod.number().int(),
-    effectiveSampleSize: zod.number().int(),
-    openDisputes: zod.number().int(),
+    completedItems: zod.int(),
+    effectiveSampleSize: zod.int(),
+    openDisputes: zod.int(),
     createdAt: zod.coerce.date(),
   })
   .and(
@@ -714,7 +713,7 @@ export const GetAuditResponse = zod
       items: zod.array(
         zod.object({
           id: zod.string(),
-          ordinal: zod.number().int(),
+          ordinal: zod.int(),
           taskId: zod.string(),
           externalId: zod.string(),
           question: zod.string(),
@@ -778,14 +777,14 @@ export const GetAuditAdjudicationResponse = zod
   .object({
     id: zod.string(),
     status: zod.string(),
-    sampleSize: zod.number().int(),
+    sampleSize: zod.int(),
     seed: zod.string(),
     samplingFrameHash: zod.string(),
     independent: zod.boolean(),
     required: zod.boolean(),
-    completedItems: zod.number().int(),
-    effectiveSampleSize: zod.number().int(),
-    openDisputes: zod.number().int(),
+    completedItems: zod.int(),
+    effectiveSampleSize: zod.int(),
+    openDisputes: zod.int(),
     createdAt: zod.coerce.date(),
   })
   .and(
@@ -868,7 +867,7 @@ export const getFactoryQueueResponsePolicyDefinitionRedirectionThresholdMax = 1;
 export const GetFactoryQueueResponse = zod.object({
   factory: zod.enum(["evidence", "preference"]),
   policy: zod.object({
-    revision: zod.number().int(),
+    revision: zod.int(),
     definition: zod.object({
       schemaVersion: zod.literal(1),
       assistanceAllowed: zod.boolean(),
@@ -889,7 +888,7 @@ export const GetFactoryQueueResponse = zod.object({
       id: zod.string(),
       workKind: zod.enum(["task", "comparison", "audit"]),
       title: zod.string(),
-      version: zod.number().int(),
+      version: zod.int(),
       lane: zod.enum([
         "human_review",
         "assistance",
@@ -902,13 +901,13 @@ export const GetFactoryQueueResponse = zod.object({
       automaticAcceptance: zod.literal(false),
       quarantined: zod.boolean(),
       quarantineReason: zod.string().nullable(),
-      controlRevision: zod.number().int(),
+      controlRevision: zod.int(),
       assignedTo: zod.string().nullable(),
       expiresAt: zod.coerce.date().nullable(),
       claimToken: zod.string().nullable(),
     }),
   ),
-  counts: zod.record(zod.string(), zod.number().int()),
+  counts: zod.record(zod.string(), zod.int()),
   actor: zod.string(),
   canConfigure: zod.boolean(),
   releaseGate: zod.string(),
@@ -928,7 +927,6 @@ export const createFactoryPolicyRevisionBodyDefinitionRedirectionThresholdMax = 
 
 export const CreateFactoryPolicyRevisionBody = zod.object({
   expectedRevision: zod
-    .number()
     .int()
     .min(createFactoryPolicyRevisionBodyExpectedRevisionMin),
   definition: zod.object({
@@ -960,9 +958,8 @@ export const claimFactoryWorkBodyMinutesDefault = 10;
 export const claimFactoryWorkBodyMinutesMax = 15;
 
 export const ClaimFactoryWorkBody = zod.object({
-  expectedVersion: zod.number().int().min(1),
+  expectedVersion: zod.int().min(1),
   expectedRevision: zod
-    .number()
     .int()
     .min(claimFactoryWorkBodyExpectedRevisionMin)
     .optional()
@@ -970,7 +967,6 @@ export const ClaimFactoryWorkBody = zod.object({
       "Current control revision required for explicit owner reassignment",
     ),
   minutes: zod
-    .number()
     .int()
     .min(1)
     .max(claimFactoryWorkBodyMinutesMax)
@@ -1000,10 +996,7 @@ export const setFactoryQuarantineBodyExpectedRevisionMin = 0;
 export const setFactoryQuarantineBodyReasonMax = 2000;
 
 export const SetFactoryQuarantineBody = zod.object({
-  expectedRevision: zod
-    .number()
-    .int()
-    .min(setFactoryQuarantineBodyExpectedRevisionMin),
+  expectedRevision: zod.int().min(setFactoryQuarantineBodyExpectedRevisionMin),
   quarantined: zod.boolean(),
   reason: zod.string().min(1).max(setFactoryQuarantineBodyReasonMax),
 });
@@ -1045,7 +1038,7 @@ export const CreateProjectResponse = zod.object({
 export const ListMembersResponseItem = zod.object({
   userId: zod.string(),
   role: zod.string(),
-  revision: zod.number().int(),
+  revision: zod.int(),
 });
 export const ListMembersResponse = zod.array(ListMembersResponseItem);
 
@@ -1063,24 +1056,21 @@ export const ChangeMembershipBody = zod.object({
     "exporter",
     "revoked",
   ]),
-  expectedRevision: zod
-    .number()
-    .int()
-    .min(changeMembershipBodyExpectedRevisionMin),
+  expectedRevision: zod.int().min(changeMembershipBodyExpectedRevisionMin),
 });
 
 export const ChangeMembershipResponse = zod.object({
   userId: zod.string(),
   role: zod.string(),
-  revision: zod.number().int(),
+  revision: zod.int(),
 });
 
 export const GetJevBudgetResponse = zod.object({
-  revision: zod.number().int(),
+  revision: zod.int(),
   enabled: zod.boolean(),
-  maxCalls: zod.number().int(),
-  used: zod.number().int(),
-  remaining: zod.number().int(),
+  maxCalls: zod.int(),
+  used: zod.int(),
+  remaining: zod.int(),
 });
 
 export const changeJevBudgetBodyExpectedRevisionMin = 0;
@@ -1089,13 +1079,9 @@ export const changeJevBudgetBodyMaxCallsMin = 0;
 export const changeJevBudgetBodyMaxCallsMax = 100;
 
 export const ChangeJevBudgetBody = zod.object({
-  expectedRevision: zod
-    .number()
-    .int()
-    .min(changeJevBudgetBodyExpectedRevisionMin),
+  expectedRevision: zod.int().min(changeJevBudgetBodyExpectedRevisionMin),
   enabled: zod.boolean(),
   maxCalls: zod
-    .number()
     .int()
     .min(changeJevBudgetBodyMaxCallsMin)
     .max(changeJevBudgetBodyMaxCallsMax),
@@ -1103,11 +1089,11 @@ export const ChangeJevBudgetBody = zod.object({
 });
 
 export const ChangeJevBudgetResponse = zod.object({
-  revision: zod.number().int(),
+  revision: zod.int(),
   enabled: zod.boolean(),
-  maxCalls: zod.number().int(),
-  used: zod.number().int(),
-  remaining: zod.number().int(),
+  maxCalls: zod.int(),
+  used: zod.int(),
+  remaining: zod.int(),
 });
 
 export const GetJevEvaluationPlanResponse = zod.record(

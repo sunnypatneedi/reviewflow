@@ -6,10 +6,10 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type EvaluateInputRequestedModel = typeof EvaluateInputRequestedModel[keyof typeof EvaluateInputRequestedModel];
-
+export type EvaluateInputRequestedModel =
+  (typeof EvaluateInputRequestedModel)[keyof typeof EvaluateInputRequestedModel];
 
 export const EvaluateInputRequestedModel = {
-  'demo-simulator-v1': 'demo-simulator-v1',
-  'jev-1130': 'jev-1.13.0',
+  "demo-simulator-v1": "demo-simulator-v1",
+  "jev-1130": "jev-1.13.0",
 } as const;
