@@ -101,18 +101,23 @@ test("mocked Jev transport validates typed probabilities and never silently simu
     let captured = "";
     globalThis.fetch = async (_url, options) => {
       captured = String(options?.body);
-      return new Response(JSON.stringify({ answers: { preference: {
+      return new Response(JSON.stringify({ model: "jev-returned-test-version", answers: { preference: {
         choice: "a", confidence: 0.8, probabilities: { a: 0.8, b: 0.1, tie: 0.025, both_unacceptable: 0.025, insufficient_evidence: 0.025, escalate: 0.025 },
       } } }), { status: 200 });
     };
     const result = await traceProposal(comparison, "jev");
     assert.equal(result.decision, "a");
     assert.equal(result.simulated, false);
+    assert.equal(result.model, "jev-returned-test-version");
     assert.equal(captured.includes("private-reference"), false);
-    globalThis.fetch = async () => new Response(JSON.stringify({ answers: { preference: {
+    globalThis.fetch = async () => new Response(JSON.stringify({ model: "jev-returned-test-version", answers: { preference: {
       choice: "a", confidence: 1, probabilities: { a: -1, b: 2, tie: 0, both_unacceptable: 0, insufficient_evidence: 0, escalate: 0 },
     } } }), { status: 200 });
     await assert.rejects(traceProposal(comparison, "jev"), /invalid typed/);
+    for (const body of ["null", "{", " ".repeat(64_001)]) {
+      globalThis.fetch = async () => new Response(body);
+      await assert.rejects(traceProposal(comparison, "jev"), /invalid (JSON|typed)/);
+    }
     globalThis.fetch = async () => { throw new Error("mock timeout"); };
     await assert.rejects(traceProposal(comparison, "jev"), /No simulated fallback/);
   } finally {

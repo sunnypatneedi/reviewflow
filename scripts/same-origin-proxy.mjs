@@ -51,5 +51,6 @@ server.on("upgrade", (request, socket, head) => {
 });
 
 server.listen(listenPort, resolveListenHost(process.env), () => {
+  process.send?.({ type: "listening", host: resolveListenHost(process.env), port: listenPort });
   console.log(`ReviewFlow same-origin proxy listening on http://localhost:${listenPort}`);
 });

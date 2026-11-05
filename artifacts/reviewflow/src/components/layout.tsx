@@ -19,6 +19,7 @@ import { projectHeaders } from "@workspace/api-client-react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/observability", label: "Observability", icon: LayoutDashboard },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/factories", label: "Factories & lanes", icon: ListTodo },
   { href: "/traces", label: "Trace2Preference", icon: GitCompareArrows },
@@ -88,7 +89,7 @@ function NavLinks({
   return (
     <nav className="p-3 space-y-0.5" aria-label="Primary">
       {NAV_ITEMS.filter((item) =>
-        role === "auditor"
+        item.href === "/observability" ? ["owner", "adjudicator", "demo"].includes(role ?? "") : role === "auditor"
           ? ["/", "/factories", "/audits", "/team"].includes(item.href)
           : role === "exporter"
             ? ["/", "/releases", "/traces", "/team"].includes(item.href)

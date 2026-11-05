@@ -48,8 +48,8 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-16
           echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
-      - run: sh scripts/verify-isolated.sh
+      - run: pnpm install --frozen-lockfile
       - name: Install isolated browser
         run: pnpm --filter @workspace/scripts exec playwright install --with-deps chromium
-      - name: Synthetic browser and accessibility journeys
-        run: pnpm run test:browser
+      - name: Full local pipeline, browser, recovery and launcher verification
+        run: pnpm run verify:local

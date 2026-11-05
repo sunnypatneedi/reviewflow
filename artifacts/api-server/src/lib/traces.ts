@@ -1,3 +1,4 @@
+import { readProviderJson, validChoice, validMetadata } from "./provider-contract";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -187,15 +188,12 @@ export async function traceProposal(comparison: TraceObject, provider: "simulato
   } catch { throw new TraceError("Jev request failed or timed out. No simulated fallback was used.", 502); }
   if (!response.ok) throw new TraceError(`Jev request failed (${response.status}). No simulated fallback was used.`, 502);
   let raw: TraceObject;
-  try { raw = await response.json() as TraceObject; } catch { throw new TraceError("Jev returned invalid JSON", 502); }
-  const answer = raw.answers?.preference;
+  try { raw = await readProviderJson(response) as TraceObject; } catch { throw new TraceError("Jev returned invalid JSON", 502); }
+  const answer = raw?.answers?.preference;
   const probabilities = answer?.probabilities;
-  if (!TRACE_DECISIONS.includes(answer?.choice) || !probabilities
-    || !TRACE_DECISIONS.every(key => Number.isFinite(probabilities[key]) && probabilities[key] >= 0 && probabilities[key] <= 1)
-    || Math.abs(TRACE_DECISIONS.reduce((sum, key) => sum + probabilities[key], 0) - 1) > 0.02
-    || !Number.isFinite(answer.confidence) || answer.confidence < 0 || answer.confidence > 1) {
+  if (!validChoice(answer, TRACE_DECISIONS) || !validMetadata(raw)) {
     throw new TraceError("Jev returned an invalid typed preference judgment", 502);
   }
-  return { provider, simulated: false, model: "jev-1.13.0", decision: answer.choice, probabilities,
+  return { provider, simulated: false, model: raw.model, decision: answer.choice, probabilities,
     confidence: answer.confidence, serviceMs: Date.now() - started, createdAt: new Date().toISOString() };
 }

@@ -493,3 +493,33 @@ test("worker reports polling failures, recovers with bounded retry, and wakes pr
   const before = performance.now(); stopped.stop(); await running;
   assert.ok(performance.now() - before < 500, "Stop interrupts the poll wait");
 });
+
+test("fractional complexity migration preserves historical values and accepts native fractional mapping", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const migration = await readFile(new URL("../../../lib/db/drizzle/0006_fractional_complexity.sql", import.meta.url), "utf8");
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // A temporary relation shadows the persistent table; no application rows are rewritten.
+    await client.query("CREATE TEMP TABLE rf_proposals (complexity integer NOT NULL) ON COMMIT DROP");
+    await client.query("INSERT INTO rf_proposals (complexity) VALUES (1), (3), (5)");
+    await client.query(migration);
+    assert.deepEqual((await client.query("SELECT complexity FROM rf_proposals ORDER BY complexity")).rows.map(row => row.complexity), [1, 3, 5]);
+    await client.query("INSERT INTO rf_proposals (complexity) VALUES (2.43)");
+    const fractional = (await client.query("SELECT complexity FROM rf_proposals WHERE complexity > 2 AND complexity < 3")).rows[0].complexity;
+    assert.ok(Math.abs(fractional - 2.43) < 0.00001);
+  } finally {
+    await client.query("ROLLBACK");
+    client.release();
+  }
+});
+
+
+test("worker persists fractional compatibility complexity without rounding", async () => {
+  const task = await createTask();
+  await enqueueEvaluationJobs({ projectId: task.projectId, taskIds: [task.id], mode: "demo" });
+  const worker = new EvaluationWorker({ workerId: "fractional-complexity", evaluate: async () => ({ ...simulated(task), complexity: 2.43 }) });
+  assert.equal(await worker.runOnce(), true);
+  const [proposal] = await db.select().from(proposalsTable).where(eq(proposalsTable.taskId, task.id));
+  assert.ok(Math.abs(proposal.complexity - 2.43) < 0.00001);
+});

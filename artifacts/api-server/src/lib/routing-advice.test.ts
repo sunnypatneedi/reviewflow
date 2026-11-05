@@ -22,3 +22,12 @@ test("model routing advice cannot override protected lanes or apply a decision",
   assert.equal(suggestion.recommendedLane, "escalation");
   assert.equal(routingAdvice({}, policy).recommendedLane, "human_review");
 });
+
+
+test("fractional compatibility complexity preserves the native level-three escalation boundary", () => {
+  const advice = (complexity: number) => routingAdvice({}, policy, { injection: 0, complexity } as EvaluationResult);
+  assert.equal(advice(3.99).recommendedLane, "human_review");
+  assert.equal(advice(4).recommendedLane, "escalation");
+  assert.equal(advice(4.43).recommendedLane, "escalation");
+  assert.equal(advice(4.43).effectiveLane, "human_review");
+});

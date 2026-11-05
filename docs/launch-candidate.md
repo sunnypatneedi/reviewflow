@@ -1,4 +1,4 @@
-> Local hardening follow-up and external qualification gates: [production readiness](production-readiness.md). The separately running reviewed preview remains on `f9e39b5`.
+> Current local workflow and verification scope: [local system](local-system.md), including durable local workspaces and observability. The earlier reviewed preview was based on `f9e39b5`; this document does not establish that it is currently running. Local hardening and external qualification gates: [production readiness](production-readiness.md).
 
 # Local launch candidate and release gates
 

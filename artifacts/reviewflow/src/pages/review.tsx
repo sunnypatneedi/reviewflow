@@ -636,7 +636,7 @@ export default function Review() {
                   <dd className="font-mono text-ink-2">
                     {proposal.latencyMs}ms
                   </dd>
-                  <dt>Complexity</dt>
+                  <dt title="ReviewFlow 1–5 scale; native Jev Score (0–4) plus one">Complexity (1–5)</dt>
                   <dd className="font-mono text-ink-2">
                     {proposal.complexity.toFixed(2)}
                   </dd>

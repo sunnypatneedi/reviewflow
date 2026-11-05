@@ -1,9 +1,13 @@
 # Architecture and tradeoffs
 
+For the current local pipeline, observability, installation and verification
+contract, see [Local system](local-system.md). The overview below describes the
+core design; optional integrations are not independently qualified by local tests.
+
 ## System shape
 
 - **React/TypeScript web app:** desktop-first import, queue, review, audit, release, and settings surfaces.
-- **Express/TypeScript API:** OpenAPI-first endpoints, Clerk session verification, signed anonymous demo isolation, provider adapter, and transactional state changes.
+- **Express/TypeScript API:** generated OpenAPI contracts for established endpoints, typed handwritten newer collaboration/observability endpoints, optional Clerk session verification, signed local demo isolation, provider adapter, and transactional state changes.
 - **PostgreSQL/Drizzle:** projects, memberships, rubric versions, tasks, jobs, immutable proposals, reviews, audits, releases, and append-only events.
 - **Generated client:** Orval generates React Query hooks and Zod schemas from the OpenAPI contract.
 
@@ -33,8 +37,16 @@ Only rate-limit and transient provider responses are retried. `429` and `529` sc
 
 Queue counts, proposal coverage, corrections, measured active review time, and request latency come from stored records. Confidence and chosen-label probability are not described as accuracy. Independent accuracy is `null` until a genuinely independent blind audit exists. Savings remain unmeasured without a baseline.
 
-## Deferred production hardening
+## Implemented controls and remaining qualification
 
-- Add explicit membership/role middleware to all live, audit, adjudication, and export routes.
-- Add reproducible blind-audit creation/adjudication endpoints and enforce required-audit policies.
-- Add a PostgreSQL integration test database and mocked provider transport matrix.
+Current routes include persisted membership/role checks, independent-audit and
+adjudication gates, exposure tracking, current grant validation and frozen-release
+lineage checks. The isolated harness includes PostgreSQL integration and mocked
+provider tests, browser journeys and crash recovery. These are no longer deferred
+features. Current scope and remaining instrumentation gaps are listed in
+[Local system](local-system.md).
+
+Live Clerk/Jev qualification, a genuine independent human reference study, full
+cost/labor accounting and external event delivery are not established. Durable
+local workspace upgrades, relocation, identity recovery and backup restoration
+need explicit workflows; they are not silently performed at startup.

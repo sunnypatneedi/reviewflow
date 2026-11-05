@@ -26,21 +26,35 @@ rather than silently replacing them with a later model result.
 - Optional Clerk mode with persisted project roles
 - Live CRDT shared notes for evidence review, with role, exposure and quarantine guards
 - An optional Jev adapter and routing-advice API behind server/project approval and call caps
+- A project observability dashboard with defined pipeline/queue metrics and explicit unknowns
+- An owned durable local workspace, plus a separate disposable trial launcher
 
 The supported first-run path is `APP_MODE=demo`. It needs neither hosted
 authentication nor Jev credentials. See **[local setup](docs/setup.md)**.
 
-## Quick start
+## Install and run locally
 
 With Node 24, pnpm 10.26.1, Python 3.11+, and PostgreSQL 16 tools (`initdb`, `pg_ctl`,
 `createdb`) on your path:
 
 ```bash
+node scripts/doctor.mjs
 pnpm install --frozen-lockfile
-pnpm run demo:isolated
+pnpm run local:init "$HOME/reviewflow-data"
+pnpm run local:start "$HOME/reviewflow-data"
 ```
 
-Open `http://localhost:5280`. In **Trace2Preference**, import the scripted sample
+Choose a **new directory outside the source checkout**. Initialization runs once;
+later use only `local:start`. Open **http://127.0.0.1:5280** in the same browser.
+Ctrl-C stops services while preserving your local data and session. See the
+[durable workspace guide](docs/local-workspace.md) for identity, backup and upgrade
+limits. Native macOS/Linux prerequisites are required; these commands do not
+install system software.
+
+For a throwaway trial instead, run `pnpm run demo:isolated`.
+**That trial deletes all of its data on exit.**
+
+In **Trace2Preference**, import the scripted sample
 or an authorized [trace export](docs/trace-contract.md), inspect observed evidence
 and actual responses, record a blind preference (or explicitly reveal assistance),
 complete the quality check, and download a frozen dataset release. Missing
@@ -54,8 +68,13 @@ boundaries](docs/factory-lanes.md).
 **Team & provider** adds shared-project selection, member roles and revocation,
 owner assignment, blind-exposure tracking and an optional lifetime Jev call cap.
 See the [multiplayer implementation and qualification boundaries](docs/multiplayer-provider.md).
-This command uses a temporary database; stopping it discards that demo only.
 See [setup](docs/setup.md) and the reusable [Python CLI](docs/trace-python.md).
+
+Owners and adjudicators can open **Observability** to inspect both pipelines,
+queue/retry/lease state, recorded review effort and release timing. Unsupported
+total cost, full labor, independent accuracy and baseline gains remain N/A.
+Active blind-audit assignments block this aggregate view to protect independence.
+See [architecture and verification scope](docs/local-system.md).
 
 ## Scope
 
@@ -71,6 +90,8 @@ with scripted responders, not real models. No genuine human benchmark exists; se
 
 ## Documentation
 
+- [Local pipeline, metrics, algorithms and unified verification](docs/local-system.md)
+- [Durable local install and run](docs/local-workspace.md)
 - [Local hardening and remaining production gates](docs/production-readiness.md)
 
 - [Launch candidate, live collaboration, routing API and release gates](docs/launch-candidate.md)

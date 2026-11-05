@@ -116,9 +116,9 @@ assert.deepEqual(
   inventory(stage),
   "Extracted source must exactly match the scanned stage",
 );
-execFileSync("sh", ["scripts/verify-isolated.sh"], {
+execFileSync(process.execPath, ["scripts/verify-local.mjs"], {
   cwd: join(extracted, "reviewflow-source"),
-  env: process.env,
+  env: { ...process.env, REVIEWFLOW_SOURCE_REVISION: revision },
   stdio: "inherit",
 });
 const manifest = {
@@ -128,7 +128,8 @@ const manifest = {
   secrets: "gitleaks candidate scan passed",
   inventory: "committed/staged/extracted paths and SHA-256 digests match",
   fileCount: files.length,
-  verification: "full isolated harness passed from extracted archive",
+  verification:
+    "full isolated API/build/recovery, synthetic browser/accessibility, disposable launcher and durable local restart gates passed from extracted archive",
   published: false,
 };
 writeFileSync(

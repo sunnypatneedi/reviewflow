@@ -104,6 +104,11 @@ export interface Proposal {
    * @maximum 1
    */
   injectionProbability: number;
+  /**
+   * ReviewFlow compatibility scale; native Jev fractional Score (0–4) plus one.
+   * @minimum 1
+   * @maximum 5
+   */
   complexity: number;
   /**
    * @minimum 0

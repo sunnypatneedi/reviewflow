@@ -5,9 +5,9 @@
  * ReviewFlow evidence-grounded labeling API
  * OpenAPI spec version: 1.0.0
  */
-import type { Label } from './label';
-import type { ProposalMode } from './proposalMode';
-import type { ProposalProbabilities } from './proposalProbabilities';
+import type { Label } from "./label";
+import type { ProposalMode } from "./proposalMode";
+import type { ProposalProbabilities } from "./proposalProbabilities";
 
 export interface Proposal {
   id: string;
@@ -16,21 +16,26 @@ export interface Proposal {
   model: string;
   label: Label;
   /**
-     * @minimum 0
-     * @maximum 1
-     */
+   * @minimum 0
+   * @maximum 1
+   */
   labelProbability: number;
   probabilities: ProposalProbabilities;
   /**
-     * @minimum 0
-     * @maximum 1
-     */
+   * @minimum 0
+   * @maximum 1
+   */
   injectionProbability: number;
+  /**
+   * ReviewFlow compatibility scale; native Jev fractional Score (0–4) plus one.
+   * @minimum 1
+   * @maximum 5
+   */
   complexity: number;
   /**
-     * @minimum 0
-     * @maximum 1
-     */
+   * @minimum 0
+   * @maximum 1
+   */
   confidence: number;
   latencyMs: number;
   /** @nullable */

@@ -1,4 +1,4 @@
-> Current local candidate adds WebSocket shared notes, optional routing advice, accessibility and clean-source checks. See [launch candidate](launch-candidate.md). Historical results below remain scoped to their recorded revisions.
+> Current local work adds managed persistent workspaces, observability, corrected fractional Jev Score handling and a unified `verify:local` gate. See [local system](local-system.md), [durable workspace](local-workspace.md) and the exact candidate receipt. Historical results below remain scoped to their recorded revisions; they are not evidence for later edits.
 
 # Experimental-alpha verification
 

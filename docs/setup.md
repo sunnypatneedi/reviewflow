@@ -9,16 +9,59 @@ Processes do not load it automatically: copy the relevant values into each
 shell, or source your own local ignored `.env` before starting them. Keep each
 process's `PORT` value on its command line as shown below.
 
-## Requirements
+## Local prerequisites and first run
 
-- Node.js 24
-- pnpm 10
-- Python 3.11+ (`python3` on `PATH`) for the integrated Trace2Preference validator
-- PostgreSQL 16 (the SQL may work on nearby versions, but they are not the
-  repository's configured baseline)
-- `createdb` or equivalent PostgreSQL administration access
-- `initdb` and `pg_ctl` on `PATH` if running the local isolated verification
-  harness
+Supported native platforms are macOS and Linux. Windows users need a Linux/WSL2
+installation; native Windows and Docker/Compose are not currently qualified.
+Install these prerequisites using your normal trusted package manager:
+
+- Node.js **24** and pnpm **10.26.1**
+- Python **3.11+** (`python3` on `PATH`)
+- PostgreSQL **16**, including `initdb`, `pg_ctl`, and `createdb` on `PATH`
+- A non-root account, because PostgreSQL refuses to initialize as root
+
+On macOS, PostgreSQL packages may not add their versioned `bin` directory to
+`PATH`. For Homebrew PostgreSQL 16, use `$(brew --prefix postgresql@16)/bin`.
+On Ubuntu with PostgreSQL 16 installed, the tools are normally in
+`/usr/lib/postgresql/16/bin`. Add the appropriate directory to your shell's PATH.
+No global PostgreSQL server needs to be running for this demo.
+
+```bash
+node scripts/doctor.mjs
+pnpm install --frozen-lockfile
+pnpm run local:init "$HOME/reviewflow-data"
+pnpm run local:start "$HOME/reviewflow-data"
+```
+
+Choose a new directory outside the checkout; initialization refuses existing paths.
+Run `local:init` once and `local:start` on later visits. Open
+`http://127.0.0.1:5280` using the same browser. Data survives Ctrl-C and restart.
+Read the [durable workspace guide](local-workspace.md), especially the browser
+identity, upgrade and backup limitations. No automated schema upgrade or
+account-recovery guarantee is implied.
+
+## Disposable trial
+
+For a fresh trial whose records should be discarded, run `pnpm run demo:isolated`.
+Open `http://localhost:5280`. This launcher starts its own loopback database,
+API, evaluation worker, web UI and proxy, and checks owned-service readiness.
+It refuses occupied ports 5280–5283 and concurrent demo starts rather than
+stopping an existing process. Live inference and inherited credentials are
+disabled. Press Ctrl-C in its terminal to stop.
+
+**All demo data is deleted when this command stops.** Export anything you need
+before quitting. This is a disposable trial, not durable local storage. The
+manual development instructions below are not the managed local workspace path.
+Do not put valuable data into the disposable migration path.
+
+If a hard crash leaves a launch-lock directory, the error prints its path.
+Verify that no demo remains running before removing that lock yourself; the
+launcher never guesses whether an existing process or directory is safe to kill.
+
+## Manual development setup (advanced)
+
+The following path requires a running PostgreSQL server and administration
+access, unlike the recommended self-contained temporary demo.
 
 ## Install and create a disposable database
 

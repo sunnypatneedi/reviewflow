@@ -43,6 +43,13 @@
       "when": 1789879712181,
       "tag": "0005_shared_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789879712182,
+      "tag": "0006_fractional_complexity",
+      "breakpoints": true
     }
   ]
 }

@@ -50,7 +50,7 @@ test("trace provider requests release the project lock, fence stale results, and
     if (!String(url).startsWith("https://api.typesafe.ai/")) return originalFetch(url, options);
     providerStarted();
     await waiting;
-    return new Response(JSON.stringify({ answers: { preference: { choice: "a", confidence: 1,
+    return new Response(JSON.stringify({ model: "jev-1.13.0", answers: { preference: { choice: "a", confidence: 1,
       probabilities: { a: 1, b: 0, tie: 0, both_unacceptable: 0, insufficient_evidence: 0, escalate: 0 } } } }), { status: 200 });
   };
   try {

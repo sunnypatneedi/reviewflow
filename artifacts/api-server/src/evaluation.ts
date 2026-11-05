@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { tasksTable } from "@workspace/db";
+import type { tasksTable } from "@workspace/db";
+import { readProviderJson, validChoice, validProbability, validDistribution, validMetadata } from "./lib/provider-contract";
 
 export const MODEL = "jev-1.13.0";
 export const LABELS = ["supported", "contradicted", "insufficient_evidence"] as const;
@@ -113,11 +114,11 @@ async function live(task: EvaluationTask, timeoutMs = 20_000): Promise<Evaluatio
         type: "score",
         instructions: "How complex is careful human review?",
         criteria: [
-          "1 — direct single-claim comparison",
-          "2 — minor ambiguity",
-          "3 — multiple claims or moderate ambiguity",
-          "4 — subtle conflict, domain nuance, or injection",
-          "5 — high-stakes or highly ambiguous",
+          "Direct single-claim comparison",
+          "Minor ambiguity",
+          "Multiple claims or moderate ambiguity",
+          "Subtle conflict, domain nuance, or injection",
+          "High-stakes or highly ambiguous",
         ],
       },
     },
@@ -140,44 +141,33 @@ async function live(task: EvaluationTask, timeoutMs = 20_000): Promise<Evaluatio
 
   let raw: any;
   try {
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("No response body");
-    const chunks: Uint8Array[] = []; let size = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > 64_000) { await reader.cancel(); throw new Error("Response exceeds limit"); }
-      chunks.push(value);
-    }
-    raw = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    raw = await readProviderJson(response);
   } catch {
     throw new ProviderError("Jev returned invalid JSON", { status: response.status });
   }
-  const choice = raw.answers?.label;
-  const noul = raw.answers?.attempted_redirection;
-  const score = raw.answers?.review_complexity;
-  if (!LABELS.includes(choice?.choice) || !choice?.probabilities
-    || typeof noul?.noul !== "number" || !Number.isFinite(score?.score)) {
+  const choice = raw?.answers?.label;
+  const noul = raw?.answers?.attempted_redirection;
+  const score = raw?.answers?.review_complexity;
+  if (!validChoice(choice, LABELS) || !validProbability(noul?.noul)
+    || !Number.isFinite(score?.score) || score.score < 0 || score.score > 4
+    || !validProbability(score?.confidence)
+    || !validDistribution(score?.probabilities, ["0", "1", "2", "3", "4"])
+    || !validMetadata(raw)) {
     throw new ProviderError("Jev returned an invalid typed response", { status: response.status });
   }
+  const expectedScore = [0, 1, 2, 3, 4].reduce((sum, level) => sum + level * score.probabilities[level], 0);
+  // Allow normal response rounding, but reject a score inconsistent with its distribution.
+  if (Math.abs(expectedScore - score.score) > 0.05) {
+    throw new ProviderError("Jev returned an inconsistent score distribution", { status: response.status });
+  }
   const probs = choice.probabilities as Record<string, number>;
-  const sum = LABELS.reduce((total, label) => total + Number(probs[label] ?? NaN), 0);
-  if (!LABELS.every((label) => Number.isFinite(probs[label]) && probs[label] >= 0 && probs[label] <= 1)
-    || Math.abs(sum - 1) > 0.02) {
-    throw new ProviderError("Jev returned an invalid probability distribution", { status: response.status });
-  }
-  if (!Number.isFinite(choice.confidence) || choice.confidence < 0 || choice.confidence > 1
-    || noul.noul < 0 || noul.noul > 1
-    || !Number.isInteger(score.score) || score.score < 1 || score.score > 5) {
-    throw new ProviderError("Jev returned invalid probability or score bounds", { status: response.status });
-  }
   return {
     label: choice.choice as Label,
     probabilities: probs,
     labelProbability: probs[choice.choice],
     injection: noul.noul,
-    complexity: score.score,
+    // Compatibility scale: UI/routing historically use 1..5; Jev uses 0..4.
+    complexity: score.score + 1,
     confidence: choice.confidence,
     latencyMs: Date.now() - started,
     model: raw.model,

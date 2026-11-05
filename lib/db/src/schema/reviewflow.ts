@@ -1,6 +1,7 @@
 import {
   boolean,
   integer,
+  real,
   jsonb,
   pgTable,
   text,
@@ -95,7 +96,7 @@ export const proposalsTable = pgTable("rf_proposals", {
   labelProbability: text("label_probability").notNull(),
   probabilities: jsonb("probabilities").notNull(),
   injectionProbability: text("injection_probability").notNull(),
-  complexity: integer("complexity").notNull(),
+  complexity: real("complexity").notNull(),
   confidence: text("confidence").notNull(),
   latencyMs: integer("latency_ms").notNull(),
   inputTokens: integer("input_tokens"),

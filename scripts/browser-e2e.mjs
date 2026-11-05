@@ -249,6 +249,77 @@ try {
     .getByRole("button", { name: "Cut Release", exact: true })
     .click();
   await exporter.getByText("synthetic-team-release", { exact: true }).waitFor();
+  // Read-only dashboard must agree with this workflow and keep unknowns honest.
+  await owner.goto(base + "/observability");
+  await owner
+    .getByRole("heading", { name: "Evidence pipeline", exact: true })
+    .waitFor();
+  const metric = (label) =>
+    owner.getByText(label, { exact: true }).locator("..").locator("dd");
+  assert.equal(await metric("Imported tasks").innerText(), "1");
+  assert.equal(await metric("Currently finalized").innerText(), "1");
+  assert.equal(await metric("Released unique content").innerText(), "1");
+  await owner
+    .getByRole("heading", { name: "Not yet measured", exact: true })
+    .waitFor();
+  await accessible(owner);
+  await owner.screenshot({
+    path: resolve(captures, "reviewflow-observability.png"),
+    fullPage: true,
+  });
+  await owner.setViewportSize({ width: 390, height: 844 });
+  await accessible(owner);
+  assert.equal(
+    await owner.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+    true,
+  );
+  await owner.screenshot({
+    path: resolve(captures, "reviewflow-observability-mobile.png"),
+    fullPage: true,
+  });
+  await owner.setViewportSize({ width: 1440, height: 1100 });
+  // A failed refresh must hide prior values, not present stale data as current.
+  const snapshotPattern = "**/api/reviewflow/observability";
+  await owner.route(snapshotPattern, (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Synthetic unavailable" }),
+    }),
+  );
+  await owner
+    .getByRole("button", { name: "Refresh observability snapshot" })
+    .click();
+  await owner
+    .getByRole("alert")
+    .filter({ hasText: "Snapshot unavailable" })
+    .waitFor();
+  assert.equal(
+    await owner
+      .getByRole("heading", { name: "Evidence pipeline", exact: true })
+      .count(),
+    0,
+  );
+  await owner.unroute(snapshotPattern);
+  await owner
+    .getByRole("button", { name: "Refresh observability snapshot" })
+    .click();
+  await owner
+    .getByRole("heading", { name: "Evidence pipeline", exact: true })
+    .waitFor();
+  await reviewer.goto(base + "/observability");
+  await reviewer
+    .getByRole("alert")
+    .filter({ hasText: "owners and adjudicators" })
+    .waitFor();
+  assert.equal(
+    await reviewer
+      .getByRole("heading", { name: "Evidence pipeline", exact: true })
+      .count(),
+    0,
+  );
   await owner.goto(base + "/team");
   await owner.getByLabel("Lifetime call cap (0–100)").fill("2");
   await owner
@@ -329,7 +400,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    "Synthetic multiplayer browser passed: shared project, member roles, assignment, review, blind audit, exporter release, provider preparation, revocation, desktop/mobile. Live CRDT concurrent merge and reconnect, routing rules, WCAG A/AA checks passed. No real authentication or provider calls.",
+    "Synthetic multiplayer browser passed: shared project, member roles, assignment, review, blind audit, exporter release, provider preparation, revocation, observability counts/unknowns/access/refetch failure and recovery, desktop/mobile. Live CRDT concurrent merge and reconnect, routing rules, WCAG A/AA checks passed. No real authentication or provider calls.",
   );
 } finally {
   for (const context of contexts) await context.close();

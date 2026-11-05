@@ -17,6 +17,8 @@ export const getBootstrapResponseTasksItemProposalOneLabelProbabilityMax = 1;
 export const getBootstrapResponseTasksItemProposalOneInjectionProbabilityMin = 0;
 export const getBootstrapResponseTasksItemProposalOneInjectionProbabilityMax = 1;
 
+export const getBootstrapResponseTasksItemProposalOneComplexityMax = 5;
+
 export const getBootstrapResponseTasksItemProposalOneConfidenceMin = 0;
 export const getBootstrapResponseTasksItemProposalOneConfidenceMax = 1;
 
@@ -99,7 +101,13 @@ export const GetBootstrapResponse = zod.object({
             .max(
               getBootstrapResponseTasksItemProposalOneInjectionProbabilityMax,
             ),
-          complexity: zod.number(),
+          complexity: zod
+            .number()
+            .min(1)
+            .max(getBootstrapResponseTasksItemProposalOneComplexityMax)
+            .describe(
+              "ReviewFlow compatibility scale; native Jev fractional Score (0–4) plus one.",
+            ),
           confidence: zod
             .number()
             .min(getBootstrapResponseTasksItemProposalOneConfidenceMin)
@@ -175,6 +183,8 @@ export const listTasksResponseProposalOneLabelProbabilityMax = 1;
 export const listTasksResponseProposalOneInjectionProbabilityMin = 0;
 export const listTasksResponseProposalOneInjectionProbabilityMax = 1;
 
+export const listTasksResponseProposalOneComplexityMax = 5;
+
 export const listTasksResponseProposalOneConfidenceMin = 0;
 export const listTasksResponseProposalOneConfidenceMax = 1;
 
@@ -219,7 +229,13 @@ export const ListTasksResponseItem = zod.object({
         .number()
         .min(listTasksResponseProposalOneInjectionProbabilityMin)
         .max(listTasksResponseProposalOneInjectionProbabilityMax),
-      complexity: zod.number(),
+      complexity: zod
+        .number()
+        .min(1)
+        .max(listTasksResponseProposalOneComplexityMax)
+        .describe(
+          "ReviewFlow compatibility scale; native Jev fractional Score (0–4) plus one.",
+        ),
       confidence: zod
         .number()
         .min(listTasksResponseProposalOneConfidenceMin)
@@ -305,6 +321,8 @@ export const getNextReviewResponseOneTaskProposalOneLabelProbabilityMax = 1;
 export const getNextReviewResponseOneTaskProposalOneInjectionProbabilityMin = 0;
 export const getNextReviewResponseOneTaskProposalOneInjectionProbabilityMax = 1;
 
+export const getNextReviewResponseOneTaskProposalOneComplexityMax = 5;
+
 export const getNextReviewResponseOneTaskProposalOneConfidenceMin = 0;
 export const getNextReviewResponseOneTaskProposalOneConfidenceMax = 1;
 
@@ -357,7 +375,13 @@ export const GetNextReviewResponse = zod
             .max(
               getNextReviewResponseOneTaskProposalOneInjectionProbabilityMax,
             ),
-          complexity: zod.number(),
+          complexity: zod
+            .number()
+            .min(1)
+            .max(getNextReviewResponseOneTaskProposalOneComplexityMax)
+            .describe(
+              "ReviewFlow compatibility scale; native Jev fractional Score (0–4) plus one.",
+            ),
           confidence: zod
             .number()
             .min(getNextReviewResponseOneTaskProposalOneConfidenceMin)
@@ -417,6 +441,8 @@ export const submitReviewResponseProposalOneLabelProbabilityMax = 1;
 export const submitReviewResponseProposalOneInjectionProbabilityMin = 0;
 export const submitReviewResponseProposalOneInjectionProbabilityMax = 1;
 
+export const submitReviewResponseProposalOneComplexityMax = 5;
+
 export const submitReviewResponseProposalOneConfidenceMin = 0;
 export const submitReviewResponseProposalOneConfidenceMax = 1;
 
@@ -461,7 +487,13 @@ export const SubmitReviewResponse = zod.object({
         .number()
         .min(submitReviewResponseProposalOneInjectionProbabilityMin)
         .max(submitReviewResponseProposalOneInjectionProbabilityMax),
-      complexity: zod.number(),
+      complexity: zod
+        .number()
+        .min(1)
+        .max(submitReviewResponseProposalOneComplexityMax)
+        .describe(
+          "ReviewFlow compatibility scale; native Jev fractional Score (0–4) plus one.",
+        ),
       confidence: zod
         .number()
         .min(submitReviewResponseProposalOneConfidenceMin)
