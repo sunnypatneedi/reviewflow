@@ -481,7 +481,7 @@ export const submitReviewBodyReasonMax = 2000;
 export const submitReviewBodyEvidenceExcerptMax = 2000;
 
 export const submitReviewBodyActiveMsMin = 0;
-export const submitReviewBodyActiveMsMax = 604800000;
+export const submitReviewBodyActiveMsMax = 7200000;
 
 export const SubmitReviewBody = zod.object({
   taskId: zod.string(),

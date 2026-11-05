@@ -641,7 +641,7 @@ components:
         correctedLabel: { type: ["string", "null"], enum: [supported, contradicted, insufficient_evidence, null] }
         reason: { type: ["string", "null"], maxLength: 2000 }
         evidenceExcerpt: { type: ["string", "null"], maxLength: 2000 }
-        activeMs: { type: integer, minimum: 0, maximum: 604800000 }
+        activeMs: { type: integer, minimum: 0, maximum: 7200000 }
     FactoryPolicy:
       type: object
       additionalProperties: false

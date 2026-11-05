@@ -353,7 +353,7 @@ export interface ReviewInput {
   evidenceExcerpt?: string | null;
   /**
    * @minimum 0
-   * @maximum 604800000
+   * @maximum 7200000
    */
   activeMs: number;
 }
